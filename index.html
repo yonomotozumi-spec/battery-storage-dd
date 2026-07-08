@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="系統用蓄電池の用地DDチェックシート。系統接続変数・許認可17項目・スケジュール・コストをブラウザだけでスクリーニング。">
+
+<title>蓄電池案件 DDチェックシート（PX準拠）</title>
+<style>
+/* ── Design tokens ── */
+:root {
+  --bg:       #F0F3F9;
+  --surf:     #FFFFFF;
+  --surf2:    #E8EDF8;
+  --bdr:      #CDD5E8;
+  --txt:      #16213D;
+  --txt2:     #465070;
+  --txt3:     #8390AC;
+  --acc:      #1B55CC;
+  --acc-h:    #1444AA;
+  --pass:     #0B9966;
+  --pass-bg:  #E8FAF3;
+  --warn:     #BF7800;
+  --warn-bg:  #FEF8E0;
+  --fail:     #CC2A20;
+  --fail-bg:  #FEECEA;
+  --link:     #1B55CC;
+  --r:        8px;
+  --sh:       0 1px 3px rgba(16,32,80,.07),0 1px 2px rgba(16,32,80,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:      #0B1221;
+    --surf:    #161F35;
+    --surf2:   #1D2B48;
+    --bdr:     #273450;
+    --txt:     #E3EBFC;
+    --txt2:    #7D91BA;
+    --txt3:    #4A5A7A;
+    --acc:     #4D82F7;
+    --acc-h:   #6896F9;
+    --pass:    #18BB82;
+    --pass-bg: rgba(24,187,130,.13);
+    --warn:    #F0A800;
+    --warn-bg: rgba(240,168,0,.12);
+    --fail:    #EF4C42;
+    --fail-bg: rgba(239,76,66,.13);
+    --link:    #6896F9;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:      #0B1221;--surf:#161F35;--surf2:#1D2B48;--bdr:#273450;
+  --txt:#E3EBFC;--txt2:#7D91BA;--txt3:#4A5A7A;
+  --acc:#4D82F7;--acc-h:#6896F9;--link:#6896F9;
+  --pass:#18BB82;--pass-bg:rgba(24,187,130,.13);
+  --warn:#F0A800;--warn-bg:rgba(240,168,0,.12);
+  --fail:#EF4C42;--fail-bg:rgba(239,76,66,.13);
+}
+:root[data-theme="light"] {
+  --bg:#F0F3F9;--surf:#FFFFFF;--surf2:#E8EDF8;--bdr:#CDD5E8;
+  --txt:#16213D;--txt2:#465070;--txt3:#8390AC;
+  --acc:#1B55CC;--acc-h:#1444AA;--link:#1B55CC;
+  --pass:#0B9966;--pass-bg:#E8FAF3;
+  --warn:#BF7800;--warn-bg:#FEF8E0;
+  --fail:#CC2A20;--fail-bg:#FEECEA;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg); color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans','Yu Gothic UI','Meiryo',system-ui,sans-serif;
+  font-size:14px; line-height:1.6;
+}
+.wrap { max-width:800px; margin:0 auto; padding:28px 16px 80px; }
+
+/* ── Header ── */
+.pg-head { margin-bottom:22px; }
+.pg-title {
+  font-size:17px; font-weight:700; letter-spacing:-.02em;
+  display:flex; align-items:center; gap:8px;
+}
+.pg-sub { font-size:12px; color:var(--txt3); margin-top:3px; }
+.px-badge {
+  font-size:10px; font-weight:700; letter-spacing:.06em;
+  background:var(--acc); color:#fff;
+  padding:2px 8px; border-radius:4px; text-transform:uppercase;
+}
+
+/* ── Cards ── */
+.card {
+  background:var(--surf); border:1px solid var(--bdr);
+  border-radius:var(--r); box-shadow:var(--sh); margin-bottom:12px; overflow:hidden;
+}
+.card-head {
+  display:flex; align-items:center; gap:8px;
+  padding:10px 16px; background:var(--surf2); border-bottom:1px solid var(--bdr);
+}
+.sec-tag {
+  font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--acc); background:rgba(27,85,204,.1);
+  padding:2px 7px; border-radius:4px; flex-shrink:0;
+}
+.card-title { font-size:13px; font-weight:600; }
+.card-note  { font-size:11px; color:var(--txt3); margin-left:auto; }
+
+/* ── Field rows ── */
+.frow {
+  display:grid; grid-template-columns:185px 1fr;
+  gap:10px; align-items:start;
+  padding:10px 16px; border-bottom:1px solid var(--bdr);
+}
+.frow:last-child { border-bottom:none; }
+.frow-full { display:block; padding:10px 16px; border-bottom:1px solid var(--bdr); }
+.frow-full:last-child { border-bottom:none; }
+
+.flabel { font-size:13px; color:var(--txt2); padding-top:6px; line-height:1.4; }
+.fnote  { font-size:11px; color:var(--txt3); margin-top:2px; }
+.fcontrol { display:flex; flex-direction:column; gap:4px; }
+
+/* ── Form controls ── */
+select, input[type="text"], input[type="number"] {
+  appearance:none; width:100%; background:var(--bg);
+  border:1px solid var(--bdr); border-radius:6px;
+  color:var(--txt); font:inherit; font-size:13px;
+  padding:7px 10px; outline:none;
+  transition:border-color .15s, box-shadow .15s;
+}
+select:focus, input:focus {
+  border-color:var(--acc);
+  box-shadow:0 0 0 3px rgba(27,85,204,.1);
+}
+.coord-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.coord-label { font-size:11px; color:var(--txt3); margin-bottom:3px; }
+
+/* ── Radio pills ── */
+.rpills { display:flex; flex-wrap:wrap; gap:5px; padding-top:2px; }
+.rpills input[type="radio"] { position:absolute; opacity:0; width:0; height:0; }
+.rpills label {
+  cursor:pointer; user-select:none;
+  padding:5px 12px; border:1px solid var(--bdr); border-radius:20px;
+  font-size:12px; color:var(--txt2); background:var(--bg);
+  transition:all .15s; display:inline-block;
+}
+.rpills label:hover { border-color:var(--acc); color:var(--acc); }
+.rpills input:checked + label { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
+.rpills input[data-sev="pass"]:checked + label { background:var(--pass); border-color:var(--pass); }
+.rpills input[data-sev="warn"]:checked + label { background:var(--warn); border-color:var(--warn); }
+.rpills input[data-sev="fail"]:checked + label { background:var(--fail); border-color:var(--fail); }
+
+/* ── Map links grid ── */
+.links-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px 16px; }
+.link-btn {
+  display:flex; align-items:center; gap:7px;
+  padding:8px 12px; border:1px solid var(--bdr); border-radius:6px;
+  background:var(--surf); text-decoration:none;
+  color:var(--link); font-size:12px; font-weight:500;
+  transition:background .15s, border-color .15s;
+}
+.link-btn:hover { background:var(--surf2); border-color:var(--acc); }
+.link-btn.disabled { color:var(--txt3); pointer-events:none; opacity:.5; }
+.link-icon { font-size:14px; flex-shrink:0; }
+.link-label { line-height:1.3; }
+.link-note { font-size:10px; color:var(--txt3); }
+.coord-needed { font-size:12px; color:var(--txt3); padding:10px 16px; }
+
+/* ── Permit items table ── */
+.permit-table { width:100%; border-collapse:collapse; }
+.permit-table th {
+  font-size:11px; font-weight:600; letter-spacing:.04em;
+  color:var(--txt3); text-align:left;
+  padding:8px 10px; border-bottom:2px solid var(--bdr);
+  background:var(--surf2);
+}
+.permit-table td {
+  padding:8px 10px; border-bottom:1px solid var(--bdr);
+  font-size:12px; vertical-align:middle;
+}
+.permit-table tr:last-child td { border-bottom:none; }
+.permit-table tr:hover td { background:var(--surf2); }
+.pitem-no { color:var(--txt3); width:28px; }
+.pitem-name { color:var(--txt); font-weight:500; }
+.plink-cell a {
+  color:var(--link); text-decoration:none; font-size:11px;
+  display:inline-flex; align-items:center; gap:3px;
+}
+.plink-cell a:hover { text-decoration:underline; }
+.pauto-cell .auto-tag {
+  font-size:10px; font-weight:600; padding:1px 5px; border-radius:3px;
+}
+.auto-tag.full   { background:var(--pass-bg); color:var(--pass); }
+.auto-tag.api    { background:rgba(27,85,204,.1); color:var(--acc); }
+.auto-tag.manual { background:var(--surf2); color:var(--txt3); }
+
+/* ── TSO links ── */
+.tso-links { padding:10px 16px; display:flex; flex-wrap:wrap; gap:6px; }
+.tso-chip {
+  padding:4px 10px; border:1px solid var(--bdr); border-radius:14px;
+  font-size:11px; color:var(--link); text-decoration:none;
+  background:var(--surf);
+  transition:background .12s;
+}
+.tso-chip:hover { background:var(--surf2); border-color:var(--acc); }
+
+/* ── Diagnose button ── */
+.btn-run {
+  width:100%; margin-top:8px; padding:14px;
+  background:var(--acc); color:#fff; border:none;
+  border-radius:var(--r); font:inherit; font-size:15px; font-weight:700;
+  letter-spacing:.01em; cursor:pointer; transition:background .15s;
+}
+.btn-run:hover { background:var(--acc-h); }
+.btn-run:focus-visible { outline:2px solid var(--acc); outline-offset:3px; }
+
+/* ── Result ── */
+#result { display:none; }
+#result.show { display:block; margin-top:8px; }
+
+.res-top { display:grid; grid-template-columns:auto 1fr; gap:20px; align-items:center; padding:18px 18px; }
+.ring-wrap { position:relative; width:88px; height:88px; flex-shrink:0; }
+.ring-wrap canvas { display:block; }
+.ring-val { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.ring-num { font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; letter-spacing:-.02em; }
+.ring-den { font-size:11px; color:var(--txt3); }
+
+.verdict-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 14px; border-radius:20px; font-size:14px; font-weight:700; margin-bottom:5px; }
+.verdict-badge.pass { background:var(--pass-bg); color:var(--pass); }
+.verdict-badge.warn { background:var(--warn-bg); color:var(--warn); }
+.verdict-badge.fail { background:var(--fail-bg); color:var(--fail); }
+.verdict-desc { font-size:12px; color:var(--txt2); line-height:1.5; }
+
+.cat-bars { border-top:1px solid var(--bdr); display:grid; grid-template-columns:1fr 1fr; gap:0; background:var(--bdr); }
+.cat-bars > * { background:var(--surf); padding:10px 16px; }
+.cat-bars > *:nth-child(odd) { border-right:1px solid var(--bdr); }
+.cat-bars > *:nth-child(1), .cat-bars > *:nth-child(2) { border-bottom:1px solid var(--bdr); }
+.cbar-label { font-size:12px; color:var(--txt2); margin-bottom:5px; font-weight:500; }
+.cbar-track { height:5px; background:var(--surf2); border-radius:3px; overflow:hidden; margin-bottom:3px; }
+.cbar-fill { height:100%; border-radius:3px; transition:width .5s cubic-bezier(.4,0,.2,1); }
+.cbar-fill.pass{background:var(--pass);} .cbar-fill.warn{background:var(--warn);} .cbar-fill.fail{background:var(--fail);}
+.cbar-val { font-size:11px; color:var(--txt3); font-variant-numeric:tabular-nums; }
+
+.issues-wrap { padding:12px 16px; }
+.issues-title { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--txt3); margin-bottom:8px; }
+.issue { display:flex; gap:8px; align-items:flex-start; padding:7px 0; border-bottom:1px solid var(--bdr); }
+.issue:last-child { border-bottom:none; }
+.idot { width:7px; height:7px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+.idot.fail{background:var(--fail);} .idot.warn{background:var(--warn);}
+.itext { font-size:12px; line-height:1.5; }
+.itext b { font-weight:600; }
+.empty-ok { font-size:13px; color:var(--pass); padding:4px 0; }
+
+/* ── Divider ── */
+.section-divider { margin:16px 0 8px; display:flex; align-items:center; gap:8px; }
+.section-divider span { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--txt3); white-space:nowrap; }
+.section-divider::before, .section-divider::after { content:''; flex:1; height:1px; background:var(--bdr); }
+.section-divider::after { content:''; }
+
+/* ── Responsive ── */
+@media(max-width:520px){
+  .frow{grid-template-columns:1fr;gap:5px;} .flabel{padding-top:0;}
+  .coord-row{grid-template-columns:1fr;} .cat-bars{grid-template-columns:1fr;}
+  .cat-bars>*:nth-child(odd){border-right:none;} .cat-bars>*:nth-child(2){border-bottom:1px solid var(--bdr);}
+  .res-top{grid-template-columns:1fr;text-align:center;justify-items:center;}
+  .links-grid{grid-template-columns:1fr;}
+}
+@media(prefers-reduced-motion:reduce){ .cbar-fill{transition:none;} }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+
+<header class="pg-head">
+  <div class="pg-title">
+    <span class="px-badge">PX</span>
+    蓄電池案件 DDチェックシート
+  </div>
+  <div class="pg-sub">PX案件チェックシートに準拠 ― 許認可事前確認 17項目 ＋ 系統接続変数スクリーニング</div>
+</header>
+
+<!-- ── 案件基本情報 ── -->
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">基本</span>
+    <span class="card-title">案件基本情報</span>
+  </div>
+  <div class="frow">
+    <div class="flabel">PX案件番号</div>
+    <div class="fcontrol"><input type="text" id="pxno" placeholder="例：PE-2025-001"></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">担当者</div>
+    <div class="fcontrol"><input type="text" id="tanto" placeholder="氏名"></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">地名・地点名称</div>
+    <div class="fcontrol"><input type="text" id="locname" placeholder="例：北海道恵庭市〇〇地区"></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">
+      緯度・経度（優先）
+      <div class="fnote">座標がある場合は必ずここに入力<br>住所からの変換は下段で補完</div>
+    </div>
+    <div class="fcontrol">
+      <div class="coord-row">
+        <div>
+          <div class="coord-label">緯度（例：42.9849）</div>
+          <input type="number" id="lat" placeholder="42.9849" step="0.0001" oninput="updateLinks()">
+        </div>
+        <div>
+          <div class="coord-label">経度（例：141.5476）</div>
+          <input type="number" id="lon" placeholder="141.5476" step="0.0001" oninput="updateLinks()">
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">住所（座標不明時のみ）</div>
+    <div class="fcontrol"><input type="text" id="addr" placeholder="例：北海道恵庭市南島松〇番地"></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">送配電エリア</div>
+    <div class="fcontrol">
+      <select id="tso" onchange="updateLinks()">
+        <option value="">選択してください</option>
+        <option value="hepco">北海道電力NW</option>
+        <option value="tohoku">東北電力NW</option>
+        <option value="tepco">東京電力PG</option>
+        <option value="chubu">中部電力PG</option>
+        <option value="hokuriku">北陸電力送配電</option>
+        <option value="kepco">関西電力送配電</option>
+        <option value="chugoku">中国電力NW</option>
+        <option value="yonden">四国電力送配電</option>
+        <option value="kyuden">九州電力送配電</option>
+        <option value="okiden">沖縄電力</option>
+      </select>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">希望出力</div>
+    <div class="fcontrol" style="flex-direction:row;align-items:center;gap:6px">
+      <input type="number" id="outkw" placeholder="例：2000" min="0" style="max-width:140px">
+      <span style="font-size:13px;color:var(--txt3)">kW</span>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">希望接続時期</div>
+    <div class="fcontrol">
+      <div class="rpills">
+        <input type="radio" name="timing" id="t1" value="今年度内"><label for="t1">今年度内</label>
+        <input type="radio" name="timing" id="t2" value="来年度" checked><label for="t2">来年度</label>
+        <input type="radio" name="timing" id="t3" value="再来年度以降"><label for="t3">再来年度以降</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 確認リンク（座標自動生成） ── -->
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">リンク</span>
+    <span class="card-title">確認マップ（座標入力で自動生成）</span>
+    <span class="card-note">PX準拠：GSI/ハザードマップ/空き容量</span>
+  </div>
+  <div id="links-area">
+    <div class="coord-needed">📍 上記に緯度・経度を入力すると確認マップが開けるリンクを生成します</div>
+  </div>
+  <div style="padding:4px 16px 10px">
+    <div class="issues-title" style="margin-bottom:6px">送配電事業者 空き容量マップ</div>
+    <div class="tso-links" id="tso-links">
+      <a class="tso-chip" href="https://www.hepco.co.jp/network/connect_access/grid_capacity.html" target="_blank" rel="noopener">北海道</a>
+      <a class="tso-chip" href="https://nw.tohoku-epco.co.jp/publics/index/20/" target="_blank" rel="noopener">東北</a>
+      <a class="tso-chip" href="https://www.tepco.co.jp/electricity-grid/infrastructure/provision-of-information/capacity/index-j.html" target="_blank" rel="noopener">東京</a>
+      <a class="tso-chip" href="https://powergrid.chuden.co.jp/network/open/akiyouryou/" target="_blank" rel="noopener">中部</a>
+      <a class="tso-chip" href="https://www.rikuden.co.jp/nw_service/akiyouryou.html" target="_blank" rel="noopener">北陸</a>
+      <a class="tso-chip" href="https://www.kansai-td.co.jp/connect/open/capacity/" target="_blank" rel="noopener">関西</a>
+      <a class="tso-chip" href="https://www.energia.co.jp/nw/service/connect/grid_capacity/" target="_blank" rel="noopener">中国</a>
+      <a class="tso-chip" href="https://www.yonden.co.jp/nw/akiyouryou/index.html" target="_blank" rel="noopener">四国</a>
+      <a class="tso-chip" href="https://www.kyuden.co.jp/td_network_akiyouryou_index.html" target="_blank" rel="noopener">九州</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── A. 系統接続変数 ── -->
+<div class="section-divider"><span>系統接続スクリーニング（PX新規追加変数）</span></div>
+
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">A</span>
+    <span class="card-title">系統変数</span>
+    <span class="card-note">ウェイト 40%</span>
+  </div>
+  <div class="frow">
+    <div class="flabel">公表空き容量<div class="fnote">各社マップで事前確認</div></div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="a1" id="a1p" data-sev="pass" data-score="2" data-msg=""><label for="a1p">空きあり（増強不要）</label>
+      <input type="radio" name="a1" id="a1w" data-sev="warn" data-score="1" data-msg="空き容量が「要確認」。系統影響評価に進む可能性があり、回答期間が延びるリスク有り"><label for="a1w">要確認</label>
+      <input type="radio" name="a1" id="a1f" data-sev="fail" data-score="0" data-msg="【重要】空き容量なし。系統増強が必要となり工事費が大幅に増加する可能性が高い"><label for="a1f">空きなし・不明</label>
+    </div></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">先行申込案件<div class="fnote">先着優先で容量を先取りされるリスク</div></div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="a2" id="a2p" data-sev="pass" data-score="2" data-msg=""><label for="a2p">ほぼなし</label>
+      <input type="radio" name="a2" id="a2w" data-sev="warn" data-score="1" data-msg="数件の先行申込あり。申込後に空き容量が消えるリスクがある"><label for="a2w">数件あり</label>
+      <input type="radio" name="a2" id="a2f" data-sev="fail" data-score="0" data-msg="先行案件が多数。容量先取りリスクが高い。至急申込を検討すること"><label for="a2f">多数</label>
+    </div></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">想定電圧階級</div>
+    <div class="fcontrol">
+      <select id="a3" name="a3">
+        <option value="">選択してください</option>
+        <option value="2" data-msg="">6.6 kV（配電線）</option>
+        <option value="2" data-msg="">22〜33 kV（中圧）</option>
+        <option value="1" data-msg="66kV以上は系統影響評価の対象になりやすく、回答リードタイムが延びる場合がある">66 kV</option>
+        <option value="0" data-msg="154kV以上は詳細系統影響評価が必要。来年度接続目標との整合を再確認">154 kV 以上</option>
+      </select>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">ノンファーム接続エリア</div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="a4" id="a4p" data-sev="pass" data-score="2" data-msg=""><label for="a4p">通常接続</label>
+      <input type="radio" name="a4" id="a4w" data-sev="warn" data-score="1" data-msg="ノンファーム型接続エリア。系統混雑時に出力制御が発生する。事業収支の試算に織り込むこと"><label for="a4w">ノンファーム型</label>
+    </div></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">検討区分の見込み<div class="fnote">簡易 vs 詳細で回答期間が大きく異なる</div></div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="a5" id="a5p" data-sev="pass" data-score="2" data-msg=""><label for="a5p">簡易検討で完結</label>
+      <input type="radio" name="a5" id="a5w" data-sev="warn" data-score="1" data-msg="詳細検討が必要な可能性。回答まで6ヶ月〜1年超になる可能性がある。来年度接続目標を再確認"><label for="a5w">詳細検討が必要かも</label>
+      <input type="radio" name="a5" id="a5f" data-sev="fail" data-score="0" data-msg="検討区分が不明。送配電事業者への事前ヒアリングを推奨"><label for="a5f">不明</label>
+    </div></div>
+  </div>
+</div>
+
+<!-- ── B. 許認可事前確認（PX 17項目） ── -->
+<div class="section-divider"><span>許認可事前確認（PX 17項目）</span></div>
+
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">B</span>
+    <span class="card-title">許認可事前確認 DD</span>
+    <span class="card-note">ウェイト 30% ／ ◎=自動 ○=API ー=リンク確認</span>
+  </div>
+  <div style="overflow-x:auto">
+  <table class="permit-table">
+    <thead><tr>
+      <th style="width:28px">No</th>
+      <th>項目</th>
+      <th style="width:60px">自動</th>
+      <th style="width:110px">確認状況</th>
+      <th>確認リンク</th>
+    </tr></thead>
+    <tbody id="permit-rows"></tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── C. スケジュール変数 ── -->
+<div class="section-divider"><span>スケジュール・コスト（PX新規追加変数）</span></div>
+
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">C</span>
+    <span class="card-title">スケジュール変数</span>
+    <span class="card-note">ウェイト 20%</span>
+  </div>
+  <div class="frow">
+    <div class="flabel">系統連系検討の申込状況</div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="c1" id="c1a" data-sev="pass" data-score="2" data-msg=""><label for="c1a">回答受取済み</label>
+      <input type="radio" name="c1" id="c1b" data-sev="pass" data-score="2" data-msg=""><label for="c1b">申込済み</label>
+      <input type="radio" name="c1" id="c1c" data-sev="warn" data-score="1" data-msg="未申込。来年度接続目標には至急申込が必要。申込〜回答まで通常3〜6ヶ月"><label for="c1c">未申込（今期予定）</label>
+      <input type="radio" name="c1" id="c1d" data-sev="fail" data-score="0" data-msg="【重要】申込未定。来年度接続の実現は困難な可能性が高い"><label for="c1d">未定</label>
+    </div></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">農地転用・開発許可の要否</div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="c2" id="c2a" data-sev="pass" data-score="2" data-msg=""><label for="c2a">不要</label>
+      <input type="radio" name="c2" id="c2b" data-sev="warn" data-score="1" data-msg="許認可申請中。進捗を定期確認し、スケジュールへの影響を評価すること"><label for="c2b">申請中</label>
+      <input type="radio" name="c2" id="c2c" data-sev="fail" data-score="0" data-msg="許認可が必要だが未着手。農地転用で3〜6ヶ月・開発許可で数ヶ月〜1年超かかり、来年度接続目標と競合する"><label for="c2c">必要・未着手</label>
+    </div></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">機器調達の見通し<div class="fnote">蓄電池・PCSの確保状況</div></div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="c3" id="c3a" data-sev="pass" data-score="2" data-msg=""><label for="c3a">確保済み・内示済み</label>
+      <input type="radio" name="c3" id="c3b" data-sev="warn" data-score="1" data-msg="交渉中。発注が遅れると系統工事完了時に機器が間に合わないリスクがある"><label for="c3b">交渉中</label>
+      <input type="radio" name="c3" id="c3c" data-sev="fail" data-score="0" data-msg="機器調達が未定。系統接続が完了しても蓄電池本体の設置が間に合わないリスクがある"><label for="c3c">未定</label>
+    </div></div>
+  </div>
+</div>
+
+<!-- ── D. コスト変数 ── -->
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">D</span>
+    <span class="card-title">コスト変数</span>
+    <span class="card-note">ウェイト 10%</span>
+  </div>
+  <div class="frow">
+    <div class="flabel">接続工事費負担金の概算<div class="fnote">回答書の金額（未取得時は空欄可）</div></div>
+    <div class="fcontrol" style="flex-direction:row;align-items:center;gap:6px">
+      <input type="number" id="d1" placeholder="例：1000" min="0" style="max-width:150px">
+      <span style="font-size:13px;color:var(--txt3)">万円</span>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">特定負担の有無<div class="fnote">系統増強費が事業者負担か</div></div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="d2" id="d2a" data-sev="pass" data-score="2" data-msg=""><label for="d2a">なし（一般負担のみ）</label>
+      <input type="radio" name="d2" id="d2b" data-sev="warn" data-score="1" data-msg="特定負担が一部発生。増強費の事業者負担分を試算に織り込むこと"><label for="d2b">一部あり</label>
+      <input type="radio" name="d2" id="d2c" data-sev="fail" data-score="0" data-msg="【重要】特定負担が発生。系統増強費の大部分が事業者負担となり、接続費用が大幅増加する"><label for="d2c">あり（系統増強）</label>
+    </div></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">造成工事の必要度</div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="d3" id="d3a" data-sev="pass" data-score="2" data-msg=""><label for="d3a">軽微（平坦・良地盤）</label>
+      <input type="radio" name="d3" id="d3b" data-sev="warn" data-score="1" data-msg="中程度の造成が必要。地盤調査を踏まえて造成費を精査すること"><label for="d3b">中程度</label>
+      <input type="radio" name="d3" id="d3c" data-sev="fail" data-score="0" data-msg="大規模造成が必要。工事費・工期とも増大リスクあり。事業採算性を再検討すること"><label for="d3c">大規模</label>
+    </div></div>
+  </div>
+  <div class="frow">
+    <div class="flabel">地権者との契約状況</div>
+    <div class="fcontrol"><div class="rpills">
+      <input type="radio" name="d4" id="d4a" data-sev="pass" data-score="2" data-msg=""><label for="d4a">確定（解除条項あり）</label>
+      <input type="radio" name="d4" id="d4b" data-sev="warn" data-score="1" data-msg="交渉中。接続不可時の白紙解除特約を必ず盛り込むこと"><label for="d4b">交渉中</label>
+      <input type="radio" name="d4" id="d4c" data-sev="fail" data-score="0" data-msg="用地契約が未着手。条件付き仮契約を早期に締結することを推奨"><label for="d4c">未着手</label>
+    </div></div>
+  </div>
+</div>
+
+<button class="btn-run" onclick="diagnose()">📋 DDチェックを実行する</button>
+<button class="btn-run" id="btn-export" onclick="exportGridJson()" style="display:none;background:var(--surf);color:var(--acc);border:1px solid var(--acc);margin-top:8px">📥 grid.json をダウンロード（PXチェックシートxlsx連携用）</button>
+
+<!-- ── 結果 ── -->
+<div class="card" id="result">
+  <div class="card-head">
+    <span class="sec-tag">結果</span>
+    <span class="card-title">DD スクリーニング結果</span>
+    <span class="card-note" id="res-proj"></span>
+  </div>
+  <div class="res-top">
+    <div class="ring-wrap">
+      <canvas id="ring-canvas" width="88" height="88"></canvas>
+      <div class="ring-val">
+        <span class="ring-num" id="ring-num">0</span>
+        <span class="ring-den">/ 100</span>
+      </div>
+    </div>
+    <div>
+      <div class="verdict-badge" id="verdict-badge"></div>
+      <div class="verdict-desc" id="verdict-desc"></div>
+    </div>
+  </div>
+  <div class="cat-bars">
+    <div><div class="cbar-label">A. 系統変数</div><div class="cbar-track"><div class="cbar-fill" id="bar-a" style="width:0%"></div></div><div class="cbar-val" id="val-a">—</div></div>
+    <div><div class="cbar-label">B. 許認可事前確認</div><div class="cbar-track"><div class="cbar-fill" id="bar-b" style="width:0%"></div></div><div class="cbar-val" id="val-b">—</div></div>
+    <div><div class="cbar-label">C. スケジュール</div><div class="cbar-track"><div class="cbar-fill" id="bar-c" style="width:0%"></div></div><div class="cbar-val" id="val-c">—</div></div>
+    <div><div class="cbar-label">D. コスト</div><div class="cbar-track"><div class="cbar-fill" id="bar-d" style="width:0%"></div></div><div class="cbar-val" id="val-d">—</div></div>
+  </div>
+  <div class="issues-wrap">
+    <div class="issues-title">要確認・リスク項目</div>
+    <div id="issues-list"></div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ── PX DD 17項目定義 ──
+const DD_ITEMS = [
+  { no:1,  name:'住所',         auto:'◎', link:null, detail:'GSI逆ジオコーダで自動入力' },
+  { no:2,  name:'座標',         auto:'◎', link:null, detail:'緯度経度・度分秒変換' },
+  { no:3,  name:'架線の敷地縦横断', auto:'ー', link:'gsi', detail:'GSI航空写真で目視確認' },
+  { no:4,  name:'ハザード・浸水', auto:'○', link:'hazard', detail:'reinfolib XKT026-028' },
+  { no:5,  name:'ハザード・土砂災害', auto:'○', link:'hazard', detail:'reinfolib XKT029' },
+  { no:6,  name:'液状化危険度',  auto:'○', link:'jshis', detail:'reinfolib XKT025' },
+  { no:7,  name:'垂直積雪量',   auto:'ー', link:'google', detail:'自治体建築基準法施行細則' },
+  { no:8,  name:'市街化区域',   auto:'○', link:'hazard', detail:'reinfolib XKT001' },
+  { no:9,  name:'市街化調整区域', auto:'○', link:'hazard', detail:'reinfolib XKT001' },
+  { no:10, name:'用途地域',     auto:'○', link:'hazard', detail:'reinfolib XKT002' },
+  { no:11, name:'農地該当',     auto:'ー', link:'google', detail:'eMAFF農地ナビ／農業委員会' },
+  { no:12, name:'森林',         auto:'ー', link:'gsi',    detail:'都道府県 森林GIS' },
+  { no:13, name:'公園（自然公園）', auto:'○', link:'hazard', detail:'reinfolib XKT019' },
+  { no:14, name:'鳥獣保護区',   auto:'ー', link:'google', detail:'都道府県 鳥獣保護区位置図' },
+  { no:15, name:'埋蔵文化財包蔵地', auto:'ー', link:'google', detail:'遺跡地図GIS' },
+  { no:16, name:'景観区域',     auto:'ー', link:'google', detail:'自治体 景観計画区域図' },
+  { no:17, name:'騒音・振動規制', auto:'ー', link:'google', detail:'自治体 規制地域指定' },
+];
+
+// ── State ──
+let currentLat = null, currentLon = null;
+
+// ── Build permit table ──
+function buildPermitTable() {
+  const tbody = document.getElementById('permit-rows');
+  DD_ITEMS.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.dataset.no = item.no;
+    tr.innerHTML = `
+      <td class="pitem-no">${item.no}</td>
+      <td class="pitem-name">${item.name}<br><span style="font-size:10px;color:var(--txt3)">${item.detail}</span></td>
+      <td class="pauto-cell">
+        <span class="auto-tag ${item.auto==='◎'?'full':item.auto==='○'?'api':'manual'}">${item.auto}</span>
+      </td>
+      <td>
+        <select name="p${item.no}" style="font-size:11px;padding:4px 6px">
+          <option value="-1">未確認</option>
+          <option value="2">問題なし</option>
+          <option value="1">要確認</option>
+          <option value="0">該当・問題あり</option>
+        </select>
+      </td>
+      <td class="plink-cell" id="plink-${item.no}">—</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Update map links from coordinates ──
+function updateLinks() {
+  const lat = parseFloat(document.getElementById('lat').value);
+  const lon = parseFloat(document.getElementById('lon').value);
+
+  if (isNaN(lat) || isNaN(lon)) {
+    currentLat = null; currentLon = null;
+    document.getElementById('links-area').innerHTML =
+      '<div class="coord-needed">📍 上記に緯度・経度を入力すると確認マップが開けるリンクを生成します</div>';
+    updatePermitLinks(null, null);
+    return;
+  }
+
+  currentLat = lat; currentLon = lon;
+
+  const links = [
+    { icon:'🗺️', label:'Googleマップ', note:'衛星写真・ストリートビュー',
+      href:`https://www.google.com/maps?q=${lat},${lon}` },
+    { icon:'✈️', label:'GSI 航空写真', note:'正確な座標で開く・架線確認',
+      href:`https://maps.gsi.go.jp/#18/${lat}/${lon}/&base=ort` },
+    { icon:'🌊', label:'重ねるハザードマップ', note:'浸水・土砂・液状化',
+      href:`https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=${lat},${lon}&z=16&base=pale` },
+    { icon:'🔴', label:'J-SHIS（液状化）', note:'地震ハザードステーション',
+      href:`https://www.j-shis.bosai.go.jp/map/?lang=jp&ll=${lat},${lon}&z=14` },
+  ];
+
+  document.getElementById('links-area').innerHTML = `
+    <div class="links-grid">
+      ${links.map(l=>`
+        <a class="link-btn" href="${l.href}" target="_blank" rel="noopener">
+          <span class="link-icon">${l.icon}</span>
+          <span class="link-label">${l.label}<br><span class="link-note">${l.note}</span></span>
+        </a>
+      `).join('')}
+    </div>
+  `;
+
+  updatePermitLinks(lat, lon);
+}
+
+// ── Update permit table link cells ──
+function updatePermitLinks(lat, lon) {
+  DD_ITEMS.forEach(item => {
+    const cell = document.getElementById(`plink-${item.no}`);
+    if (!cell) return;
+    if (!lat || !lon || !item.link) { cell.innerHTML = '—'; return; }
+
+    let href='', txt='地図を開く';
+    if (item.link === 'gsi')    { href=`https://maps.gsi.go.jp/#18/${lat}/${lon}/&base=ort`; txt='GSI航空写真'; }
+    if (item.link === 'hazard') { href=`https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=${lat},${lon}&z=16&base=pale`; txt='ハザードマップ'; }
+    if (item.link === 'jshis')  { href=`https://www.j-shis.bosai.go.jp/map/?lang=jp&ll=${lat},${lon}&z=14`; txt='J-SHIS'; }
+    if (item.link === 'google') { href=`https://www.google.com/maps?q=${lat},${lon}`; txt='Googleマップ'; }
+
+    cell.innerHTML = `<a href="${href}" target="_blank" rel="noopener">🔗 ${txt}</a>`;
+  });
+}
+
+// ── Scoring helpers ──
+function radioScore(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  if (!el) return {score:-1,sev:'unknown',msg:''};
+  return {score:parseInt(el.dataset.score||'0'), sev:el.dataset.sev||'fail', msg:el.dataset.msg||''};
+}
+function selectScore(id) {
+  const el = document.getElementById(id);
+  if (!el||!el.value) return {score:-1,sev:'unknown',msg:''};
+  const v=parseInt(el.value);
+  return {score:v, sev:v===2?'pass':v===1?'warn':'fail', msg:el.options[el.selectedIndex].dataset.msg||''};
+}
+function permitScore() {
+  let sum=0, known=0;
+  DD_ITEMS.forEach(item=>{
+    const sel=document.querySelector(`select[name="p${item.no}"]`);
+    if(!sel) return;
+    const v=parseInt(sel.value);
+    if(v<0) return;
+    sum+=v; known++;
+  });
+  return known===0?-1:Math.round(sum/(known*2)*100);
+}
+function catPct(items){ const k=items.filter(x=>x.score>=0); if(!k.length) return -1; return Math.round(k.reduce((s,x)=>s+x.score,0)/(k.length*2)*100); }
+function barClass(p){ return p>=70?'pass':p>=40?'warn':'fail'; }
+
+// ── Draw ring ──
+function drawRing(pct,color){
+  const canvas=document.getElementById('ring-canvas');
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1, s=88;
+  canvas.width=s*dpr; canvas.height=s*dpr;
+  canvas.style.width=s+'px'; canvas.style.height=s+'px';
+  ctx.scale(dpr,dpr);
+  const cx=s/2,cy=s/2,r=33,lw=7;
+  const bg=getComputedStyle(document.documentElement).getPropertyValue('--surf2').trim()||'#eee';
+  ctx.clearRect(0,0,s,s);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.strokeStyle=bg; ctx.lineWidth=lw; ctx.stroke();
+  if(pct>0){
+    ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);
+    ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.lineCap='round'; ctx.stroke();
+  }
+}
+
+// ── Main diagnose ──
+function diagnose(){
+  const a1=radioScore('a1'), a2=radioScore('a2'), a3=selectScore('a3'), a4=radioScore('a4'), a5=radioScore('a5');
+  const c1=radioScore('c1'), c2=radioScore('c2'), c3=radioScore('c3');
+  const d2=radioScore('d2'), d3=radioScore('d3'), d4=radioScore('d4');
+  const d1v=parseFloat(document.getElementById('d1').value);
+  let d1={score:-1,sev:'unknown',msg:''};
+  if(!isNaN(d1v)){
+    if(d1v<=1000) d1={score:2,sev:'pass',msg:''};
+    else if(d1v<=3000) d1={score:1,sev:'warn',msg:`接続工事費 ${d1v.toLocaleString()}万円 は目安（1,000万円）超。費用対効果を再確認`};
+    else d1={score:0,sev:'fail',msg:`【重要】接続工事費 ${d1v.toLocaleString()}万円 は目安の3倍超。系統増強が必要な可能性が高い`};
+  }
+
+  const pA=catPct([a1,a2,a3,a4,a5]);
+  const pB=permitScore();
+  const pC=catPct([c1,c2,c3]);
+  const pD=catPct([d1,d2,d3,d4]);
+
+  const ws=[{p:pA,w:.40},{p:pB,w:.30},{p:pC,w:.20},{p:pD,w:.10}];
+  const kw=ws.filter(x=>x.p>=0); let total=0;
+  if(kw.length){ const tw=kw.reduce((s,x)=>s+x.w,0); total=Math.round(kw.reduce((s,x)=>s+x.p*x.w,0)/tw); }
+
+  let verdict, vdesc, vcls;
+  if(total>=75){ verdict='✅ 進行推奨'; vdesc='主要なリスク項目は低く、本格的な用地取得・詳細DD（PXチェックシート xlsx生成）へ進むことを推奨します。'; vcls='pass'; }
+  else if(total>=45){ verdict='⚠️ 要確認事項あり'; vdesc='複数のリスク項目があります。下記を解消してから用地取得に進んでください。'; vcls='warn'; }
+  else { verdict='🔴 リスク高・再検討推奨'; vdesc='重大リスクが複数あります。このまま進めると来年度接続・目標コストの達成が困難になる可能性があります。'; vcls='fail'; }
+
+  const allItems=[
+    {label:'A-1 空き容量',...a1},{label:'A-2 先行申込',...a2},{label:'A-3 電圧階級',...a3},
+    {label:'A-4 ノンファーム',...a4},{label:'A-5 検討区分',...a5},
+    {label:'C-1 系統申込',...c1},{label:'C-2 農地・開発許可',...c2},{label:'C-3 機器調達',...c3},
+    {label:'D-1 接続費',...d1},{label:'D-2 特定負担',...d2},{label:'D-3 造成',...d3},{label:'D-4 用地契約',...d4},
+  ].filter(x=>x.msg&&(x.sev==='fail'||x.sev==='warn'))
+   .sort((a,b)=>(a.sev==='fail'?0:1)-(b.sev==='fail'?0:1));
+
+  // render
+  const res=document.getElementById('result');
+  res.classList.add('show');
+  const pxno=document.getElementById('pxno').value;
+  const loc=document.getElementById('locname').value;
+  document.getElementById('res-proj').textContent=[pxno,loc].filter(Boolean).join('  ');
+  document.getElementById('ring-num').textContent=total;
+  const cmap={pass:'var(--pass)',warn:'var(--warn)',fail:'var(--fail)'};
+  setTimeout(()=>drawRing(total/100,cmap[vcls]),50);
+  const badge=document.getElementById('verdict-badge');
+  badge.className='verdict-badge '+vcls; badge.textContent=verdict;
+  document.getElementById('verdict-desc').textContent=vdesc;
+
+  function setBar(id,vid,p){ const b=document.getElementById(id),v=document.getElementById(vid);
+    if(p<0){b.style.width='0%';b.className='cbar-fill';v.textContent='未入力';}
+    else{b.style.width=p+'%';b.className='cbar-fill '+barClass(p);v.textContent=p+'%';} }
+  setBar('bar-a','val-a',pA); setBar('bar-b','val-b',pB); setBar('bar-c','val-c',pC); setBar('bar-d','val-d',pD);
+
+  const list=document.getElementById('issues-list');
+  list.innerHTML=allItems.length===0
+    ?'<div class="empty-ok">✅ 重大なリスク項目は見つかりませんでした</div>'
+    :allItems.map(x=>`<div class="issue"><div class="idot ${x.sev}"></div><div class="itext"><b>${x.label}</b>　${x.msg}</div></div>`).join('');
+
+  document.getElementById('btn-export').style.display='block';
+  res.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── Export grid.json（build_px_checksheet.py --grid 用） ──
+function exportGridJson(){
+  const sevMap={pass:'良',warn:'注意',fail:'リスク'};
+  function fromRadio(name){
+    const el=document.querySelector(`input[name="${name}"]:checked`);
+    if(!el) return null;
+    const label=document.querySelector(`label[for="${el.id}"]`);
+    return {value:label?label.textContent.trim():'', judge:sevMap[el.dataset.sev]||'注意'};
+  }
+  function fromSelect(id){
+    const el=document.getElementById(id);
+    if(!el||!el.value) return null;
+    const v=parseInt(el.value);
+    return {value:el.options[el.selectedIndex].textContent.trim(), judge:v===2?'良':v===1?'注意':'リスク'};
+  }
+  const items={};
+  const put=(no,x)=>{ if(x) items[String(no)]=x; };
+  put(1,fromRadio('a1')); put(2,fromRadio('a2')); put(3,fromSelect('a3'));
+  put(4,fromRadio('a4')); put(5,fromRadio('a5'));
+  put(6,fromRadio('c1')); put(7,fromRadio('c2')); put(8,fromRadio('c3'));
+  const d1v=parseFloat(document.getElementById('d1').value);
+  if(!isNaN(d1v)) put(9,{value:d1v.toLocaleString()+'万円', judge:d1v<=1000?'良':d1v<=3000?'注意':'リスク'});
+  put(10,fromRadio('d2')); put(11,fromRadio('d3')); put(12,fromRadio('d4'));
+  const meta={pxno:document.getElementById('pxno').value, locname:document.getElementById('locname').value,
+    lat:document.getElementById('lat').value, lon:document.getElementById('lon').value,
+    tso:document.getElementById('tso').selectedOptions[0]?.textContent||'', exported:new Date().toISOString().slice(0,10)};
+  const blob=new Blob([JSON.stringify({meta,items},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='grid.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Init ──
+buildPermitTable();
+</script>
+
+</body>
+</html>
