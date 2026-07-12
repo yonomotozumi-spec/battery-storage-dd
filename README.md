@@ -25,6 +25,28 @@
 
 判定：75点以上=進行推奨 ／ 45〜74点=要確認事項あり ／ 44点以下=リスク高・再検討推奨
 
+## 座標から許認可を自動判定（reinfolib）
+
+許認可17項目のうち `○`（API）が付く7項目（浸水・土砂災害・液状化・市街化区域・市街化調整区域・用途地域・自然公園）は、
+国交省 不動産情報ライブラリ（reinfolib）の座標判定を取り込んで**自動で確認状況を埋められます**。
+APIキーの秘匿とCORSの都合上、API取得はスクリプト側（`reinfolib_judge.py`）で行い、Web画面はその結果JSONを読み込む方式です。
+
+1. Webツールに**緯度経度を入力**する
+2. 取得URLを生成し、GeoJSONを取得してから判定JSON（values.json）を出力する
+
+```bash
+# ① 取得URLを一覧化（reinfolibのAPIキーが必要）
+python scripts/reinfolib_judge.py urls --lat 42.9270 --lon 141.2698 --key <APIKEY>
+# ② 各URLのGeoJSONを <reinfolibdir>/<コード>.geojson として保存後、点内判定
+python scripts/reinfolib_judge.py judge --lat 42.9270 --lon 141.2698 \
+  --dir <reinfolibdir> --out values.json
+```
+
+3. Web画面の **B. 許認可事前確認 → 「📥 自動判定JSONを読込」** で `values.json` を選択すると、
+   対象7項目のプルダウンが座標判定に応じて自動セットされ、検出値がインラインで表示されます
+
+> 自動判定はスクリーニング補助です。プルダウンは手動で上書きでき、最終確認は各行政窓口・地図の目視で行ってください。
+
 ## xlsxチェックシート生成（scripts/）
 
 Webツールの回答（grid.json）を取り込んで、5タブ構成のPX案件チェックシートを生成できます。

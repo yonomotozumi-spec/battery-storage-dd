@@ -190,6 +190,27 @@ select:focus, input:focus {
 .auto-tag.api    { background:rgba(27,85,204,.1); color:var(--acc); }
 .auto-tag.manual { background:var(--surf2); color:var(--txt3); }
 
+/* ── Auto-judgment (reinfolib JSON) ── */
+.autoload-row {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:10px 16px; background:var(--surf2); border-bottom:1px solid var(--bdr);
+}
+.autoload-btn {
+  display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+  padding:7px 12px; border:1px solid var(--acc); border-radius:6px;
+  background:var(--surf); color:var(--link); font-size:12px; font-weight:600;
+  transition:background .15s;
+}
+.autoload-btn:hover { background:var(--bg); }
+.autoload-status { font-size:11px; color:var(--txt3); line-height:1.4; flex:1; min-width:180px; }
+.pauto-detected { font-size:10px; color:var(--txt2); margin-top:3px; line-height:1.35; }
+.auto-detected {
+  font-size:9px; font-weight:700; padding:1px 4px; border-radius:3px; margin-right:3px;
+}
+.auto-detected.pass { background:var(--pass-bg); color:var(--pass); }
+.auto-detected.warn { background:var(--warn-bg); color:var(--warn); }
+.auto-detected.fail { background:var(--fail-bg); color:var(--fail); }
+
 /* ── TSO links ── */
 .tso-links { padding:10px 16px; display:flex; flex-wrap:wrap; gap:6px; }
 .tso-chip {
@@ -443,6 +464,14 @@ select:focus, input:focus {
     <span class="card-title">許認可事前確認 DD</span>
     <span class="card-note">ウェイト 30% ／ ◎=自動 ○=API ー=リンク確認</span>
   </div>
+  <div class="autoload-row">
+    <label class="autoload-btn">
+      <span>📥</span>
+      <span>自動判定JSONを読込</span>
+      <input type="file" accept=".json,application/json" onchange="loadReinfolibJson(this.files[0])" style="display:none">
+    </label>
+    <span class="autoload-status" id="auto-status">reinfolib_judge.py で出力した values.json を読み込むと、○（API）項目を座標から自動判定します</span>
+  </div>
   <div style="overflow-x:auto">
   <table class="permit-table">
     <thead><tr>
@@ -603,7 +632,7 @@ function buildPermitTable() {
     tr.dataset.no = item.no;
     tr.innerHTML = `
       <td class="pitem-no">${item.no}</td>
-      <td class="pitem-name">${item.name}<br><span style="font-size:10px;color:var(--txt3)">${item.detail}</span></td>
+      <td class="pitem-name">${item.name}<br><span style="font-size:10px;color:var(--txt3)">${item.detail}</span><div class="pauto-detected" id="pauto-val-${item.no}"></div></td>
       <td class="pauto-cell">
         <span class="auto-tag ${item.auto==='◎'?'full':item.auto==='○'?'api':'manual'}">${item.auto}</span>
       </td>
@@ -782,6 +811,70 @@ function diagnose(){
 
   document.getElementById('btn-export').style.display='block';
   res.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── reinfolib 自動判定JSON（reinfolib_judge.py の values.json）を読込 ──
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// 自動判定テキスト → プルダウン値（2=問題なし / 1=要確認 / 0=該当・問題あり）
+function judgeFromValue(no, value){
+  const v = String(value||'').trim();
+  const none = /該当なし|指定なし|対象範囲外/.test(v);
+  switch(no){
+    case 4:  return none ? 2 : 0;               // 浸水：該当は問題あり
+    case 5:  return none ? 2 : 0;               // 土砂：警戒/特別警戒とも問題あり
+    case 6:  return none ? 2 : 1;               // 液状化：傾向図該当は要確認
+    case 8:  return 2;                          // 市街化区域：情報項目（該当でも可）
+    case 9:  return /指定あり/.test(v) ? 1 : 2; // 市街化調整区域該当は要確認（開発許可）
+    case 10: return none ? 2 : 1;               // 用途地域指定ありは要確認
+    case 13: return none ? 2 : 0;               // 自然公園該当は問題あり
+    default: return -1;                         // ◎/ー項目は自動対象外
+  }
+}
+
+function loadReinfolibJson(file){
+  const status=document.getElementById('auto-status');
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let data;
+    try{ data=JSON.parse(e.target.result); }
+    catch(err){ status.textContent='⚠️ JSONの読み込みに失敗しました：'+err.message; status.style.color='var(--fail)'; return; }
+    if(!data || typeof data.values!=='object'){
+      status.textContent='⚠️ reinfolib_judge.py の values.json 形式ではありません（"values" が見つかりません）';
+      status.style.color='var(--fail)'; return;
+    }
+    applyAutoValues(data);
+  };
+  reader.onerror=()=>{ status.textContent='⚠️ ファイルの読み込みに失敗しました'; status.style.color='var(--fail)'; };
+  reader.readAsText(file);
+}
+
+function applyAutoValues(data){
+  const status=document.getElementById('auto-status');
+  const values=data.values||{};
+  let applied=0, skipped=0;
+  Object.keys(values).forEach(k=>{
+    const no=parseInt(k);
+    const sel=document.querySelector(`select[name="p${no}"]`);
+    const box=document.getElementById(`pauto-val-${no}`);
+    if(!sel){ skipped++; return; }
+    const j=judgeFromValue(no, values[k].value);
+    if(j<0){ skipped++; return; }
+    sel.value=String(j);
+    applied++;
+    if(box){
+      const sev=j===2?'pass':j===1?'warn':'fail';
+      box.innerHTML=`<span class="auto-detected ${sev}">自動</span>${escapeHtml(values[k].value||'')}`;
+      box.title=values[k].comment||'';
+    }
+  });
+  const missing=Array.isArray(data.missing)?data.missing:[];
+  let msg=`✅ ${applied}項目を座標から自動判定しました（reinfolib）`;
+  if(missing.length) msg+=` ／ 未取得レイヤ ${missing.length}件`;
+  msg+='　※判定は目視で最終確認してください';
+  status.textContent=msg;
+  status.style.color='var(--txt2)';
 }
 
 // ── Export grid.json（build_px_checksheet.py --grid 用） ──
