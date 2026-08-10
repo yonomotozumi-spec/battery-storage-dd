@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="候補地の緯度経度から最寄りの変電所を検索し、系統スコア80点＋近接スコア20点で総合評価する系統用蓄電池のスクリーニングツール。">
+
+<title>変電所スコア検索（系統用蓄電池・高圧2MW）</title>
+<style>
+/* ── Design tokens（index.html と共通）── */
+:root {
+  --bg:       #F0F3F9;
+  --surf:     #FFFFFF;
+  --surf2:    #E8EDF8;
+  --bdr:      #CDD5E8;
+  --txt:      #16213D;
+  --txt2:     #465070;
+  --txt3:     #8390AC;
+  --acc:      #1B55CC;
+  --acc-h:    #1444AA;
+  --pass:     #0B9966;
+  --pass-bg:  #E8FAF3;
+  --warn:     #BF7800;
+  --warn-bg:  #FEF8E0;
+  --fail:     #CC2A20;
+  --fail-bg:  #FEECEA;
+  --link:     #1B55CC;
+  --r:        8px;
+  --sh:       0 1px 3px rgba(16,32,80,.07),0 1px 2px rgba(16,32,80,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:      #0B1221;
+    --surf:    #161F35;
+    --surf2:   #1D2B48;
+    --bdr:     #273450;
+    --txt:     #E3EBFC;
+    --txt2:    #7D91BA;
+    --txt3:    #4A5A7A;
+    --acc:     #4D82F7;
+    --acc-h:   #6896F9;
+    --pass:    #18BB82;
+    --pass-bg: rgba(24,187,130,.13);
+    --warn:    #F0A800;
+    --warn-bg: rgba(240,168,0,.12);
+    --fail:    #EF4C42;
+    --fail-bg: rgba(239,76,66,.13);
+    --link:    #6896F9;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0B1221;--surf:#161F35;--surf2:#1D2B48;--bdr:#273450;
+  --txt:#E3EBFC;--txt2:#7D91BA;--txt3:#4A5A7A;
+  --acc:#4D82F7;--acc-h:#6896F9;--link:#6896F9;
+  --pass:#18BB82;--pass-bg:rgba(24,187,130,.13);
+  --warn:#F0A800;--warn-bg:rgba(240,168,0,.12);
+  --fail:#EF4C42;--fail-bg:rgba(239,76,66,.13);
+}
+:root[data-theme="light"] {
+  --bg:#F0F3F9;--surf:#FFFFFF;--surf2:#E8EDF8;--bdr:#CDD5E8;
+  --txt:#16213D;--txt2:#465070;--txt3:#8390AC;
+  --acc:#1B55CC;--acc-h:#1444AA;--link:#1B55CC;
+  --pass:#0B9966;--pass-bg:#E8FAF3;
+  --warn:#BF7800;--warn-bg:#FEF8E0;
+  --fail:#CC2A20;--fail-bg:#FEECEA;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg); color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans','Yu Gothic UI','Meiryo',system-ui,sans-serif;
+  font-size:14px; line-height:1.6;
+}
+.wrap { max-width:1000px; margin:0 auto; padding:28px 16px 80px; }
+
+/* ── Header ── */
+.pg-head { margin-bottom:22px; display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.pg-title { font-size:17px; font-weight:700; letter-spacing:-.02em; display:flex; align-items:center; gap:8px; }
+.pg-sub { font-size:12px; color:var(--txt3); margin-top:3px; }
+.px-badge {
+  font-size:10px; font-weight:700; letter-spacing:.06em;
+  background:var(--acc); color:#fff; padding:2px 8px; border-radius:4px; text-transform:uppercase;
+}
+.head-link {
+  margin-left:auto; font-size:12px; color:var(--link); text-decoration:none;
+  border:1px solid var(--bdr); border-radius:6px; padding:6px 12px; background:var(--surf);
+  white-space:nowrap;
+}
+.head-link:hover { background:var(--surf2); border-color:var(--acc); }
+
+/* ── Cards ── */
+.card {
+  background:var(--surf); border:1px solid var(--bdr);
+  border-radius:var(--r); box-shadow:var(--sh); margin-bottom:12px; overflow:hidden;
+}
+.card-head {
+  display:flex; align-items:center; gap:8px;
+  padding:10px 16px; background:var(--surf2); border-bottom:1px solid var(--bdr);
+}
+.sec-tag {
+  font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--acc); background:rgba(27,85,204,.1);
+  padding:2px 7px; border-radius:4px; flex-shrink:0;
+}
+.card-title { font-size:13px; font-weight:600; }
+.card-note  { font-size:11px; color:var(--txt3); margin-left:auto; text-align:right; }
+
+/* ── Field rows ── */
+.frow {
+  display:grid; grid-template-columns:185px 1fr;
+  gap:10px; align-items:start; padding:10px 16px; border-bottom:1px solid var(--bdr);
+}
+.frow:last-child { border-bottom:none; }
+.flabel { font-size:13px; color:var(--txt2); padding-top:6px; line-height:1.4; }
+.fnote  { font-size:11px; color:var(--txt3); margin-top:2px; }
+.fcontrol { display:flex; flex-direction:column; gap:4px; }
+
+select, input[type="text"], input[type="number"] {
+  appearance:none; width:100%; background:var(--bg);
+  border:1px solid var(--bdr); border-radius:6px;
+  color:var(--txt); font:inherit; font-size:13px;
+  padding:7px 10px; outline:none; transition:border-color .15s, box-shadow .15s;
+}
+select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(27,85,204,.1); }
+.coord-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.coord-label { font-size:11px; color:var(--txt3); margin-bottom:3px; }
+.opt-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; padding-top:5px; }
+.chk { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--txt2); cursor:pointer; }
+.chk input { width:15px; height:15px; accent-color:var(--acc); cursor:pointer; }
+
+.btn-run {
+  width:100%; margin-top:8px; padding:14px;
+  background:var(--acc); color:#fff; border:none; border-radius:var(--r);
+  font:inherit; font-size:15px; font-weight:700; letter-spacing:.01em;
+  cursor:pointer; transition:background .15s;
+}
+.btn-run:hover { background:var(--acc-h); }
+.btn-run:focus-visible { outline:2px solid var(--acc); outline-offset:3px; }
+.btn-run:disabled { background:var(--txt3); cursor:not-allowed; }
+
+/* ── Summary ── */
+.sum-grid { display:grid; grid-template-columns:repeat(3,1fr); background:var(--bdr); gap:1px; }
+.sum-cell { background:var(--surf); padding:12px 16px; }
+.sum-label { font-size:11px; color:var(--txt3); margin-bottom:3px; }
+.sum-main { font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.25; }
+.sum-sub { font-size:11px; color:var(--txt2); margin-top:2px; line-height:1.4; }
+
+/* ── Rank badges ── */
+.rk {
+  display:inline-block; min-width:22px; text-align:center;
+  font-size:11px; font-weight:700; padding:1px 7px; border-radius:4px; white-space:nowrap;
+}
+.rk-S { background:var(--pass); color:#fff; }
+.rk-A { background:var(--pass-bg); color:var(--pass); border:1px solid var(--pass); }
+.rk-B { background:var(--warn-bg); color:var(--warn); }
+.rk-C { background:var(--surf2); color:var(--txt3); }
+.rk-x { background:var(--fail-bg); color:var(--fail); }
+.rk-n { background:var(--surf2); color:var(--txt3); border:1px dashed var(--bdr); }
+
+/* ── Result table ── */
+.tbl-scroll { overflow-x:auto; }
+.rtbl { width:100%; border-collapse:collapse; min-width:720px; }
+.rtbl th {
+  font-size:11px; font-weight:600; letter-spacing:.04em; color:var(--txt3);
+  text-align:left; padding:8px 10px; border-bottom:2px solid var(--bdr);
+  background:var(--surf2); white-space:nowrap; position:sticky; top:0;
+}
+.rtbl td { padding:8px 10px; border-bottom:1px solid var(--bdr); font-size:12px; vertical-align:middle; }
+.rtbl tbody tr:last-child td { border-bottom:none; }
+.rtbl tr.row-main { cursor:pointer; }
+.rtbl tr.row-main:hover td { background:var(--surf2); }
+.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ss-name { font-weight:600; }
+.ss-meta { font-size:10px; color:var(--txt3); }
+.total-cell { font-weight:800; font-size:14px; font-variant-numeric:tabular-nums; }
+.memo-tag {
+  display:inline-block; font-size:10px; font-weight:600; margin-top:2px;
+  background:rgba(27,85,204,.1); color:var(--acc); padding:1px 5px; border-radius:3px;
+}
+.tbl-links a { color:var(--link); text-decoration:none; font-size:11px; white-space:nowrap; }
+.tbl-links a:hover { text-decoration:underline; }
+
+/* ── Detail row ── */
+tr.row-detail > td { background:var(--bg); padding:0; }
+.detail-in { padding:12px 16px; display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.dt-title { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--txt3); margin-bottom:7px; }
+.sbar { display:grid; grid-template-columns:118px 1fr 42px; gap:8px; align-items:center; margin-bottom:5px; font-size:11px; }
+.sbar-label { color:var(--txt2); }
+.sbar-track { display:block; height:6px; background:var(--surf2); border-radius:3px; overflow:hidden; }
+.sbar-fill { display:block; height:100%; min-width:2px; background:var(--acc); border-radius:3px; }
+.sbar-fill.zero { background:var(--fail); opacity:.4; }
+.sbar-val { text-align:right; font-variant-numeric:tabular-nums; color:var(--txt2); }
+.kv { display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-size:11.5px; }
+.kv dt { color:var(--txt3); white-space:nowrap; }
+.kv dd { color:var(--txt); font-variant-numeric:tabular-nums; }
+.detail-note { grid-column:1/-1; font-size:11px; color:var(--txt2); background:var(--surf); border:1px solid var(--bdr); border-radius:6px; padding:8px 10px; line-height:1.5; }
+.detail-links { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:6px; }
+.chip {
+  padding:4px 10px; border:1px solid var(--bdr); border-radius:14px;
+  font-size:11px; color:var(--link); text-decoration:none; background:var(--surf);
+}
+.chip:hover { background:var(--surf2); border-color:var(--acc); }
+
+/* ── Misc ── */
+.msg { padding:14px 16px; font-size:13px; color:var(--txt2); line-height:1.6; }
+.msg.warn { background:var(--warn-bg); color:var(--warn); }
+.plain-list { padding:10px 16px 14px; }
+.plain-list li { font-size:11.5px; color:var(--txt2); margin-left:16px; line-height:1.65; }
+details.foldable > summary {
+  cursor:pointer; padding:10px 16px; background:var(--surf2);
+  font-size:12px; font-weight:600; color:var(--txt2); list-style:none;
+}
+details.foldable > summary::-webkit-details-marker { display:none; }
+details.foldable > summary::before { content:'▸ '; color:var(--txt3); }
+details.foldable[open] > summary::before { content:'▾ '; }
+.def-tbl { width:100%; border-collapse:collapse; }
+.def-tbl th, .def-tbl td { padding:6px 10px; border-bottom:1px solid var(--bdr); font-size:11.5px; text-align:left; vertical-align:top; }
+.def-tbl th { color:var(--txt3); font-weight:600; background:var(--surf2); }
+.disclaimer { font-size:11px; color:var(--txt3); line-height:1.65; margin-top:14px; }
+#result { display:none; }
+#result.show { display:block; }
+
+@media(max-width:640px){
+  .frow{grid-template-columns:1fr;gap:5px;} .flabel{padding-top:0;}
+  .coord-row{grid-template-columns:1fr;}
+  .sum-grid{grid-template-columns:1fr;}
+  .detail-in{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="pg-head">
+  <div>
+    <div class="pg-title">
+      <span class="px-badge">PX</span>
+      変電所スコア検索
+    </div>
+    <div class="pg-sub">候補地の緯度経度から最寄りの変電所を検索し、系統スコア80点＋近接スコア20点で総合評価（系統用蓄電池・高圧2MW前提）</div>
+  </div>
+  <a class="head-link" id="dd-link" href="index.html">DDチェックシートへ →</a>
+</header>
+
+<!-- ── 入力 ── -->
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">Input</span>
+    <span class="card-title">候補地の座標</span>
+    <span class="card-note" id="data-note">データ読込中…</span>
+  </div>
+
+  <div class="frow">
+    <div class="flabel">緯度・経度<div class="fnote">10進法（例: 42.9270 / 141.2698）</div></div>
+    <div class="fcontrol">
+      <div class="coord-row">
+        <div>
+          <div class="coord-label">緯度 (lat)</div>
+          <input type="number" id="lat" placeholder="42.9270" step="0.000001">
+        </div>
+        <div>
+          <div class="coord-label">経度 (lon)</div>
+          <input type="number" id="lon" placeholder="141.2698" step="0.000001">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frow">
+    <div class="flabel">まとめて貼り付け<div class="fnote">「35.12, 139.45」やGoogleマップのURLを貼ると自動で分解します</div></div>
+    <div class="fcontrol">
+      <input type="text" id="paste" placeholder="42.9270, 141.2698 / https://www.google.com/maps?q=42.927,141.2698">
+      <span class="fnote" id="paste-msg"></span>
+    </div>
+  </div>
+
+  <div class="frow">
+    <div class="flabel">検索範囲</div>
+    <div class="fcontrol">
+      <select id="radius">
+        <option value="5000">半径 5km</option>
+        <option value="10000" selected>半径 10km</option>
+        <option value="20000">半径 20km</option>
+        <option value="50000">半径 50km</option>
+        <option value="0">全国（距離制限なし）</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="frow">
+    <div class="flabel">並び順・表示</div>
+    <div class="fcontrol">
+      <select id="sortby">
+        <option value="total" selected>総合スコア順（100点）</option>
+        <option value="dist">距離が近い順</option>
+        <option value="grid">系統スコア順（80点）</option>
+      </select>
+      <div class="opt-row">
+        <label class="chk"><input type="checkbox" id="f-gate"> ゲート除外の変電所も表示</label>
+        <label class="chk"><input type="checkbox" id="f-nodata" checked> 空容量データ無し（OSM由来）も表示</label>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-run" id="btn-run">この座標でスコアを算出する</button>
+</div>
+
+<!-- ── 結果 ── -->
+<div id="result">
+
+  <div class="card">
+    <div class="card-head">
+      <span class="sec-tag">Result</span>
+      <span class="card-title">総合評価</span>
+      <span class="card-note" id="res-coord"></span>
+    </div>
+    <div class="sum-grid">
+      <div class="sum-cell">
+        <div class="sum-label">最有力候補（総合スコア）</div>
+        <div class="sum-main" id="sum-best">—</div>
+        <div class="sum-sub" id="sum-best-sub"></div>
+      </div>
+      <div class="sum-cell">
+        <div class="sum-label">最寄りの変電所</div>
+        <div class="sum-main" id="sum-near">—</div>
+        <div class="sum-sub" id="sum-near-sub"></div>
+      </div>
+      <div class="sum-cell">
+        <div class="sum-label">範囲内のランクS/A</div>
+        <div class="sum-main" id="sum-sa">—</div>
+        <div class="sum-sub" id="sum-sa-sub"></div>
+      </div>
+    </div>
+    <div class="msg" id="sum-msg" style="border-top:1px solid var(--bdr)"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="sec-tag">Ranking</span>
+      <span class="card-title">候補変電所</span>
+      <span class="card-note" id="tbl-note">行をクリックすると内訳を表示</span>
+    </div>
+    <div class="tbl-scroll">
+      <table class="rtbl">
+        <thead>
+          <tr>
+            <th>#</th><th>変電所</th><th class="num">距離</th>
+            <th class="num">S7近接<br>(20)</th><th class="num">系統<br>(80)</th>
+            <th class="num">総合<br>(100)</th><th>ランク</th><th>地図</th>
+          </tr>
+        </thead>
+        <tbody id="rtbody"></tbody>
+      </table>
+    </div>
+    <div class="msg" id="tbl-empty" style="display:none"></div>
+  </div>
+
+  <div class="card" id="card-nocoord" style="display:none">
+    <div class="card-head">
+      <span class="sec-tag">補足</span>
+      <span class="card-title">同エリアの高スコア変電所（座標未取得のため距離判定できず）</span>
+      <span class="card-note" id="nocoord-note"></span>
+    </div>
+    <div class="tbl-scroll">
+      <table class="rtbl">
+        <thead>
+          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>ランク</th></tr>
+        </thead>
+        <tbody id="nctbody"></tbody>
+      </table>
+    </div>
+    <div class="msg" style="border-top:1px solid var(--bdr);font-size:11.5px">
+      これらは送配電事業者の公表データに載っているが座標が未取得の変電所です。距離が計算できないため上のランキングには出てきません。
+      所在地から候補地の近くにありそうなものは、地図で位置を確認してください。
+    </div>
+  </div>
+
+</div><!-- /result -->
+
+<!-- ── スコア定義 ── -->
+<details class="card foldable">
+  <summary>スコアの定義と前提（配点・ゲート・ランク）</summary>
+  <div class="tbl-scroll">
+    <table class="def-tbl">
+      <thead><tr><th>記号</th><th>変数</th><th>配点</th><th>閾値・ルール</th><th>根拠(実績)</th></tr></thead>
+      <tbody id="defbody"></tbody>
+    </table>
+  </div>
+  <ul class="plain-list" id="noteslist"></ul>
+</details>
+
+<details class="card foldable">
+  <summary>接続検討回答の実績DB（このスコアの校正元）</summary>
+  <div class="tbl-scroll">
+    <table class="def-tbl">
+      <thead><tr><th>エリア</th><th>変電所名</th><th>案件</th><th>負担金</th><th>連系工期</th><th>主な対策工事</th><th>教訓</th></tr></thead>
+      <tbody id="resbody"></tbody>
+    </table>
+  </div>
+  <ul class="plain-list" id="analysislist"></ul>
+</details>
+
+<p class="disclaimer" id="disclaimer"></p>
+
+</div><!-- /wrap -->
+
+<script src="data/substations.js"></script>
+<script>
+'use strict';
+
+const D = window.SUBSTATION_DATA;
+const F = {};
+(D ? D.fields : []).forEach((n, i) => { F[n] = i; });
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ── 実績DB（エリア＋変電所名 で引き当て）──
+const MEMO = {};
+if (D) D.results.forEach(r => { MEMO[r[0] + String(r[1]).trim()] = r; });
+
+// ── 距離（Haversine・地球半径6371.0088km）──
+function distanceM(lat1, lon1, lat2, lon2) {
+  const R = 6371008.8, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+// ── S7 近接スコア（substations.js の params と同じ定義）──
+function s7Points(m) {
+  for (const [limit, pts] of D.params.s7Steps) if (m <= limit) return pts;
+  return 0;
+}
+function totalRank(total) {
+  for (const [thr, rk] of D.params.totalRankSteps) if (total >= thr) return rk;
+  return 'C';
+}
+const rkClass = r => ({ S: 'rk-S', A: 'rk-A', B: 'rk-B', C: 'rk-C' }[r] || (r === '除外' ? 'rk-x' : 'rk-n'));
+const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
+const fmtNum = v => v == null ? '—' : String(v);
+const gmaps = (la, lo) => `https://www.google.com/maps?q=${la},${lo}`;
+
+// ── 座標のパース（「35.1, 139.4」/ GoogleマップURL）──
+function parseCoords(text) {
+  if (!text) return null;
+  let m = text.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);          // maps/@lat,lon,15z
+  if (!m) m = text.match(/[?&]q=(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/); // ?q=lat,lon
+  if (!m) m = text.match(/(-?\d{1,3}\.\d+)[,\s/]+(-?\d{1,3}\.\d+)/); // 素の "lat, lon"
+  if (!m) return null;
+  const la = parseFloat(m[1]), lo = parseFloat(m[2]);
+  if (!isFinite(la) || !isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) return null;
+  return { lat: la, lon: lo };
+}
+
+// ── 行アクセスのヘルパ ──
+const val = (row, key) => row[F[key]];
+const area = row => D.dict.area[row[F.area]];
+const rank = row => D.dict.rank[row[F.rank]];
+const n1 = row => D.dict.n1[row[F.n1]] || '—';
+const curtail = row => D.dict.curtail[row[F.curtail]] || '—';
+const acc = row => D.dict.acc[row[F.acc]] || '';
+const memoOf = row => MEMO[area(row) + String(val(row, 'name')).trim()] || null;
+
+let lastResults = [];
+
+// ── 算出 ──
+function run() {
+  const lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
+  if (!isFinite(lat) || !isFinite(lon)) {
+    alert('緯度・経度を入力してください（10進法）。');
+    return;
+  }
+  const radius = parseInt($('radius').value, 10);
+  const showGate = $('f-gate').checked;
+  const showNoData = $('f-nodata').checked;
+  const sortBy = $('sortby').value;
+
+  const hits = [];
+  let nearestAny = null;
+  for (const row of D.rows) {
+    const la = val(row, 'lat'), lo = val(row, 'lon');
+    if (la == null || lo == null) continue;
+    const d = distanceM(lat, lon, la, lo);
+    if (!nearestAny || d < nearestAny.dist) nearestAny = { row, dist: d };
+    if (radius && d > radius) continue;
+    const rk = rank(row);
+    if (!showGate && rk === '除外') continue;
+    if (!showNoData && rk === 'データ無') continue;
+    const s7 = s7Points(d);
+    hits.push({ row, dist: d, s7, grid: val(row, 'grid'), total: val(row, 'grid') + s7 });
+  }
+
+  if (sortBy === 'dist') hits.sort((a, b) => a.dist - b.dist);
+  else if (sortBy === 'grid') hits.sort((a, b) => b.grid - a.grid || a.dist - b.dist);
+  else hits.sort((a, b) => b.total - a.total || a.dist - b.dist);
+
+  lastResults = hits;
+  render(hits, { lat, lon, radius, nearestAny });
+  $('result').classList.add('show');
+  $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function render(hits, ctx) {
+  const { lat, lon, radius, nearestAny } = ctx;
+  $('res-coord').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}　/　` +
+    (radius ? `半径${radius / 1000}km` : '全国');
+  $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
+
+  // サマリー
+  const scored = hits.filter(h => rank(h.row) !== 'データ無' && rank(h.row) !== '除外');
+  const best = hits.length ? hits.reduce((a, b) => (b.total > a.total ? b : a)) : null;
+  const near = hits.length ? hits.reduce((a, b) => (b.dist < a.dist ? b : a)) : nearestAny;
+  const saCount = hits.filter(h => ['S', 'A'].includes(rank(h.row))).length;
+
+  if (best) {
+    $('sum-best').innerHTML = `${best.total} <span style="font-size:12px;color:var(--txt3)">/100</span> ` +
+      `<span class="rk ${rkClass(totalRank(best.total))}">${totalRank(best.total)}</span>`;
+    $('sum-best-sub').innerHTML = `${esc(val(best.row, 'name'))}（${esc(area(best.row))}）` +
+      `<br>系統${best.grid} ＋ 近接${best.s7}　${fmtDist(best.dist)}　系統ランク <span class="rk ${rkClass(rank(best.row))}">${esc(rank(best.row))}</span>`;
+  } else {
+    $('sum-best').textContent = '—';
+    $('sum-best-sub').textContent = '範囲内に該当なし';
+  }
+
+  if (near) {
+    const nrow = near.row;
+    $('sum-near').textContent = fmtDist(near.dist);
+    $('sum-near-sub').innerHTML = `${esc(val(nrow, 'name'))}（${esc(area(nrow))}${val(nrow, 'pref') ? ' / ' + esc(val(nrow, 'pref')) : ''}）` +
+      `<br>座標精度: ${esc(acc(nrow))}　S7=${s7Points(near.dist)}点`;
+  }
+
+  $('sum-sa').textContent = saCount + ' 件';
+  $('sum-sa-sub').textContent = `範囲内${hits.length}件のうち、空容量データがある変電所は${scored.length}件`;
+
+  const notes = [];
+  if (!hits.length) notes.push('指定範囲に変電所が見つかりませんでした。検索範囲を広げてください。');
+  if (best && best.s7 === 0) notes.push('最有力候補までの距離が5kmを超えており、近接スコアは0点です。負担金は高圧線の亘長にほぼ比例するため、より近い候補地を探すことを推奨します。');
+  if (scored.length === 0 && hits.length) notes.push('範囲内の変電所はすべて空容量が未公表（OSM由来）です。系統の空きは送配電事業者の公表マップか接続検討で確認してください。');
+  notes.push('近接スコアは<b>変電所までの直線距離</b>で判定しています。実際の負担金は既設高圧配電線までの亘長と工事内容で決まるため、目安として扱ってください。');
+  $('sum-msg').innerHTML = notes.map(n => '・' + n).join('<br>');
+
+  // ランキング表
+  const tb = $('rtbody');
+  tb.innerHTML = '';
+  const top = hits.slice(0, 50);
+  top.forEach((h, i) => {
+    const row = h.row, rk = rank(row), memo = memoOf(row);
+    const tr = document.createElement('tr');
+    tr.className = 'row-main';
+    tr.innerHTML = `
+      <td class="num">${i + 1}</td>
+      <td>
+        <span class="ss-name">${esc(val(row, 'name'))}</span>
+        <div class="ss-meta">${esc(area(row))}${val(row, 'pref') ? ' / ' + esc(val(row, 'pref')) : ''}
+          ${val(row, 'vmax') != null ? ' ・ ' + val(row, 'vmax') + 'kV' : ''}
+          ${val(row, 'vsec') != null ? '→' + val(row, 'vsec') + 'kV' : ''}</div>
+        ${memo ? `<span class="memo-tag">実績: ${esc(memo[8])}</span>` : ''}
+      </td>
+      <td class="num">${fmtDist(h.dist)}</td>
+      <td class="num">${h.s7}</td>
+      <td class="num">${h.grid}</td>
+      <td class="num total-cell">${h.total}</td>
+      <td><span class="rk ${rkClass(rk)}">${esc(rk)}</span></td>
+      <td class="tbl-links"><a href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">地図</a></td>`;
+    const dtr = document.createElement('tr');
+    dtr.className = 'row-detail';
+    dtr.style.display = 'none';
+    dtr.innerHTML = `<td colspan="8">${detailHtml(h)}</td>`;
+    tr.addEventListener('click', () => {
+      dtr.style.display = dtr.style.display === 'none' ? '' : 'none';
+    });
+    tb.appendChild(tr);
+    tb.appendChild(dtr);
+  });
+  $('tbl-note').textContent = hits.length > 50
+    ? `上位50件を表示（該当${hits.length}件）／行をクリックで内訳`
+    : '行をクリックすると内訳を表示';
+  $('tbl-empty').style.display = hits.length ? 'none' : '';
+  $('tbl-empty').textContent = '該当する変電所がありません。検索範囲を広げるか、フィルタを外してください。';
+
+  renderNoCoord(near ? area(near.row) : null, near ? val(near.row, 'pref') : null);
+}
+
+function detailHtml(h) {
+  const row = h.row, memo = memoOf(row);
+  const parts = [
+    ['S1 空容量', val(row, 's1'), 35], ['S2 N-1電制', val(row, 's2'), 10],
+    ['S3 潮流余裕', val(row, 's3'), 15], ['S4 出力制御', val(row, 's4'), 5],
+    ['S5 配電用変電所', val(row, 's5'), 10], ['S6 エリア', val(row, 's6'), 5],
+    ['S7 近接（距離）', h.s7, 20],
+  ];
+  const bars = parts.map(([label, v, max]) => `
+    <div class="sbar">
+      <span class="sbar-label">${label}</span>
+      <span class="sbar-track"><span class="sbar-fill ${v === 0 ? 'zero' : ''}" style="width:${(v / max) * 100}%"></span></span>
+      <span class="sbar-val">${v}/${max}</span>
+    </div>`).join('');
+
+  const kv = `
+    <dl class="kv">
+      <dt>空容量(上位系考慮)</dt><dd>${fmtNum(val(row, 'availUp'))} MW</dd>
+      <dt>空容量(当該設備)</dt><dd>${fmtNum(val(row, 'availCur'))} MW</dd>
+      <dt>運用容量</dt><dd>${fmtNum(val(row, 'opcap'))} MW</dd>
+      <dt>予想潮流</dt><dd>${fmtNum(val(row, 'flow'))} MW</dd>
+      <dt>N-1電制</dt><dd>${esc(n1(row))}</dd>
+      <dt>出力制御</dt><dd>${esc(curtail(row))}</dd>
+      <dt>座標精度</dt><dd>${esc(acc(row))}</dd>
+      <dt>所在地(参考)</dt><dd>${esc(val(row, 'addr') || '—')}</dd>
+    </dl>`;
+
+  const memoHtml = memo ? `<div class="detail-note"><b>この変電所の接続検討 実績</b>：
+      ${esc(memo[2])}／出力${esc(memo[3])}／負担金 ${esc(memo[4])}／工期 ${esc(memo[5])}／対策 ${esc(memo[6])}
+      <br>教訓: ${esc(memo[7])}</div>` : '';
+
+  const gateHtml = rank(row) === '除外'
+    ? `<div class="detail-note" style="border-color:var(--fail);color:var(--fail)">
+        <b>ゲート除外</b>：空容量(上位系考慮)≦0 かつ N-1電制が「可」でないため、上位系増強が必要になるリスクが高い区分です
+        （実績: 喜多方は上位系増強で工期10年2ヶ月）。</div>` : '';
+  const noDataHtml = rank(row) === 'データ無'
+    ? `<div class="detail-note"><b>空容量データ無し</b>：この変電所はOSM由来で、送配電事業者の空容量・予想潮流が未取得です。
+        S1・S3が0点のため系統スコアは実力より低く出ます。送配電事業者の空き容量マップで確認してください。</div>` : '';
+
+  return `<div class="detail-in">
+      <div><div class="dt-title">スコア内訳</div>${bars}</div>
+      <div><div class="dt-title">系統データ</div>${kv}</div>
+      ${gateHtml}${noDataHtml}${memoHtml}
+      <div class="detail-links">
+        <a class="chip" href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">📍 変電所をGoogleマップで見る</a>
+        <a class="chip" href="https://maps.gsi.go.jp/#15/${val(row, 'lat')}/${val(row, 'lon')}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>
+        <a class="chip" href="https://www.google.com/maps/dir/?api=1&origin=${$('lat').value},${$('lon').value}&destination=${val(row, 'lat')},${val(row, 'lon')}" target="_blank" rel="noopener">🚗 候補地からのルート</a>
+      </div>
+    </div>`;
+}
+
+// ── 座標未取得の高スコア変電所（同エリア）──
+function renderNoCoord(areaName, pref) {
+  const card = $('card-nocoord'), tb = $('nctbody');
+  if (!areaName) { card.style.display = 'none'; return; }
+  const list = D.rows.filter(r =>
+    val(r, 'lat') == null && area(r) === areaName && ['S', 'A'].includes(rank(r)));
+  if (!list.length) { card.style.display = 'none'; return; }
+  // 同じ都道府県を先に、そのあと系統スコア降順
+  list.sort((a, b) => (val(b, 'pref') === pref) - (val(a, 'pref') === pref) || val(b, 'grid') - val(a, 'grid'));
+  tb.innerHTML = list.slice(0, 20).map(r => `
+    <tr>
+      <td><span class="ss-name">${esc(val(r, 'name'))}</span>
+        <div class="ss-meta">${esc(val(r, 'addr') || '所在地不明')}</div></td>
+      <td>${esc(val(r, 'pref') || '—')}</td>
+      <td class="num">${fmtNum(val(r, 'availUp') != null ? val(r, 'availUp') : val(r, 'availCur'))}</td>
+      <td>${esc(n1(r))}</td>
+      <td class="num">${val(r, 'grid')}</td>
+      <td><span class="rk ${rkClass(rank(r))}">${esc(rank(r))}</span></td>
+    </tr>`).join('');
+  $('nocoord-note').textContent = `${areaName}エリア ${list.length}件中 上位${Math.min(20, list.length)}件`;
+  card.style.display = '';
+}
+
+// ── 定義・実績DBの描画 ──
+function renderStatic() {
+  $('defbody').innerHTML = D.scoreDefs.map(d =>
+    `<tr>${d.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+  const [sThr, aThr, bThr] = D.params.totalRankSteps.map(s => s[0]);
+  $('noteslist').innerHTML = D.notes.map(n => `<li>${esc(n)}</li>`).join('') +
+    `<li>系統ランクは系統スコア80点での区分（S:${D.params.gridRank.S}以上 / A:${D.params.gridRank.A} / B:${D.params.gridRank.B}）。` +
+    `本画面の総合ランクは、これを100点満点に比例換算した本ツール独自の区分（S:${sThr}以上 / A:${aThr} / B:${bThr}）です。</li>`;
+  $('resbody').innerHTML = D.results.map(r =>
+    `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[4])}</td>
+      <td>${esc(r[5])}</td><td>${esc(r[6])}</td><td>${esc(r[7])}</td></tr>`).join('');
+  $('analysislist').innerHTML = D.analysisNotes.map(n => `<li>${esc(n)}</li>`).join('');
+
+  const noCoord = D.meta.total - D.meta.withCoords;
+  $('data-note').innerHTML = `全${D.meta.total.toLocaleString()}変電所<br>うち座標あり ${D.meta.withCoords.toLocaleString()}件`;
+  $('disclaimer').innerHTML =
+    `元データ: ${esc(D.meta.source)}（生成 ${esc(D.meta.generated)}）。スコア定義は substation_scoring.py と共通で、xlsx版と同じ配点です。<br>` +
+    `<b>制約</b>: 座標が未取得の${noCoord.toLocaleString()}件は距離判定の対象外です（送配電事業者の公表データには載っているが座標が取れていない変電所）。` +
+    `高スコアの変電所はこちらに多く含まれるため、上の「同エリアの高スコア変電所」も必ず確認してください。<br>` +
+    `本ツールは事前スクリーニング用の簡易評価です。空容量は特高側の公表値であり、高圧連系の可否・負担金・工期の確定は接続検討の申込によってのみ行えます。`;
+}
+
+// ── 初期化 ──
+function init() {
+  if (!D) {
+    $('data-note').textContent = 'データ読込失敗';
+    $('btn-run').disabled = true;
+    alert('変電所データ（data/substations.js）を読み込めませんでした。ファイルが同じ場所にあるか確認してください。');
+    return;
+  }
+  renderStatic();
+
+  $('btn-run').addEventListener('click', run);
+  $('paste').addEventListener('input', e => {
+    const c = parseCoords(e.target.value);
+    if (c) {
+      $('lat').value = c.lat; $('lon').value = c.lon;
+      $('paste-msg').textContent = `→ 緯度 ${c.lat} / 経度 ${c.lon} を反映しました`;
+    } else if (e.target.value.trim()) {
+      $('paste-msg').textContent = '座標を読み取れませんでした';
+    } else {
+      $('paste-msg').textContent = '';
+    }
+  });
+  ['lat', 'lon'].forEach(id => $(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') run();
+  }));
+  ['radius', 'sortby', 'f-gate', 'f-nodata'].forEach(id => $(id).addEventListener('change', () => {
+    if ($('result').classList.contains('show')) run();
+  }));
+
+  // URLパラメータ（index.html からの引き継ぎ）
+  const q = new URLSearchParams(location.search);
+  const la = parseFloat(q.get('lat')), lo = parseFloat(q.get('lon'));
+  if (isFinite(la) && isFinite(lo)) {
+    $('lat').value = la; $('lon').value = lo;
+    run();
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>

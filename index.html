@@ -73,7 +73,13 @@ body {
 .wrap { max-width:800px; margin:0 auto; padding:28px 16px 80px; }
 
 /* ── Header ── */
-.pg-head { margin-bottom:22px; }
+.pg-head { margin-bottom:22px; display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.head-link {
+  margin-left:auto; font-size:12px; color:var(--link); text-decoration:none;
+  border:1px solid var(--bdr); border-radius:6px; padding:6px 12px;
+  background:var(--surf); white-space:nowrap;
+}
+.head-link:hover { background:var(--surf2); border-color:var(--acc); }
 .pg-title {
   font-size:17px; font-weight:700; letter-spacing:-.02em;
   display:flex; align-items:center; gap:8px;
@@ -291,11 +297,14 @@ select:focus, input:focus {
 <div class="wrap">
 
 <header class="pg-head">
-  <div class="pg-title">
-    <span class="px-badge">PX</span>
-    蓄電池案件 DDチェックシート
+  <div>
+    <div class="pg-title">
+      <span class="px-badge">PX</span>
+      蓄電池案件 DDチェックシート
+    </div>
+    <div class="pg-sub">PX案件チェックシートに準拠 ― 許認可事前確認 17項目 ＋ 系統接続変数スクリーニング</div>
   </div>
-  <div class="pg-sub">PX案件チェックシートに準拠 ― 許認可事前確認 17項目 ＋ 系統接続変数スクリーニング</div>
+  <a class="head-link" id="ss-link" href="substation.html">変電所スコア検索へ →</a>
 </header>
 
 <!-- ── 案件基本情報 ── -->
@@ -655,15 +664,19 @@ function updateLinks() {
   const lat = parseFloat(document.getElementById('lat').value);
   const lon = parseFloat(document.getElementById('lon').value);
 
+  const ssLink = document.getElementById('ss-link');
+
   if (isNaN(lat) || isNaN(lon)) {
     currentLat = null; currentLon = null;
     document.getElementById('links-area').innerHTML =
       '<div class="coord-needed">📍 上記に緯度・経度を入力すると確認マップが開けるリンクを生成します</div>';
     updatePermitLinks(null, null);
+    if (ssLink) ssLink.href = 'substation.html';
     return;
   }
 
   currentLat = lat; currentLon = lon;
+  if (ssLink) ssLink.href = `substation.html?lat=${lat}&lon=${lon}`;
 
   const links = [
     { icon:'🗺️', label:'Googleマップ', note:'衛星写真・ストリートビュー',
@@ -674,6 +687,8 @@ function updateLinks() {
       href:`https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=${lat},${lon}&z=16&base=pale` },
     { icon:'🔴', label:'J-SHIS（液状化）', note:'地震ハザードステーション',
       href:`https://www.j-shis.bosai.go.jp/map/?lang=jp&ll=${lat},${lon}&z=14` },
+    { icon:'⚡', label:'変電所スコア検索', note:'最寄り変電所の系統スコア＋近接スコア',
+      href:`substation.html?lat=${lat}&lon=${lon}` },
   ];
 
   document.getElementById('links-area').innerHTML = `
@@ -913,6 +928,17 @@ function exportGridJson(){
 
 // ── Init ──
 buildPermitTable();
+
+// 変電所スコア検索からの座標引き継ぎ（?lat=..&lon=..）
+(function () {
+  const q = new URLSearchParams(location.search);
+  const la = parseFloat(q.get('lat')), lo = parseFloat(q.get('lon'));
+  if (isFinite(la) && isFinite(lo)) {
+    document.getElementById('lat').value = la;
+    document.getElementById('lon').value = lo;
+    updateLinks();
+  }
+})();
 </script>
 
 </body>
