@@ -82,8 +82,8 @@ python scripts/build_px_checksheet.py \
 ```bash
 pip install openpyxl
 python scripts/score_substations.py \
-  --in 全国変電所リスト_66kV以上.xlsx \
-  --out 変電所スコアリング.xlsx
+  --in "data/全国変電所リスト_66kV以上.xlsx" \
+  --out "変電所スコアリング.xlsx"
 ```
 
 タブ構成：**スコアリング**（全行のゲート判定・S1〜S6・系統スコア・ランク・実績メモ。全て数式で入力に連動）／
@@ -137,6 +137,40 @@ Googleマップで開いた地点のURLを「まとめて貼り付け」欄に�
 > 送配電事業者の公表データ（空容量・予想潮流）を持つ変電所の多くは座標が未取得のため、
 > 画面下部に「同エリアの高スコア変電所（座標未取得）」を併記しています。こちらも必ず確認してください。
 
+### 変電所座標の追加（OSM / scripts/fetch_substation_coords.py）
+
+座標が未取得の変電所（全6,071件中2,924件。うちランクS/Aが1,109件）に、OpenStreetMapから
+実測座標を付与します。取得（要ネットワーク）と反映（ネットワーク不要）を分けているので、
+Overpass APIに到達できない環境ではキャッシュだけ別環境で取得して持ち込めます。
+元リストは `data/全国変電所リスト_66kV以上.xlsx` に同梱しているので、そのまま実行できます。
+
+```bash
+# ① 取得：都道府県ごとにOSMの変電所を取得してキャッシュ（Overpass APIへの接続が必要）
+python scripts/fetch_substation_coords.py fetch \
+  --in "data/全国変電所リスト_66kV以上.xlsx" --cache-dir osm_cache
+
+# ② 反映：キャッシュと名称を突き合わせて座標を書き込む（ネットワーク不要）
+python scripts/fetch_substation_coords.py apply \
+  --in "data/全国変電所リスト_66kV以上.xlsx" --cache-dir osm_cache \
+  --out "data/全国変電所リスト_66kV以上_座標追加.xlsx" --report coord_report.csv
+
+# ③ 座標が増えたらスコアリングxlsxとWeb用データを再生成
+python scripts/score_substations.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
+python scripts/build_substation_web_data.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out data/substations.js
+```
+
+**推測で座標を埋めません。** 一致しなかった行は空欄のままにします（近接スコアS7は500m〜5kmの
+刻みで判定するため、都道府県の代表点のような数十km誤差の推定値を入れると距離評価が破綻するため）。
+
+照合のルール：
+
+- 都道府県内に限定して照合（同名の変電所が全国に多数あるため）。都道府県が不明な行は全国検索し、候補がちょうど1件のときだけ採用
+- 名称は事業者名プレフィックス・法人格・連番（①など）・空白を除いて正規化。**施設種別（変電所／開閉所／変換所）は区別したまま**照合する（「芳賀変電所」と「芳賀開閉所」の取り違えを防ぐため）
+- 種別が一致しない場合のみ種別を外した緩い照合に落とすが、候補が一意のときだけ採用
+- 同名候補が複数ある場合は、リストの最大電圧と一致するOSM候補がちょうど1件のときだけ採用。決められなければ見送り
+- 付与した行の座標精度は `OSM実測(名称一致)` になり、Web版の内訳に「同名の別変電所の可能性が残る」旨が表示されます
+- `--report` で全行の照合結果（一致／特定不可／一致なし、OSM側の名称）をCSVに出力
+
 ### データの再生成
 
 `data/substations.js` は自動生成ファイルです（`window.SUBSTATION_DATA` に代入するだけの素のJSなので、
@@ -144,7 +178,7 @@ Googleマップで開いた地点のURLを「まとめて貼り付け」欄に�
 
 ```bash
 python scripts/build_substation_web_data.py \
-  --in 全国変電所リスト_66kV以上.xlsx \
+  --in "data/全国変電所リスト_66kV以上.xlsx" \
   --out data/substations.js
 ```
 
