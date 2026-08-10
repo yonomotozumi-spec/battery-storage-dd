@@ -619,6 +619,13 @@ function detailHtml(h) {
     ? `<div class="detail-note" style="border-color:var(--fail);color:var(--fail)">
         <b>ゲート除外</b>：空容量(上位系考慮)≦0 かつ N-1電制が「可」でないため、上位系増強が必要になるリスクが高い区分です
         （実績: 喜多方は上位系増強で工期10年2ヶ月）。</div>` : '';
+  const a = acc(row);
+  const accHtml = a && a !== 'OSM実測' ? `<div class="detail-note">
+      <b>座標精度: ${esc(a)}</b>：${a.includes('名称一致')
+        ? 'OSMの変電所名との一致で座標を取得しているため、同名の別変電所である可能性が残ります。'
+        : '市町村レベルの推定座標です。'}
+      距離・近接スコアS7はこの座標に基づくため、地図で位置を確認してください。</div>` : '';
+
   const noDataHtml = rank(row) === 'データ無'
     ? `<div class="detail-note"><b>空容量データ無し</b>：この変電所はOSM由来で、送配電事業者の空容量・予想潮流が未取得です。
         S1・S3が0点のため系統スコアは実力より低く出ます。送配電事業者の空き容量マップで確認してください。</div>` : '';
@@ -626,7 +633,7 @@ function detailHtml(h) {
   return `<div class="detail-in">
       <div><div class="dt-title">スコア内訳</div>${bars}</div>
       <div><div class="dt-title">系統データ</div>${kv}</div>
-      ${gateHtml}${noDataHtml}${memoHtml}
+      ${gateHtml}${noDataHtml}${accHtml}${memoHtml}
       <div class="detail-links">
         <a class="chip" href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">📍 変電所をGoogleマップで見る</a>
         <a class="chip" href="https://maps.gsi.go.jp/#15/${val(row, 'lat')}/${val(row, 'lon')}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>
