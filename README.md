@@ -82,8 +82,8 @@ python scripts/build_px_checksheet.py \
 ```bash
 pip install openpyxl
 python scripts/score_substations.py \
-  --in 全国変電所リスト_66kV以上.xlsx \
-  --out 変電所スコアリング.xlsx
+  --in "data/全国変電所リスト_66kV以上.xlsx" \
+  --out "変電所スコアリング.xlsx"
 ```
 
 タブ構成：**スコアリング**（全行のゲート判定・S1〜S6・系統スコア・ランク・実績メモ。全て数式で入力に連動）／
@@ -142,20 +142,21 @@ Googleマップで開いた地点のURLを「まとめて貼り付け」欄に�
 座標が未取得の変電所（全6,071件中2,924件。うちランクS/Aが1,109件）に、OpenStreetMapから
 実測座標を付与します。取得（要ネットワーク）と反映（ネットワーク不要）を分けているので、
 Overpass APIに到達できない環境ではキャッシュだけ別環境で取得して持ち込めます。
+元リストは `data/全国変電所リスト_66kV以上.xlsx` に同梱しているので、そのまま実行できます。
 
 ```bash
 # ① 取得：都道府県ごとにOSMの変電所を取得してキャッシュ（Overpass APIへの接続が必要）
 python scripts/fetch_substation_coords.py fetch \
-  --in 全国変電所リスト_66kV以上.xlsx --cache-dir osm_cache
+  --in "data/全国変電所リスト_66kV以上.xlsx" --cache-dir osm_cache
 
 # ② 反映：キャッシュと名称を突き合わせて座標を書き込む（ネットワーク不要）
 python scripts/fetch_substation_coords.py apply \
-  --in 全国変電所リスト_66kV以上.xlsx --cache-dir osm_cache \
-  --out 全国変電所リスト_66kV以上_座標追加.xlsx --report coord_report.csv
+  --in "data/全国変電所リスト_66kV以上.xlsx" --cache-dir osm_cache \
+  --out "data/全国変電所リスト_66kV以上_座標追加.xlsx" --report coord_report.csv
 
 # ③ 座標が増えたらスコアリングxlsxとWeb用データを再生成
-python scripts/score_substations.py --in 全国変電所リスト_66kV以上_座標追加.xlsx --out 変電所スコアリング.xlsx
-python scripts/build_substation_web_data.py --in 全国変電所リスト_66kV以上_座標追加.xlsx --out data/substations.js
+python scripts/score_substations.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
+python scripts/build_substation_web_data.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out data/substations.js
 ```
 
 **推測で座標を埋めません。** 一致しなかった行は空欄のままにします（近接スコアS7は500m〜5kmの
@@ -177,7 +178,7 @@ python scripts/build_substation_web_data.py --in 全国変電所リスト_66kV�
 
 ```bash
 python scripts/build_substation_web_data.py \
-  --in 全国変電所リスト_66kV以上.xlsx \
+  --in "data/全国変電所リスト_66kV以上.xlsx" \
   --out data/substations.js
 ```
 
