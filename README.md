@@ -171,6 +171,32 @@ python scripts/build_substation_web_data.py --in "data/全国変電所リスト_
 - 付与した行の座標精度は `OSM実測(名称一致)` になり、Web版の内訳に「同名の別変電所の可能性が残る」旨が表示されます
 - `--report` で全行の照合結果（一致／特定不可／一致なし、OSM側の名称）をCSVに出力
 
+#### Overpass APIに到達できない環境（社内プロキシ等）
+
+`fetch` は本家に加えてミラー2件を順に試し（`--endpoint` で変更可）、すべて駄目なら中断します。
+そのような環境では、未取得リストを書き出して別の手段で座標を調べ、`import` で取り込みます。
+
+```bash
+# ①' 未取得リストをCSVに出す（都道府県・電圧の降順。行ごとにOverpass照会URLとGoogleマップ検索URL付き）
+python scripts/fetch_substation_coords.py todo \
+  --in "data/全国変電所リスト_66kV以上.xlsx" --out coord_todo.csv
+
+# ②' CSVの緯度・経度列を埋めてから取り込む（出所が分かる精度表記を付ける）
+python scripts/fetch_substation_coords.py import \
+  --in "data/全国変電所リスト_66kV以上.xlsx" --csv coord_todo.csv \
+  --out "data/全国変電所リスト_66kV以上_座標追加.xlsx" \
+  --accuracy "手動確認" --report import_report.csv
+```
+
+`import` のCSVは `変電所名` `緯度` `経度`（任意で `都道府県`）の列があれば十分です（英語見出し `name` `lat` `lon` `pref` も可）。
+取り込みは `apply` と同じく安全側に倒しています。
+
+- 日本の範囲外の座標・数値でない座標は読み飛ばす
+- 都道府県を書いたCSV行は、その都道府県のリスト行にしか当てない
+- リスト側の都道府県が空の行には、CSVの都道府県がリストのエリアと矛盾しない候補が1件のときだけ当てる
+- 1件のCSV行を複数のリスト行が取り合った場合は、どちらにも書かずに見送る
+- 既に座標がある行は上書きしない（`--overwrite` で上書き可）
+
 ### データの再生成
 
 `data/substations.js` は自動生成ファイルです（`window.SUBSTATION_DATA` に代入するだけの素のJSなので、

@@ -16,8 +16,9 @@
 
 【ネットワーク】
   Overpass APIへの直接アクセスが必要。遮断された環境では取得できないため、
-  通信できる環境で `fetch` を実行して --cache-dir を持ち帰り、`apply --from-cache`
-  でオフラインに反映する運用ができる。
+  通信できる環境で `fetch` を実行して --cache-dir を持ち帰り、`apply`
+  でオフラインに反映する運用ができる。Overpassに一切到達できない環境向けに、
+  未取得リストを出す `todo` と、別途調べた座標を取り込む `import` を用意している。
 
 使い方:
   # ① 取得（要ネットワーク）。都道府県ごとにJSONを cache/ に保存する
@@ -28,6 +29,15 @@
   python scripts/fetch_substation_coords.py apply \
     --in 全国変電所リスト_66kV以上.xlsx --cache-dir osm_cache \
     --out 全国変電所リスト_66kV以上_座標追加.xlsx --report coord_report.csv
+
+  # ①' Overpassに到達できないとき：未取得リストを出す（ネットワーク不要）
+  python scripts/fetch_substation_coords.py todo \
+    --in 全国変電所リスト_66kV以上.xlsx --out coord_todo.csv
+
+  # ②' 埋めた緯度経度を取り込む（ネットワーク不要）
+  python scripts/fetch_substation_coords.py import \
+    --in 全国変電所リスト_66kV以上.xlsx --csv coord_todo.csv \
+    --out 全国変電所リスト_66kV以上_座標追加.xlsx --accuracy "手動確認"
 """
 import argparse
 import csv
@@ -45,6 +55,12 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# 本家が混んでいる／到達できないときに順に試すミラー
+OVERPASS_MIRRORS = [
+    OVERPASS_URL,
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+]
 USER_AGENT = "battery-storage-dd substation coord fetcher (+https://github.com/yonomotozumi-spec/battery-storage-dd)"
 
 ACC_OSM_NAME = "OSM実測(名称一致)"
@@ -106,6 +122,19 @@ def overpass_query_pref(pref):
     )
 
 
+def overpass_query_pref_name(pref, name):
+    """都道府県内で1つの名称を探すクエリ。todo一覧に貼る確認用URLに使う。"""
+    base = loose_name(name) or name
+    return (
+        "[out:json][timeout:60];"
+        f'area["name"="{pref}"]["admin_level"="4"]->.a;'
+        f'(way["power"="substation"]["name"~"{re.escape(base)}"](area.a);'
+        f'node["power"="substation"]["name"~"{re.escape(base)}"](area.a);'
+        f'relation["power"="substation"]["name"~"{re.escape(base)}"](area.a););'
+        "out center tags;"
+    )
+
+
 def overpass_query_japan_names(names):
     """名称の完全一致（正規表現）で全国から取得するクエリ。都道府県不明行の補完用。"""
     pattern = "|".join(re.escape(n) for n in names)
@@ -119,29 +148,38 @@ def overpass_query_japan_names(names):
     )
 
 
-def overpass_fetch(query, retries=3, sleep=5):
-    """Overpass APIを叩いてJSONを返す。429/504はバックオフして再試行。"""
+def overpass_fetch(query, retries=3, sleep=5, endpoints=None):
+    """Overpass APIを叩いてJSONを返す。429/504はバックオフして再試行し、
+    エンドポイントごと駄目なら次のミラーに移る。"""
     data = urllib.parse.urlencode({"data": query}).encode()
-    req = urllib.request.Request(OVERPASS_URL, data=data, headers={"User-Agent": USER_AGENT})
-    for attempt in range(1, retries + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=300) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            if e.code in (429, 502, 503, 504) and attempt < retries:
-                wait = sleep * (2 ** (attempt - 1))
-                print(f"  HTTP {e.code} → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
-                time.sleep(wait)
-                continue
-            raise
-        except (urllib.error.URLError, TimeoutError) as e:
-            if attempt < retries:
-                wait = sleep * (2 ** (attempt - 1))
-                print(f"  接続失敗({e}) → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
-                time.sleep(wait)
-                continue
-            raise
-    raise RuntimeError("Overpass fetch failed")
+    last = None
+    for url in endpoints or OVERPASS_MIRRORS:
+        req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT})
+        for attempt in range(1, retries + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=300) as r:
+                    return json.loads(r.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                last = e
+                if e.code in (429, 502, 503, 504) and attempt < retries:
+                    wait = sleep * (2 ** (attempt - 1))
+                    print(f"  HTTP {e.code} → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
+                    time.sleep(wait)
+                    continue
+                break
+            except (urllib.error.URLError, TimeoutError) as e:
+                last = e
+                if attempt < retries:
+                    wait = sleep * (2 ** (attempt - 1))
+                    print(f"  接続失敗({e}) → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
+                    time.sleep(wait)
+                    continue
+                break
+        print(f"  {url} から取得できませんでした（{last}）", file=sys.stderr)
+    raise RuntimeError(
+        "Overpass APIに到達できませんでした。社内プロキシ等で遮断されている場合は、"
+        "todo サブコマンドで未取得リストを出し、別環境で調べた座標を import で取り込んでください。"
+    )
 
 
 def parse_elements(payload):
@@ -210,7 +248,7 @@ def read_rows(path, sheet_name):
 
     cols = {"name": col("変電所名"), "pref": col("都道府県"), "lat": col("緯度"),
             "lon": col("経度"), "acc": col("座標精度"), "area": col("エリア"),
-            "vmax": col("最大電圧")}
+            "vmax": col("最大電圧"), "no": col("No."), "src": col("データ出典")}
     rows = []
     for r in range(hdr + 1, ws.max_row + 1):
         name = ws.cell(r, cols["name"]).value
@@ -220,11 +258,13 @@ def read_rows(path, sheet_name):
         vmax = ws.cell(r, cols["vmax"]).value
         rows.append({
             "row": r,
+            "no": ws.cell(r, cols["no"]).value,
             "name": str(name),
             "pref": pref.strip() if isinstance(pref, str) else "",
             "area": ws.cell(r, cols["area"]).value or "",
             "vmax": float(vmax) if isinstance(vmax, (int, float)) else None,
             "lat": ws.cell(r, cols["lat"]).value,
+            "src": ws.cell(r, cols["src"]).value or "",
         })
     wb.close()
     return rows, cols, hdr
@@ -248,7 +288,7 @@ def cmd_fetch(args):
             print(f"[{i}/{len(prefs)}] {pref}: キャッシュ済みのためスキップ")
             continue
         print(f"[{i}/{len(prefs)}] {pref}: 取得中…")
-        payload = overpass_fetch(overpass_query_pref(pref))
+        payload = overpass_fetch(overpass_query_pref(pref), endpoints=args.endpoint)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False)
         print(f"    {len(payload.get('elements', []))} 件取得")
@@ -265,7 +305,7 @@ def cmd_fetch(args):
             merged = {"elements": []}
             for i in range(0, len(nameless), args.chunk):
                 chunk = nameless[i:i + args.chunk]
-                payload = overpass_fetch(overpass_query_japan_names(chunk))
+                payload = overpass_fetch(overpass_query_japan_names(chunk), endpoints=args.endpoint)
                 merged["elements"].extend(payload.get("elements", []))
                 print(f"    {i + len(chunk)}/{len(nameless)} 照会済み（累計{len(merged['elements'])}件）")
                 time.sleep(args.sleep)
@@ -352,6 +392,151 @@ def cmd_apply(args):
     print("※ 一致しなかった行は空欄のままです（推定値では埋めません）。")
 
 
+def cmd_todo(args):
+    """座標未取得の行を、都道府県ごとにまとめてCSVに書き出す（ネットワーク不要）。
+
+    Overpass APIに到達できない環境で作業を引き継ぐためのリスト。行ごとに
+    Overpassの照会URLとGoogleマップの検索URLを添えるので、別環境・手作業の
+    どちらでも1件ずつ潰せる。埋めた座標は import サブコマンドで取り込む。
+    """
+    rows, _, _ = read_rows(args.src, args.list_sheet)
+    missing = [r for r in rows if not isinstance(r["lat"], (int, float))]
+    missing.sort(key=lambda r: (r["pref"] or "zz_都道府県不明", -(r["vmax"] or 0), r["name"]))
+
+    with open(args.out, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["行", "No.", "エリア", "都道府県", "変電所名", "最大電圧(kV)",
+                    "緯度", "経度", "データ出典", "Overpass照会URL", "Google Maps検索URL"])
+        for r in missing:
+            if r["pref"]:
+                q = overpass_query_pref_name(r["pref"], r["name"])
+            else:
+                q = overpass_query_japan_names([r["name"]])
+            overpass_url = OVERPASS_URL + "?" + urllib.parse.urlencode({"data": q})
+            gmap_url = "https://www.google.com/maps/search/" + urllib.parse.quote(
+                f"{r['pref']}{r['name']}")
+            w.writerow([r["row"], r["no"], r["area"], r["pref"], r["name"], r["vmax"],
+                        "", "", r["src"], overpass_url, gmap_url])
+
+    by_pref = {}
+    for r in missing:
+        by_pref[r["pref"] or "(都道府県不明)"] = by_pref.get(r["pref"] or "(都道府県不明)", 0) + 1
+    print(f"座標未取得: {len(missing)}件 / {len(by_pref)}区分")
+    for pref, n in sorted(by_pref.items(), key=lambda kv: -kv[1]):
+        print(f"  {pref}: {n}件")
+    print(f"出力: {args.out}")
+    print("緯度・経度の列を埋めて import サブコマンドに渡すと、xlsxに取り込めます。")
+
+
+def cmd_import(args):
+    """外部で調べた座標のCSVを読み、名称照合してxlsxに書き込む（ネットワーク不要）。
+
+    Overpass APIに到達できない環境でも、別環境で取得した座標・自社の設備台帳・
+    手作業で確認した座標を同じ照合ルールで反映できるようにするための入口。
+    照合は fetch/apply と同じく都道府県内に限定し、決められない行は見送る。
+    """
+    src_rows, cols, _ = read_rows(args.src, args.list_sheet)
+
+    # 都道府県がどのエリアに現れるかをリスト自身から作る。都道府県が空の行に
+    # 座標を当てるとき、エリアの合わない候補（東北の新地変電所に長崎県の座標）を弾く。
+    areas_of_pref = {}
+    for r in src_rows:
+        if r["pref"] and r["area"]:
+            areas_of_pref.setdefault(r["pref"], set()).add(r["area"])
+
+    # CSVを3通りに索引する。都道府県を書いたCSV行は、その都道府県のリスト行にしか
+    # 当てない（「新地変電所」が東北と長崎の両方にあるような取り違えを防ぐ）。
+    by_pref, no_pref, anywhere = {}, {}, {}
+    n_csv = 0
+    with open(args.csv, encoding="utf-8-sig", newline="") as f:
+        for rec in csv.DictReader(f):
+            name = (rec.get("変電所名") or rec.get("name") or "").strip()
+            lat = (rec.get("緯度") or rec.get("lat") or "").strip()
+            lon = (rec.get("経度") or rec.get("lon") or "").strip()
+            if not name or not lat or not lon:
+                continue
+            try:
+                lat, lon = float(lat), float(lon)
+            except ValueError:
+                print(f"  数値でない座標を読み飛ばし: {name} ({lat}, {lon})", file=sys.stderr)
+                continue
+            if not (20 <= lat <= 46 and 122 <= lon <= 154):
+                print(f"  日本の範囲外の座標を読み飛ばし: {name} ({lat}, {lon})", file=sys.stderr)
+                continue
+            pref = (rec.get("都道府県") or rec.get("pref") or "").strip()
+            cand = {"name": name, "lat": round(lat, 6), "lon": round(lon, 6),
+                    "voltage": 0, "pref": pref, "id": n_csv}
+            key = normalize_name(name)
+            if pref:
+                by_pref.setdefault((pref, key), []).append(cand)
+            else:
+                no_pref.setdefault(key, []).append(cand)
+            anywhere.setdefault(key, []).append(cand)
+            n_csv += 1
+    print(f"CSVから座標 {n_csv}件を読み込み")
+
+    # ① 行ごとに候補を1件へ絞る
+    picks, report, skipped = [], [], 0
+    for r in src_rows:
+        if isinstance(r["lat"], (int, float)) and not args.overwrite:
+            continue
+        key = normalize_name(r["name"])
+        if r["pref"]:
+            # ① 同じ都道府県を書いたCSV行 → ② 都道府県を書いていないCSV行（一意のときだけ）
+            cands, scope = by_pref.get((r["pref"], key), []), r["pref"]
+            if not cands:
+                cands, scope = no_pref.get(key, []), "都道府県指定なし"
+        else:
+            # リスト側の都道府県が不明。エリアが矛盾しない候補が1件のときだけ採用する
+            cands = [c for c in anywhere.get(key, [])
+                     if not c["pref"] or not r["area"]
+                     or r["area"] in areas_of_pref.get(c["pref"], set())]
+            scope = "全国(エリア照合)"
+        best, how = resolve(cands, r["vmax"])
+        if best is None:
+            if cands:
+                skipped += 1
+                report.append([r["row"], r["name"], r["pref"], how, "", ""])
+            continue
+        picks.append((r, best, f"{how}({scope})"))
+
+    # ② 1件のCSV行を複数のリスト行が取り合っていたら、どちらも見送る
+    claims = {}
+    for r, best, _ in picks:
+        claims[best["id"]] = claims.get(best["id"], 0) + 1
+
+    wb = load_workbook(args.src)
+    ws = wb[args.list_sheet]
+    fill = PatternFill("solid", fgColor="DDEBF7")  # 青=外部取込
+
+    filled, contested = 0, 0
+    for r, best, how in picks:
+        if claims[best["id"]] > 1:
+            contested += 1
+            report.append([r["row"], r["name"], r["pref"],
+                           f"CSVの「{best['name']}」を{claims[best['id']]}行が参照するため見送り", "", ""])
+            continue
+        ws.cell(r["row"], cols["lat"]).value = best["lat"]
+        ws.cell(r["row"], cols["lon"]).value = best["lon"]
+        ws.cell(r["row"], cols["acc"]).value = args.accuracy
+        for c in (cols["lat"], cols["lon"], cols["acc"]):
+            ws.cell(r["row"], c).fill = fill
+        filled += 1
+        report.append([r["row"], r["name"], r["pref"], how, best["lat"], best["lon"]])
+
+    report.sort(key=lambda x: x[0])
+    wb.save(args.out)
+    print(f"付与: {filled}件 / 候補複数で特定不可: {skipped}件 / 取込先が複数で見送り: {contested}件")
+    print(f"出力: {args.out}")
+    if args.report:
+        with open(args.report, "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["行", "変電所名", "都道府県", "結果", "緯度", "経度"])
+            w.writerows(report)
+        print(f"照合レポート: {args.report}")
+    print(f"※ 座標精度は '{args.accuracy}' として記録します。出所が分かる名前を付けてください。")
+
+
 def main():
     ap = argparse.ArgumentParser(description="OSMから変電所座標を取得して未取得行に付与する")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -363,6 +548,8 @@ def main():
     f.add_argument("--sleep", type=float, default=3.0, help="リクエスト間隔(秒)")
     f.add_argument("--chunk", type=int, default=50, help="名称検索の1リクエストあたり件数")
     f.add_argument("--force", action="store_true", help="キャッシュがあっても取り直す")
+    f.add_argument("--endpoint", action="append",
+                   help="Overpassのエンドポイント（複数指定可。既定は本家＋ミラー2件）")
     f.set_defaults(func=cmd_fetch)
 
     a = sub.add_parser("apply", help="キャッシュを突き合わせてxlsxに座標を書き込む（ネットワーク不要）")
@@ -372,6 +559,22 @@ def main():
     a.add_argument("--list-sheet", default="全国変電所リスト")
     a.add_argument("--report", help="照合結果のCSV出力先")
     a.set_defaults(func=cmd_apply)
+
+    t = sub.add_parser("todo", help="座標未取得の行を確認用URL付きでCSVに書き出す（ネットワーク不要）")
+    t.add_argument("--in", dest="src", required=True)
+    t.add_argument("--out", required=True)
+    t.add_argument("--list-sheet", default="全国変電所リスト")
+    t.set_defaults(func=cmd_todo)
+
+    i = sub.add_parser("import", help="外部で調べた座標のCSVを名称照合して書き込む（ネットワーク不要）")
+    i.add_argument("--in", dest="src", required=True)
+    i.add_argument("--csv", required=True, help="変電所名・緯度・経度（任意で都道府県）列を持つCSV")
+    i.add_argument("--out", required=True)
+    i.add_argument("--list-sheet", default="全国変電所リスト")
+    i.add_argument("--accuracy", default="外部取込", help="書き込む座標精度の表記")
+    i.add_argument("--overwrite", action="store_true", help="座標がある行も上書きする")
+    i.add_argument("--report", help="照合結果のCSV出力先")
+    i.set_defaults(func=cmd_import)
 
     args = ap.parse_args()
     args.func(args)
