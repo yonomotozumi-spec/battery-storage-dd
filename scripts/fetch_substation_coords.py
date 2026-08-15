@@ -119,8 +119,16 @@ def overpass_query_japan_names(names):
     )
 
 
+MAX_RETRY_WAIT = 60  # バックオフの上限(秒)。長時間の再試行でも待ち過ぎない
+
+
 def overpass_fetch(query, retries=3, sleep=5):
-    """Overpass APIを叩いてJSONを返す。429/504はバックオフして再試行。"""
+    """Overpass APIを叩いてJSONを返す。429/504や接続断はバックオフして再試行。
+
+    Overpassは共有IPからのアクセスを一時的に遮断することがあり、その間は
+    接続が reset される。--retries を増やすと1プロセスのまま粘れる
+    （取得済み都道府県はキャッシュに残るので、途中で落ちてもやり直しは効く）。
+    """
     data = urllib.parse.urlencode({"data": query}).encode()
     req = urllib.request.Request(OVERPASS_URL, data=data, headers={"User-Agent": USER_AGENT})
     for attempt in range(1, retries + 1):
@@ -129,14 +137,14 @@ def overpass_fetch(query, retries=3, sleep=5):
                 return json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code in (429, 502, 503, 504) and attempt < retries:
-                wait = sleep * (2 ** (attempt - 1))
+                wait = min(sleep * (2 ** (attempt - 1)), MAX_RETRY_WAIT)
                 print(f"  HTTP {e.code} → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
                 time.sleep(wait)
                 continue
             raise
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             if attempt < retries:
-                wait = sleep * (2 ** (attempt - 1))
+                wait = min(sleep * (2 ** (attempt - 1)), MAX_RETRY_WAIT)
                 print(f"  接続失敗({e}) → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
                 time.sleep(wait)
                 continue
@@ -248,7 +256,7 @@ def cmd_fetch(args):
             print(f"[{i}/{len(prefs)}] {pref}: キャッシュ済みのためスキップ")
             continue
         print(f"[{i}/{len(prefs)}] {pref}: 取得中…")
-        payload = overpass_fetch(overpass_query_pref(pref))
+        payload = overpass_fetch(overpass_query_pref(pref), args.retries, args.retry_sleep)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False)
         print(f"    {len(payload.get('elements', []))} 件取得")
@@ -265,7 +273,7 @@ def cmd_fetch(args):
             merged = {"elements": []}
             for i in range(0, len(nameless), args.chunk):
                 chunk = nameless[i:i + args.chunk]
-                payload = overpass_fetch(overpass_query_japan_names(chunk))
+                payload = overpass_fetch(overpass_query_japan_names(chunk), args.retries, args.retry_sleep)
                 merged["elements"].extend(payload.get("elements", []))
                 print(f"    {i + len(chunk)}/{len(nameless)} 照会済み（累計{len(merged['elements'])}件）")
                 time.sleep(args.sleep)
@@ -363,6 +371,10 @@ def main():
     f.add_argument("--sleep", type=float, default=3.0, help="リクエスト間隔(秒)")
     f.add_argument("--chunk", type=int, default=50, help="名称検索の1リクエストあたり件数")
     f.add_argument("--force", action="store_true", help="キャッシュがあっても取り直す")
+    f.add_argument("--retries", type=int, default=3,
+                   help="1リクエストあたりの再試行回数。Overpassに遮断されがちな環境では増やす")
+    f.add_argument("--retry-sleep", type=float, default=5.0,
+                   help="再試行の初期待ち時間(秒)。以後2倍ずつ、最大%d秒" % MAX_RETRY_WAIT)
     f.set_defaults(func=cmd_fetch)
 
     a = sub.add_parser("apply", help="キャッシュを突き合わせてxlsxに座標を書き込む（ネットワーク不要）")
