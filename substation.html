@@ -620,10 +620,12 @@ function detailHtml(h) {
         <b>ゲート除外</b>：空容量(上位系考慮)≦0 かつ N-1電制が「可」でないため、上位系増強が必要になるリスクが高い区分です
         （実績: 喜多方は上位系増強で工期10年2ヶ月）。</div>` : '';
   const a = acc(row);
-  const accHtml = a && a !== 'OSM実測' ? `<div class="detail-note">
-      <b>座標精度: ${esc(a)}</b>：${a.includes('名称一致')
-        ? 'OSMの変電所名との一致で座標を取得しているため、同名の別変電所である可能性が残ります。'
-        : '市町村レベルの推定座標です。'}
+  const accNote = v => v.includes('名称一致')
+    ? 'OSMの変電所名との一致で座標を取得しているため、同名の別変電所である可能性が残ります。'
+    : v === '推定' ? '市町村レベルの推定座標です。'
+    : 'OSM実測以外の出所から取り込んだ座標です。';
+  const accHtml = a && a !== 'OSM実測' && a !== '未取得' ? `<div class="detail-note">
+      <b>座標精度: ${esc(a)}</b>：${accNote(a)}
       距離・近接スコアS7はこの座標に基づくため、地図で位置を確認してください。</div>` : '';
 
   const noDataHtml = rank(row) === 'データ無'
