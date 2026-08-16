@@ -48,6 +48,11 @@ OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 USER_AGENT = "battery-storage-dd substation coord fetcher (+https://github.com/yonomotozumi-spec/battery-storage-dd)"
 
 ACC_OSM_NAME = "OSM実測(名称一致)"
+
+# 全国名称検索の結果をエリアの実測分布と突き合わせるときの許容幅（度）と、
+# 分布を作るのに最低限必要な参照点の数
+AREA_BOX_MARGIN = 0.3
+AREA_BOX_MIN_REF = 20
 OSM_FILL = PatternFill("solid", fgColor="E2EFDA")  # 緑=OSM実測
 
 # 変電所名の正規化で落とす事業者名プレフィックス
@@ -86,6 +91,10 @@ def normalize_name(name):
             s = s[: -len(suf)]
             break
     s = re.sub(r"[0-9]+$", "", s).strip()      # 種別の前の連番
+    # 固有名が残らないものは照合に使わない。「6203変電所」のように名前自体が数字だと
+    # 連番除去で固有名が消え、OSM側の名無しの「変電所」と同じキーになってしまうため。
+    if not s:
+        return ""
     return s + ("@" + kind if kind else "")
 
 
@@ -176,7 +185,9 @@ def parse_elements(payload):
         cand = {"name": name, "lat": round(float(lat), 6), "lon": round(float(lon), 6),
                 "voltage": volt / 1000.0 if volt else 0}   # OSMはV単位 → kV
         strict.setdefault(key, []).append(cand)
-        loose.setdefault(loose_name(name), []).append(cand)
+        lkey = loose_name(name)
+        if lkey:
+            loose.setdefault(lkey, []).append(cand)
     return strict, loose
 
 
@@ -195,6 +206,41 @@ def resolve(cands, vmax_kv):
         if len(exact) == 1:
             return exact[0], "一致(電圧で特定)"
     return None, f"候補{len(cands)}件で特定不可"
+
+
+def area_ranges(rows):
+    """既にOSM実測座標がある行から、エリアごとの緯度経度レンジを作る。
+
+    全国名称検索は同名の別変電所を掴みやすい（例: 関西エリアの「稲美変電所」に
+    北海道のOSM座標が付く）。都道府県が不明でもエリアは必ず判っているため、
+    そのエリアの実測分布から外れた候補は採用しない。
+    """
+    pts = {}
+    for r in rows:
+        if (isinstance(r["lat"], (int, float)) and isinstance(r["lon"], (int, float))
+                and str(r["acc"] or "").startswith("OSM実測")):
+            pts.setdefault(r["area"], []).append((r["lat"], r["lon"]))
+
+    def pct(seq, f):
+        return seq[min(len(seq) - 1, max(0, int(len(seq) * f)))]
+
+    box = {}
+    for area, ps in pts.items():
+        if len(ps) < AREA_BOX_MIN_REF:
+            continue   # 参照点が少ないエリア(J-POWER等)は分布が作れないので判定しない
+        lats = sorted(p[0] for p in ps)
+        lons = sorted(p[1] for p in ps)
+        box[area] = (pct(lats, 0.005) - AREA_BOX_MARGIN, pct(lats, 0.995) + AREA_BOX_MARGIN,
+                     pct(lons, 0.005) - AREA_BOX_MARGIN, pct(lons, 0.995) + AREA_BOX_MARGIN)
+    return box
+
+
+def in_area(box, area, lat, lon):
+    """レンジを作れなかったエリアは判定材料が無いので True（採用を妨げない）。"""
+    b = box.get(area)
+    if b is None:
+        return True
+    return b[0] <= lat <= b[1] and b[2] <= lon <= b[3]
 
 
 def read_rows(path, sheet_name):
@@ -233,6 +279,8 @@ def read_rows(path, sheet_name):
             "area": ws.cell(r, cols["area"]).value or "",
             "vmax": float(vmax) if isinstance(vmax, (int, float)) else None,
             "lat": ws.cell(r, cols["lat"]).value,
+            "lon": ws.cell(r, cols["lon"]).value,
+            "acc": ws.cell(r, cols["acc"]).value,
         })
     wb.close()
     return rows, cols, hdr
@@ -307,7 +355,8 @@ def cmd_apply(args):
     wb = load_workbook(args.src)
     ws = wb[args.list_sheet]
 
-    filled, ambiguous, unmatched = 0, 0, 0
+    box = area_ranges(rows)
+    filled, ambiguous, unmatched, off_area = 0, 0, 0, 0
     report = []
     for r in rows:
         if isinstance(r["lat"], (int, float)):
@@ -331,6 +380,14 @@ def cmd_apply(args):
             elif l_cands:
                 how = f"候補{len(l_cands)}件で特定不可"
 
+        # 全国検索は同名の別変電所を掴みうるので、エリアの実測分布から外れたら捨てる
+        if best is not None and scope == "全国" and not in_area(box, r["area"], best["lat"], best["lon"]):
+            off_area += 1
+            report.append([r["row"], r["name"], r["pref"],
+                           f"{how}(全国)だが{r['area']}エリア外のため不採用",
+                           "", "", best["name"]])
+            continue
+
         if best is None:
             if "特定不可" in how:
                 ambiguous += 1
@@ -349,7 +406,8 @@ def cmd_apply(args):
                        best["lat"], best["lon"], best["name"]])
 
     wb.save(args.out)
-    print(f"付与: {filled}件 / 候補複数で特定不可: {ambiguous}件 / 一致なし: {unmatched}件")
+    print(f"付与: {filled}件 / 候補複数で特定不可: {ambiguous}件 / "
+          f"エリア外で不採用: {off_area}件 / 一致なし: {unmatched}件")
     print(f"出力: {args.out}")
     if args.report:
         with open(args.report, "w", encoding="utf-8-sig", newline="") as f:
