@@ -262,9 +262,9 @@ def read_rows(path, sheet_name):
                 return i + 1
         raise SystemExit(f"ヘッダー '{token}' が見つかりません: {headers}")
 
-    cols = {"name": col("変電所名"), "pref": col("都道府県"), "lat": col("緯度"),
-            "lon": col("経度"), "acc": col("座標精度"), "area": col("エリア"),
-            "vmax": col("最大電圧")}
+    cols = {"no": col("No."), "name": col("変電所名"), "pref": col("都道府県"),
+            "lat": col("緯度"), "lon": col("経度"), "acc": col("座標精度"),
+            "area": col("エリア"), "vmax": col("最大電圧")}
     rows = []
     for r in range(hdr + 1, ws.max_row + 1):
         name = ws.cell(r, cols["name"]).value
@@ -274,6 +274,7 @@ def read_rows(path, sheet_name):
         vmax = ws.cell(r, cols["vmax"]).value
         rows.append({
             "row": r,
+            "no": ws.cell(r, cols["no"]).value,   # 本体xlsxの行を一意に指す。merge_coords.py の突き合わせキー
             "name": str(name),
             "pref": pref.strip() if isinstance(pref, str) else "",
             "area": ws.cell(r, cols["area"]).value or "",

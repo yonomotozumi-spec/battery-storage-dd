@@ -61,12 +61,15 @@ AREA_OPERATOR = {
     "J-POWER": "電源開発",
 }
 
+# No. は本体xlsxの行を一意に指すキー。merge_coords.py が突き合わせに使うので消さないこと
+# （エリア＋変電所名は13組が重複しており、キーにできない）
 COLUMNS = [
-    ("優先順位", 8), ("ランク", 7), ("系統スコア", 10), ("エリア", 8), ("変電所名", 20),
-    ("都道府県", 11), ("最大電圧\nkV", 9), ("二次電圧\nkV", 9), ("空容量\n上位系MW", 11),
-    ("空容量\n当該MW", 11), ("N-1電制", 9), ("出力制御", 9), ("問い合わせ先", 22),
-    ("検索リンク", 12), ("緯度", 11), ("経度", 11), ("出典メモ", 22),
+    ("No.", 7), ("優先順位", 8), ("ランク", 7), ("系統スコア", 10), ("エリア", 8),
+    ("変電所名", 20), ("都道府県", 11), ("最大電圧\nkV", 9), ("二次電圧\nkV", 9),
+    ("空容量\n上位系MW", 11), ("空容量\n当該MW", 11), ("N-1電制", 9), ("出力制御", 9),
+    ("問い合わせ先", 22), ("検索リンク", 12), ("緯度", 11), ("経度", 11), ("出典メモ", 22),
 ]
+COL = {h.replace("\n", ""): i for i, (h, _) in enumerate(COLUMNS, 1)}
 
 
 def maps_query(row):
@@ -107,17 +110,17 @@ def write_list_sheet(ws, title, targets, defer=False):
 
     for i, r in enumerate(targets):
         row = 3 + i
-        values = [i + 1, r["rank"], r["grid"], r["area"], r["name"], r["pref"],
+        values = [r["no"], i + 1, r["rank"], r["grid"], r["area"], r["name"], r["pref"],
                   r["vmax"], r["vsec"], r["avail_up"], r["avail"], r["n1"], r["curtail"],
                   AREA_OPERATOR.get(r["area"], ""), None, None, None, None]
         for c, v in enumerate(values, 1):
             cell = ws.cell(row, c, v)
             cell.border = BORDER
-        link = ws.cell(row, 14, "地図で探す")
+        link = ws.cell(row, COL["検索リンク"], "地図で探す")
         link.hyperlink = maps_query(r)
         link.font = Font(color="0563C1", underline="single")
-        for c in (15, 16, 17):        # 緯度・経度・出典メモは記入用
-            ws.cell(row, c).fill = INPUT_FILL
+        for name in ("緯度", "経度", "出典メモ"):        # 記入用
+            ws.cell(row, COL[name]).fill = INPUT_FILL
     ws.freeze_panes = "A3"
     return len(targets)
 
