@@ -271,7 +271,11 @@ python scripts/fetch_chuden_coords.py fill \
 | 沖縄 | 55 | PDF | 無し |
 | 九州 | 26 | PDF系統図＋画像ベースのHTML供給余力マップ | 無し |
 | 中国 | 20 | PDF（系統空容量マップ） | 無し |
-| 東京 | 17 | `www.tepco.co.jp` がデータセンタIPに403を返すため未確認 | 未確認 |
+| 東京 | 17 | PDF（`pdf_new/akiyouryou_<県名>.pdf` の県別空容量マッピング） | 無し |
+
+なお `www.tepco.co.jp` は Akamai が `/robots.txt` を含む全パスに403を返すため（ブラウザUA・
+`Accept-Language: ja` でも同じ）、この環境からは直接確認できません。上表の東京の欄は
+公開資料のURL構成から判断したものです。
 
 北陸電力送配電の系統図には、性質がはっきり書かれています。
 
