@@ -479,7 +479,7 @@ function run() {
   const sortBy = $('sortby').value;
 
   const hits = [];
-  let nearestAny = null;
+  let nearestAny = null, hiddenGate = 0, hiddenNoData = 0;
   for (const row of D.rows) {
     const la = val(row, 'lat'), lo = val(row, 'lon');
     if (la == null || lo == null) continue;
@@ -487,8 +487,10 @@ function run() {
     if (!nearestAny || d < nearestAny.dist) nearestAny = { row, dist: d };
     if (radius && d > radius) continue;
     const rk = rank(row);
-    if (!showGate && rk === '除外') continue;
-    if (!showNoData && rk === 'データ無') continue;
+    // 非表示にした分も件数だけは数える。候補地の近くにゲート除外しか無いことが
+    // 分かればその候補地を落とせるため、存在自体は隠さない。
+    if (!showGate && rk === '除外') { hiddenGate++; continue; }
+    if (!showNoData && rk === 'データ無') { hiddenNoData++; continue; }
     const s7 = s7Points(d);
     hits.push({ row, dist: d, s7, grid: val(row, 'grid'), total: val(row, 'grid') + s7 });
   }
@@ -498,13 +500,13 @@ function run() {
   else hits.sort((a, b) => b.total - a.total || a.dist - b.dist);
 
   lastResults = hits;
-  render(hits, { lat, lon, radius, nearestAny });
+  render(hits, { lat, lon, radius, nearestAny, hiddenGate, hiddenNoData });
   $('result').classList.add('show');
   $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function render(hits, ctx) {
-  const { lat, lon, radius, nearestAny } = ctx;
+  const { lat, lon, radius, nearestAny, hiddenGate, hiddenNoData } = ctx;
   $('res-coord').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}　/　` +
     (radius ? `半径${radius / 1000}km` : '全国');
   $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
@@ -537,6 +539,11 @@ function render(hits, ctx) {
 
   const notes = [];
   if (!hits.length) notes.push('指定範囲に変電所が見つかりませんでした。検索範囲を広げてください。');
+  // ゲート除外は既定で表に出さないが、件数は必ず知らせる。近くに除外しか無いことが
+  // 分かればその候補地を落とせるため、「該当なし」と区別できないと判断を誤る。
+  if (hiddenGate) notes.push(`範囲内に<b>ゲート除外の変電所が${hiddenGate}件</b>あります（表に出すには「ゲート除外の変電所も表示」にチェック）。` +
+    (hits.length ? '' : '<b>この範囲で連系できる変電所はこれだけです。</b>候補地としては見送りが妥当です。'));
+  if (hiddenNoData) notes.push(`範囲内に空容量が未公表の変電所が${hiddenNoData}件あります（表に出すにはチェックを入れてください）。`);
   if (best && best.s7 === 0) notes.push('最有力候補までの距離が5kmを超えており、近接スコアは0点です。負担金は高圧線の亘長にほぼ比例するため、より近い候補地を探すことを推奨します。');
   if (scored.length === 0 && hits.length) notes.push('範囲内の変電所はすべて空容量が未公表（OSM由来）です。系統の空きは送配電事業者の公表マップか接続検討で確認してください。');
   notes.push('近接スコアは<b>変電所までの直線距離</b>で判定しています。実際の負担金は既設高圧配電線までの亘長と工事内容で決まるため、目安として扱ってください。');
@@ -620,11 +627,29 @@ function detailHtml(h) {
         <b>ゲート除外</b>：空容量(上位系考慮)≦0 かつ N-1電制が「可」でないため、上位系増強が必要になるリスクが高い区分です
         （実績: 喜多方は上位系増強で工期10年2ヶ月）。</div>` : '';
   const a = acc(row);
-  const accHtml = a && a !== 'OSM実測' ? `<div class="detail-note">
-      <b>座標精度: ${esc(a)}</b>：${a.includes('名称一致')
-        ? 'OSMの変電所名との一致で座標を取得しているため、同名の別変電所である可能性が残ります。'
-        : '市町村レベルの推定座標です。'}
-      距離・近接スコアS7はこの座標に基づくため、地図で位置を確認してください。</div>` : '';
+  // 座標精度ごとに注意の内容が変わる。'公表資料' は送配電事業者が公表している座標で
+  // OSMより確度が高いため、推定座標と同じ注記を出さないこと。
+  let accHtml = '';
+  if (a && a !== 'OSM実測' && a !== '未取得') {
+    if (a.includes('Google')) {
+      accHtml = `<div class="detail-note">
+        <b>座標精度: ${esc(a)}</b>：Google Mapsの地点情報から、変電所名が一致したものだけを採用し、
+        座標の所在地が行の都道府県・エリアと合うことを確認しています。座標が既知の中部496件で
+        測った誤差は中央値6m・最大1.2kmでした。1km前後ずれる場合があるため、
+        S7が境界付近になる候補は地図で位置を確認してください。</div>`;
+    } else if (a.includes('公表資料')) {
+      accHtml = `<div class="detail-note">
+        <b>座標精度: ${esc(a)}</b>：送配電事業者が公表しているマッピングの座標です
+        （中部エリアは中部電力パワーグリッド「系統空容量マッピング」）。
+        同一敷地に複数バンクがある場合はその重心を採っています。</div>`;
+    } else {
+      accHtml = `<div class="detail-note">
+        <b>座標精度: ${esc(a)}</b>：${a.includes('名称一致')
+          ? 'OSMの変電所名との一致で座標を取得しているため、同名の別変電所である可能性が残ります。'
+          : '市町村レベルの推定座標です。'}
+        距離・近接スコアS7はこの座標に基づくため、地図で位置を確認してください。</div>`;
+    }
+  }
 
   const noDataHtml = rank(row) === 'データ無'
     ? `<div class="detail-note"><b>空容量データ無し</b>：この変電所はOSM由来で、送配電事業者の空容量・予想潮流が未取得です。

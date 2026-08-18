@@ -48,6 +48,11 @@ OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 USER_AGENT = "battery-storage-dd substation coord fetcher (+https://github.com/yonomotozumi-spec/battery-storage-dd)"
 
 ACC_OSM_NAME = "OSM実測(名称一致)"
+
+# 全国名称検索の結果をエリアの実測分布と突き合わせるときの許容幅（度）と、
+# 分布を作るのに最低限必要な参照点の数
+AREA_BOX_MARGIN = 0.3
+AREA_BOX_MIN_REF = 20
 OSM_FILL = PatternFill("solid", fgColor="E2EFDA")  # 緑=OSM実測
 
 # 変電所名の正規化で落とす事業者名プレフィックス
@@ -86,6 +91,10 @@ def normalize_name(name):
             s = s[: -len(suf)]
             break
     s = re.sub(r"[0-9]+$", "", s).strip()      # 種別の前の連番
+    # 固有名が残らないものは照合に使わない。「6203変電所」のように名前自体が数字だと
+    # 連番除去で固有名が消え、OSM側の名無しの「変電所」と同じキーになってしまうため。
+    if not s:
+        return ""
     return s + ("@" + kind if kind else "")
 
 
@@ -119,8 +128,16 @@ def overpass_query_japan_names(names):
     )
 
 
+MAX_RETRY_WAIT = 60  # バックオフの上限(秒)。長時間の再試行でも待ち過ぎない
+
+
 def overpass_fetch(query, retries=3, sleep=5):
-    """Overpass APIを叩いてJSONを返す。429/504はバックオフして再試行。"""
+    """Overpass APIを叩いてJSONを返す。429/504や接続断はバックオフして再試行。
+
+    Overpassは共有IPからのアクセスを一時的に遮断することがあり、その間は
+    接続が reset される。--retries を増やすと1プロセスのまま粘れる
+    （取得済み都道府県はキャッシュに残るので、途中で落ちてもやり直しは効く）。
+    """
     data = urllib.parse.urlencode({"data": query}).encode()
     req = urllib.request.Request(OVERPASS_URL, data=data, headers={"User-Agent": USER_AGENT})
     for attempt in range(1, retries + 1):
@@ -129,14 +146,14 @@ def overpass_fetch(query, retries=3, sleep=5):
                 return json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code in (429, 502, 503, 504) and attempt < retries:
-                wait = sleep * (2 ** (attempt - 1))
+                wait = min(sleep * (2 ** (attempt - 1)), MAX_RETRY_WAIT)
                 print(f"  HTTP {e.code} → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
                 time.sleep(wait)
                 continue
             raise
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             if attempt < retries:
-                wait = sleep * (2 ** (attempt - 1))
+                wait = min(sleep * (2 ** (attempt - 1)), MAX_RETRY_WAIT)
                 print(f"  接続失敗({e}) → {wait}秒待って再試行 ({attempt}/{retries})", file=sys.stderr)
                 time.sleep(wait)
                 continue
@@ -168,7 +185,9 @@ def parse_elements(payload):
         cand = {"name": name, "lat": round(float(lat), 6), "lon": round(float(lon), 6),
                 "voltage": volt / 1000.0 if volt else 0}   # OSMはV単位 → kV
         strict.setdefault(key, []).append(cand)
-        loose.setdefault(loose_name(name), []).append(cand)
+        lkey = loose_name(name)
+        if lkey:
+            loose.setdefault(lkey, []).append(cand)
     return strict, loose
 
 
@@ -187,6 +206,41 @@ def resolve(cands, vmax_kv):
         if len(exact) == 1:
             return exact[0], "一致(電圧で特定)"
     return None, f"候補{len(cands)}件で特定不可"
+
+
+def area_ranges(rows):
+    """既にOSM実測座標がある行から、エリアごとの緯度経度レンジを作る。
+
+    全国名称検索は同名の別変電所を掴みやすい（例: 関西エリアの「稲美変電所」に
+    北海道のOSM座標が付く）。都道府県が不明でもエリアは必ず判っているため、
+    そのエリアの実測分布から外れた候補は採用しない。
+    """
+    pts = {}
+    for r in rows:
+        if (isinstance(r["lat"], (int, float)) and isinstance(r["lon"], (int, float))
+                and str(r["acc"] or "").startswith("OSM実測")):
+            pts.setdefault(r["area"], []).append((r["lat"], r["lon"]))
+
+    def pct(seq, f):
+        return seq[min(len(seq) - 1, max(0, int(len(seq) * f)))]
+
+    box = {}
+    for area, ps in pts.items():
+        if len(ps) < AREA_BOX_MIN_REF:
+            continue   # 参照点が少ないエリア(J-POWER等)は分布が作れないので判定しない
+        lats = sorted(p[0] for p in ps)
+        lons = sorted(p[1] for p in ps)
+        box[area] = (pct(lats, 0.005) - AREA_BOX_MARGIN, pct(lats, 0.995) + AREA_BOX_MARGIN,
+                     pct(lons, 0.005) - AREA_BOX_MARGIN, pct(lons, 0.995) + AREA_BOX_MARGIN)
+    return box
+
+
+def in_area(box, area, lat, lon):
+    """レンジを作れなかったエリアは判定材料が無いので True（採用を妨げない）。"""
+    b = box.get(area)
+    if b is None:
+        return True
+    return b[0] <= lat <= b[1] and b[2] <= lon <= b[3]
 
 
 def read_rows(path, sheet_name):
@@ -208,9 +262,9 @@ def read_rows(path, sheet_name):
                 return i + 1
         raise SystemExit(f"ヘッダー '{token}' が見つかりません: {headers}")
 
-    cols = {"name": col("変電所名"), "pref": col("都道府県"), "lat": col("緯度"),
-            "lon": col("経度"), "acc": col("座標精度"), "area": col("エリア"),
-            "vmax": col("最大電圧")}
+    cols = {"no": col("No."), "name": col("変電所名"), "pref": col("都道府県"),
+            "lat": col("緯度"), "lon": col("経度"), "acc": col("座標精度"),
+            "area": col("エリア"), "vmax": col("最大電圧")}
     rows = []
     for r in range(hdr + 1, ws.max_row + 1):
         name = ws.cell(r, cols["name"]).value
@@ -220,11 +274,14 @@ def read_rows(path, sheet_name):
         vmax = ws.cell(r, cols["vmax"]).value
         rows.append({
             "row": r,
+            "no": ws.cell(r, cols["no"]).value,   # 本体xlsxの行を一意に指す。merge_coords.py の突き合わせキー
             "name": str(name),
             "pref": pref.strip() if isinstance(pref, str) else "",
             "area": ws.cell(r, cols["area"]).value or "",
             "vmax": float(vmax) if isinstance(vmax, (int, float)) else None,
             "lat": ws.cell(r, cols["lat"]).value,
+            "lon": ws.cell(r, cols["lon"]).value,
+            "acc": ws.cell(r, cols["acc"]).value,
         })
     wb.close()
     return rows, cols, hdr
@@ -248,7 +305,7 @@ def cmd_fetch(args):
             print(f"[{i}/{len(prefs)}] {pref}: キャッシュ済みのためスキップ")
             continue
         print(f"[{i}/{len(prefs)}] {pref}: 取得中…")
-        payload = overpass_fetch(overpass_query_pref(pref))
+        payload = overpass_fetch(overpass_query_pref(pref), args.retries, args.retry_sleep)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False)
         print(f"    {len(payload.get('elements', []))} 件取得")
@@ -265,7 +322,7 @@ def cmd_fetch(args):
             merged = {"elements": []}
             for i in range(0, len(nameless), args.chunk):
                 chunk = nameless[i:i + args.chunk]
-                payload = overpass_fetch(overpass_query_japan_names(chunk))
+                payload = overpass_fetch(overpass_query_japan_names(chunk), args.retries, args.retry_sleep)
                 merged["elements"].extend(payload.get("elements", []))
                 print(f"    {i + len(chunk)}/{len(nameless)} 照会済み（累計{len(merged['elements'])}件）")
                 time.sleep(args.sleep)
@@ -299,7 +356,8 @@ def cmd_apply(args):
     wb = load_workbook(args.src)
     ws = wb[args.list_sheet]
 
-    filled, ambiguous, unmatched = 0, 0, 0
+    box = area_ranges(rows)
+    filled, ambiguous, unmatched, off_area = 0, 0, 0, 0
     report = []
     for r in rows:
         if isinstance(r["lat"], (int, float)):
@@ -323,6 +381,14 @@ def cmd_apply(args):
             elif l_cands:
                 how = f"候補{len(l_cands)}件で特定不可"
 
+        # 全国検索は同名の別変電所を掴みうるので、エリアの実測分布から外れたら捨てる
+        if best is not None and scope == "全国" and not in_area(box, r["area"], best["lat"], best["lon"]):
+            off_area += 1
+            report.append([r["row"], r["name"], r["pref"],
+                           f"{how}(全国)だが{r['area']}エリア外のため不採用",
+                           "", "", best["name"]])
+            continue
+
         if best is None:
             if "特定不可" in how:
                 ambiguous += 1
@@ -341,7 +407,8 @@ def cmd_apply(args):
                        best["lat"], best["lon"], best["name"]])
 
     wb.save(args.out)
-    print(f"付与: {filled}件 / 候補複数で特定不可: {ambiguous}件 / 一致なし: {unmatched}件")
+    print(f"付与: {filled}件 / 候補複数で特定不可: {ambiguous}件 / "
+          f"エリア外で不採用: {off_area}件 / 一致なし: {unmatched}件")
     print(f"出力: {args.out}")
     if args.report:
         with open(args.report, "w", encoding="utf-8-sig", newline="") as f:
@@ -363,6 +430,10 @@ def main():
     f.add_argument("--sleep", type=float, default=3.0, help="リクエスト間隔(秒)")
     f.add_argument("--chunk", type=int, default=50, help="名称検索の1リクエストあたり件数")
     f.add_argument("--force", action="store_true", help="キャッシュがあっても取り直す")
+    f.add_argument("--retries", type=int, default=3,
+                   help="1リクエストあたりの再試行回数。Overpassに遮断されがちな環境では増やす")
+    f.add_argument("--retry-sleep", type=float, default=5.0,
+                   help="再試行の初期待ち時間(秒)。以後2倍ずつ、最大%d秒" % MAX_RETRY_WAIT)
     f.set_defaults(func=cmd_fetch)
 
     a = sub.add_parser("apply", help="キャッシュを突き合わせてxlsxに座標を書き込む（ネットワーク不要）")
