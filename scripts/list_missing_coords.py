@@ -78,8 +78,8 @@ def maps_query(row):
     return "https://www.google.com/maps/search/" + urllib.parse.quote(" ".join(terms))
 
 
-def load_targets(src, sheet):
-    """S/Aかつゲート除外でない、座標未取得の行を返す。"""
+def load_targets(src, sheet, ranks=("S", "A"), include_gated=False):
+    """指定ランクの、座標未取得の行を返す（既定はS/Aかつゲート除外でない行）。"""
     rows = [dict(zip(FIELDS, r)) for r in read_substations(src, sheet)]
     targets = []
     for r in rows:
@@ -87,7 +87,7 @@ def load_targets(src, sheet):
             continue
         sc = S.score_row(r["area"], r["vsec"], r["opcap"], r["flow"],
                          r["avail"], r["avail_up"], r["n1"], r["curtail"])
-        if sc["gate"] == "除外" or sc["rank"] not in ("S", "A"):
+        if (sc["gate"] == "除外" and not include_gated) or sc["rank"] not in ranks:
             continue
         r["rank"] = sc["rank"]
         r["grid"] = sc["grid_score"]
@@ -163,11 +163,17 @@ def main():
     ap.add_argument("--in", dest="src", required=True)
     ap.add_argument("--out", dest="out", required=True)
     ap.add_argument("--list-sheet", default="全国変電所リスト")
+    ap.add_argument("--ranks", default="S,A",
+                    help="対象ランク（カンマ区切り）。既定 S,A。"
+                         "例: --ranks B は候補地の除外判定用に座標だけ揃える用途")
+    ap.add_argument("--include-gated", action="store_true",
+                    help="ゲート除外の行も含める（座標だけ揃えたい場合）")
     ap.add_argument("--defer", action="append", default=[],
                     help="劣後させるエリア名。複数指定可（例: --defer 四国 --defer 北陸）")
     args = ap.parse_args()
 
-    all_rows, targets = load_targets(args.src, args.list_sheet)
+    ranks = tuple(x.strip() for x in args.ranks.split(","))
+    all_rows, targets = load_targets(args.src, args.list_sheet, ranks, args.include_gated)
     defer_areas = set(args.defer)
     priority = [r for r in targets if r["area"] not in defer_areas]
     deferred = [r for r in targets if r["area"] in defer_areas]
