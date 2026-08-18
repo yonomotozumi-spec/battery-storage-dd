@@ -108,6 +108,24 @@ python scripts/score_substations.py \
 
 サンプル出力は `docs/変電所スコアリング_全国66kV以上_v1.xlsx` を参照。
 
+### スコア一覧（スコア降順の値ベース出力）
+
+上記の「スコアリング」タブは元リストの並び（エリア順）でスコアが数式のため、Excelで開かないと点数が見えません。
+**スコアの高い順に並べた値ベースの一覧**が欲しいときは `export_score_list.py` を使います。
+
+```bash
+python scripts/export_score_list.py \
+  --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" \
+  --out "docs/変電所スコア一覧_全国66kV以上.xlsx"
+```
+
+タブ構成：**スコア一覧**（全6,071件をランク→系統スコア降順。オートフィルタ・ウィンドウ枠固定つき。
+ランクS/Aは黄色・ゲート除外はグレー。座標がある行は「地図」列からGoogleマップを開けます）／
+**集計**（ランク別件数・構成比・座標あり件数、エリア×ランクのクロス集計）／**スコア基準**（S1〜S6の配点・エリア点・ランク閾値・前提）。
+
+出力は `docs/変電所スコア一覧_全国66kV以上.xlsx`。現時点のランク別件数は S=523 ／ A=828 ／ B=939 ／ C=202 ／
+データ無=1,507 ／ 除外=2,072（全6,071件・座標カバー率87.8%）です。
+
 ## 変電所スコア検索（Web / substation.html）
 
 `substation.html` をブラウザで開き、**候補地の緯度経度を入力すると最寄りの変電所を検索**して、
@@ -162,6 +180,7 @@ python scripts/fetch_substation_coords.py apply \
 # ③ 座標が増えたらスコアリングxlsxとWeb用データを再生成
 python scripts/score_substations.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
 python scripts/build_substation_web_data.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out data/substations.js
+python scripts/export_score_list.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out "docs/変電所スコア一覧_全国66kV以上.xlsx"
 ```
 
 **推測で座標を埋めません。** 一致しなかった行は空欄のままにします（近接スコアS7は500m〜5kmの
@@ -211,6 +230,7 @@ python scripts/merge_coords.py \
 # ③ スコアリングxlsxとWeb用データを再生成
 python scripts/score_substations.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
 python scripts/build_substation_web_data.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out data/substations.js
+python scripts/export_score_list.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out "docs/変電所スコア一覧_全国66kV以上.xlsx"
 ```
 
 突き合わせは **No.**（本体xlsxの通し番号）で行うため、優先リストのNo.列は消さないでください
