@@ -72,7 +72,7 @@ def read_filled(path, sheets):
     return out
 
 
-def validate(entry, target, box, force):
+def validate(entry, target, box, force, allow_outside_area=False):
     """採用可否を (可否, 理由) で返す。"""
     if target is None:
         return False, "No.が本体xlsxに無い"
@@ -88,7 +88,14 @@ def validate(entry, target, box, force):
     if isinstance(target["lat"], (int, float)) and not force:
         return False, "既に座標がある（上書きするなら --force）"
     if not in_area(box, target["area"], lat, lon):
-        return False, f"{target['area']}エリアの実測分布から外れている"
+        # 分布は既存の実測座標から作るので、参照点が地理的に偏っているエリアでは
+        # 正しい座標でも外れることがある（例: 三重県南部の参照点が無く、熊野市の
+        # 賀田変電所 33.97 が中部の下限 34.04 を下回る）。出所が明確な座標を
+        # 採る場合は --allow-outside-area で警告扱いにできる。
+        why = f"{target['area']}エリアの実測分布から外れている"
+        if not allow_outside_area:
+            return False, why
+        return True, "採用（" + why + "・要確認）"
     return True, "採用"
 
 
@@ -101,7 +108,13 @@ def main():
     ap.add_argument("--list-sheet", default="全国変電所リスト")
     ap.add_argument("--filled-sheets", default="優先S_A,劣後S_A",
                     help="読み込む優先リストのシート名（カンマ区切り）")
+    ap.add_argument("--acc", default=ACC_MANUAL,
+                    help=f"採用行に書き込む座標精度（既定: {ACC_MANUAL}）。"
+                         "出所ごとに変えること（例: Google Places(名称一致)）")
     ap.add_argument("--force", action="store_true", help="既に座標がある行も上書きする")
+    ap.add_argument("--allow-outside-area", action="store_true",
+                    help="エリアの実測分布から外れた座標も採用する（出所が明確で、"
+                         "参照点が地理的に偏っているエリアの場合。レポートに要確認と残る）")
     args = ap.parse_args()
 
     rows, cols, _ = read_rows(args.src, args.list_sheet)
@@ -117,11 +130,11 @@ def main():
     applied, skipped, report = 0, 0, []
     for e in entries:
         target = by_no.get(e["no"])
-        ok, why = validate(e, target, box, args.force)
+        ok, why = validate(e, target, box, args.force, args.allow_outside_area)
         if ok:
             ws.cell(target["row"], cols["lat"]).value = e["lat"]
             ws.cell(target["row"], cols["lon"]).value = e["lon"]
-            ws.cell(target["row"], cols["acc"]).value = ACC_MANUAL
+            ws.cell(target["row"], cols["acc"]).value = args.acc
             for c in (cols["lat"], cols["lon"], cols["acc"]):
                 ws.cell(target["row"], c).fill = MANUAL_FILL
             applied += 1
