@@ -108,6 +108,9 @@ def main():
     ap.add_argument("--list-sheet", default="全国変電所リスト")
     ap.add_argument("--filled-sheets", default="優先S_A,劣後S_A",
                     help="読み込む優先リストのシート名（カンマ区切り）")
+    ap.add_argument("--acc", default=ACC_MANUAL,
+                    help=f"採用行に書き込む座標精度（既定: {ACC_MANUAL}）。"
+                         "出所ごとに変えること（例: Google Places(名称一致)）")
     ap.add_argument("--force", action="store_true", help="既に座標がある行も上書きする")
     ap.add_argument("--allow-outside-area", action="store_true",
                     help="エリアの実測分布から外れた座標も採用する（出所が明確で、"
@@ -131,7 +134,7 @@ def main():
         if ok:
             ws.cell(target["row"], cols["lat"]).value = e["lat"]
             ws.cell(target["row"], cols["lon"]).value = e["lon"]
-            ws.cell(target["row"], cols["acc"]).value = ACC_MANUAL
+            ws.cell(target["row"], cols["acc"]).value = args.acc
             for c in (cols["lat"], cols["lon"], cols["acc"]):
                 ws.cell(target["row"], c).fill = MANUAL_FILL
             applied += 1

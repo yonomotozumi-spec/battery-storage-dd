@@ -624,7 +624,13 @@ function detailHtml(h) {
   // OSMより確度が高いため、推定座標と同じ注記を出さないこと。
   let accHtml = '';
   if (a && a !== 'OSM実測' && a !== '未取得') {
-    if (a.includes('公表資料')) {
+    if (a.includes('Google')) {
+      accHtml = `<div class="detail-note">
+        <b>座標精度: ${esc(a)}</b>：Google Mapsの地点情報から、変電所名が一致したものだけを採用し、
+        座標の所在地が行の都道府県・エリアと合うことを確認しています。座標が既知の中部496件で
+        測った誤差は中央値6m・最大1.2kmでした。1km前後ずれる場合があるため、
+        S7が境界付近になる候補は地図で位置を確認してください。</div>`;
+    } else if (a.includes('公表資料')) {
       accHtml = `<div class="detail-note">
         <b>座標精度: ${esc(a)}</b>：送配電事業者が公表しているマッピングの座標です
         （中部エリアは中部電力パワーグリッド「系統空容量マッピング」）。
