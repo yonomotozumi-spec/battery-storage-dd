@@ -465,6 +465,19 @@ const rank = row => D.dict.rank[row[F.rank]];
 const n1 = row => D.dict.n1[row[F.n1]] || '—';
 const curtail = row => D.dict.curtail[row[F.curtail]] || '—';
 const acc = row => D.dict.acc[row[F.acc]] || '';
+// 実績の連系工期を月数にする。scripts/substation_scoring.py の actual_months と同じ規則。
+// 「受付後」は入金後と起点が違うので数えない。複数書かれていれば最長を採る。
+function actualMonths(text) {
+  const t0 = String(text || '');
+  if (!t0 || t0.includes('未読')) return null;
+  const t = t0.replace(/受付後[^)）/]*/g, '');
+  const vals = [];
+  for (const m of t.matchAll(/(\d+)\s*年(?:\s*(\d+)\s*[ヶカか]?月)?/g))
+    vals.push(Number(m[1]) * 12 + Number(m[2] || 0));
+  for (const m of t.replace(/\d+\s*年(?:\s*\d+\s*[ヶカか]?月)?/g, '')
+                   .matchAll(/(\d+)\s*[ヶカか]月/g)) vals.push(Number(m[1]));
+  return vals.length ? Math.max(...vals) : null;
+}
 const memoOf = row => MEMO[area(row) + String(val(row, 'name')).trim()] || null;
 
 let lastResults = [];
@@ -597,6 +610,7 @@ function render(hits, ctx) {
 // 各スコアが「どの値がどの閾値に当たって何点になったか」を1行で返す。
 // 点数だけ見せても根拠が追えないため、実測値・閾値・結論を必ず並べる。
 function scoreWhy(row, h) {
+  const memo = memoOf(row);
   const T = D.params.thr, n = v => (v == null ? null : v);
   const num = v => (typeof v === 'number' ? v : null);
   const eff = num(val(row, 'availUp')) != null ? num(val(row, 'availUp')) : num(val(row, 'availCur'));
@@ -633,8 +647,18 @@ function scoreWhy(row, h) {
   else if (vs <= T.s5[0]) s5 = `二次電圧 ${fmtNum(vs)}kV ≦ ${T.s5[0]}kV（配電用変電所）→ ${T.s5[1]}点`;
   else s5 = `二次電圧 ${fmtNum(vs)}kV > ${T.s5[0]}kV → ${T.s5[2]}点`;
 
+  // S6はその変電所の接続検討実績があれば実測工期で決まる。無ければエリア点（代理値）。
   const ap = (D.areaPoints || []).find(a => a[0] === area(row));
-  const s6 = ap ? `${ap[0]} → ${ap[1]}点（${ap[2]}）` : `${area(row) || '不明'} → 0点`;
+  const mo = memo ? actualMonths(memo[5]) : null;
+  let s6;
+  if (mo != null) {
+    const st = ((D.params.thr && D.params.thr.s6Actual) || []).find(([t]) => mo <= t);
+    s6 = `この変電所の実績工期 ${mo}ヶ月 → ${st ? st[1] : 0}点` +
+      (ap ? `（エリア点${ap[1]}に代えて実測を採用）` : '');
+  } else {
+    s6 = ap ? `${ap[0]} → ${ap[1]}点（実績が無いためエリア点。${ap[2]}）`
+            : `${area(row) || '不明'} → 0点`;
+  }
 
   const st7 = D.params.s7Steps.find(([t]) => h.dist <= t);
   const s7 = st7 ? `${fmtDist(h.dist)} ≦ ${st7[0] >= 1000 ? (st7[0] / 1000) + 'km' : st7[0] + 'm'} → ${st7[1]}点`

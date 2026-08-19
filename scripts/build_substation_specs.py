@@ -93,7 +93,7 @@ def build_rows(src, sheet):
     out = []
     for r in rows:
         sc = S.score_row(r["area"], r["vsec"], r["opcap"], r["flow"],
-                         r["avail"], r["avail_up"], r["n1"], r["curtail"])
+                         r["avail"], r["avail_up"], r["n1"], r["curtail"], name=r["name"])
         eff = S.effective_capacity(r["avail"], r["avail_up"])
         cap, fl = S._num(r["opcap"]), S._num(r["flow"])
         ratio = (abs(fl) / cap) if (cap and fl is not None and cap != 0) else None

@@ -33,6 +33,7 @@ from openpyxl.utils import get_column_letter
 
 from substation_scoring import (
     AREA_POINTS, ANALYSIS_NOTES, NOTES, PARAM_ROWS, RESULTS_DB, SCORE_DEFS,
+    S6_ACTUAL_STEPS, actual_months, s6_actual,
 )
 
 HEADER_FILL = PatternFill("solid", fgColor="FCE4D6")
@@ -138,7 +139,8 @@ def build_results_sheet(ws):
     ws["A1"] = "接続検討回答 実績19件（2026-08-06更新。詳細: 接続検討回答_分析メモ_20260724.md＋追加実績メモ20260806）"
     ws["A1"].font = TITLE_FONT
     headers = ["エリア", "変電所名(リスト表記)", "案件", "出力", "負担金", "連系工期",
-               "主な対策工事", "教訓", "要約(スコア表参照用)", "キー(自動)"]
+               "主な対策工事", "教訓", "要約(スコア表参照用)", "キー(自動)",
+               "工期(月)", "S6点(実績)"]
     for c, h in enumerate(headers, 1):
         cell = ws.cell(2, c, h)
         cell.fill = HEADER_FILL; cell.font = HDR_FONT; cell.alignment = CENTER; cell.border = BORDER
@@ -148,16 +150,22 @@ def build_results_sheet(ws):
             cell = ws.cell(r, c, v); cell.border = BORDER; cell.alignment = WRAP
         kc = ws.cell(r, 10, f"=A{r}&TRIM(B{r})")
         kc.border = BORDER; kc.font = SMALL
+        # 工期の表記が揺れるためPython側で月数に直し、そこからS6点を出しておく。
+        # 同じ変電所に複数件あるときは最長を採る（工事規模で変わり、事前には決まらない）。
+        mo = actual_months(row[5])
+        ws.cell(r, 11, mo).border = BORDER
+        ws.cell(r, 12, s6_actual(row[0], row[1])).border = BORDER
     last = 2 + len(RESULTS_DB)
     r = last + 2
     ws.cell(r, 1, "■分析メモ(2026-08-06追記・19件ベース)").font = HDR_FONT
     for i, note in enumerate(ANALYSIS_NOTES):
         ws.cell(r + 1 + i, 1, note).font = SMALL
-    widths = [8, 20, 24, 12, 30, 30, 34, 30, 40, 18]
+    widths = [8, 20, 24, 12, 30, 30, 34, 30, 40, 18, 9, 11]
     for c, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(c)].width = w
     ws.freeze_panes = "A3"
-    return f"実績DB!$I$3:$I${last}", f"実績DB!$J$3:$J${last}"
+    return (f"実績DB!$I$3:$I${last}", f"実績DB!$J$3:$J${last}",
+            f"実績DB!$L$3:$L${last}")
 
 
 def find_header_row(ws):
@@ -199,7 +207,7 @@ def read_substations(path, sheet_name):
     return rows
 
 
-def build_scoring_sheet(ws, rows, p, memo_range, key_range):
+def build_scoring_sheet(ws, rows, p, memo_range, key_range, s6act_range):
     ws["A1"] = "全国変電所スコアリング（高圧2MW BESS）　黄色=ランクS/A ／ グレー=ゲート除外"
     ws["A1"].font = TITLE_FONT
     headers = ["No.", "エリア", "変電所名", "都道府県", "最大電圧kV", "二次電圧kV", "緯度", "経度",
@@ -236,8 +244,10 @@ def build_scoring_sheet(ws, rows, p, memo_range, key_range):
             # S5 配電用変電所か(二次電圧)
             23: f'=IF($F{r}="",0,IF(ISNUMBER($F{r}),'
                 f'IF($F{r}<={p["s5_1"]["thr"]},{p["s5_1"]["pts"]},{p["s5_2"]["pts"]}),0))',
-            # S6 エリア点
-            24: f'=IFERROR(VLOOKUP($B{r},{p["area_range"]},2,FALSE),0)',
+            # S6 その変電所の実績工期があればそれを使い、無ければエリア点。
+            # エリア点は工期を知らないときの代理値なので、実測があれば置き換える。
+            24: f'=IFERROR(INDEX({s6act_range},MATCH($B{r}&$C{r},{key_range},0)),'
+                f'IFERROR(VLOOKUP($B{r},{p["area_range"]},2,FALSE),0))',
             # 系統スコア(80)
             25: f'=SUM($S{r}:$X{r})',
             # ランク
@@ -286,8 +296,9 @@ def main():
     ws_db = wb.create_sheet("実績DB")
 
     params = build_base_sheet(ws_base)
-    memo_range, key_range = build_results_sheet(ws_db)
-    rank_range = build_scoring_sheet(ws_score, rows, params, memo_range, key_range)
+    memo_range, key_range, s6act_range = build_results_sheet(ws_db)
+    rank_range = build_scoring_sheet(ws_score, rows, params, memo_range, key_range,
+                                     s6act_range)
     add_rank_counts(ws_base, params["rank_count_row"], rank_range)
 
     r = params["rank_count_row"] + 8

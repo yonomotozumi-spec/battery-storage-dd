@@ -70,7 +70,7 @@ def main():
     with_coords = 0
     for (no, area, name, pref, vmax, vsec, lat, lon, acc, cap, opcap, flow,
          avail, avail_up, n1, curtail, addr) in src_rows:
-        sc = S.score_row(area, vsec, opcap, flow, avail, avail_up, n1, curtail)
+        sc = S.score_row(area, vsec, opcap, flow, avail, avail_up, n1, curtail, name=name)
         la, lo = num(lat, 5), num(lon, 5)
         if la is not None and lo is not None:
             with_coords += 1
@@ -114,6 +114,7 @@ def main():
                        [S.P["s3_t3"]["thr"], S.P["s3_t3"]["pts"]]],
                 "s4": S.P["s4"]["pts"],
                 "s5": [S.P["s5_1"]["thr"], S.P["s5_1"]["pts"], S.P["s5_2"]["pts"]],
+            "s6Actual": [list(x) for x in S.S6_ACTUAL_STEPS],
             },
         },
         "areaPoints": [list(a) for a in S.AREA_POINTS],
