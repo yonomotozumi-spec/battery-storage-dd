@@ -140,10 +140,18 @@ def load_substations(path, sheet):
     return out
 
 
-def nearest(subs, lat, lon, topn, include_gate):
+def nearest(subs, lat, lon, topn, include_gate, radius_m):
+    """候補地の周辺にある変電所を総合スコア順に返す。
+
+    半径で先に絞る。絞らないと、遠方の系統スコアが高い変電所（S7=0でも80点満点中70点）が
+    近傍の変電所を上回り、「最寄り」でも何でもないものが1位になる。
+    S7は5km超で0点なので、それより広く採っても順位はほぼ系統スコアだけで決まる。
+    """
     hits = []
     for r in subs:
         d = haversine(lat, lon, r["lat"], r["lon"])
+        if d > radius_m:
+            continue
         rank = r["sc"]["rank"]
         if not include_gate and rank in ("除外", "データ無"):
             continue
@@ -186,6 +194,9 @@ def main():
     ap.add_argument("--subs-sheet", default="全国変電所リスト")
     ap.add_argument("--out", required=True)
     ap.add_argument("--topn", type=int, default=3, help="1候補地あたり何件の変電所を出すか")
+    ap.add_argument("--radius", type=float, default=10.0,
+                    help="候補地から何kmまでの変電所を対象にするか（既定10km）。"
+                         "S7は5km超で0点なので、広げても順位は系統スコアだけで決まる")
     ap.add_argument("--no-hazard", action="store_true", help="ハザード判定を省く（ネットワーク不要）")
     args = ap.parse_args()
 
@@ -210,7 +221,7 @@ def main():
     r = 3
     summary = []
     for s in sites:
-        top = nearest(subs, s["lat"], s["lon"], args.topn, include_gate=False)
+        top = nearest(subs, s["lat"], s["lon"], args.topn, False, args.radius * 1000)
         haz = {}
         if not args.no_hazard:
             for name, tpl, z in HAZARDS:
@@ -229,7 +240,7 @@ def main():
                     round(s["lat"], 6) if first else "", round(s["lon"], 6) if first else "",
                     (f"{muni} {aza}".strip() if first else ""), (match if first else "")]
             if sub is None:
-                vals += ["（範囲内に該当なし）", "", "", "", "", "", ""]
+                vals += [f"（半径{args.radius:g}km内に該当なし）", "", "", "", "", "", ""]
             else:
                 vals += [sub["name"], sub["area"],
                          f"{dist/1000:.2f} km" if dist >= 1000 else f"{int(dist)} m",
