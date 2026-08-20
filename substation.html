@@ -144,6 +144,27 @@ select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(2
 .sum-main { font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.25; }
 .sum-sub { font-size:11px; color:var(--txt2); margin-top:2px; line-height:1.4; }
 
+/* ── 供給区域バナー ── */
+.area-bar {
+  display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap;
+  padding:11px 16px; border-bottom:1px solid var(--bdr); font-size:12.5px; color:var(--txt2);
+}
+.area-bar.warn { background:var(--warn-bg); color:var(--warn); }
+.area-bar.info { background:var(--surf2); }
+.area-tag {
+  font-size:10px; font-weight:700; letter-spacing:.06em; white-space:nowrap;
+  padding:3px 7px; border-radius:4px; background:var(--surf); color:var(--txt3);
+  border:1px solid var(--bdr);
+}
+.area-name { font-weight:700; color:var(--txt); }
+.area-bar.warn .area-name { color:var(--warn); }
+.area-note { font-size:11.5px; color:var(--txt3); }
+.area-bar.warn .area-note { color:var(--warn); }
+.out-tag {
+  display:inline-block; font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:3px;
+  background:var(--fail-bg); color:var(--fail); margin-left:5px; white-space:nowrap;
+}
+
 /* ── Rank badges ── */
 .rk {
   display:inline-block; min-width:22px; text-align:center;
@@ -167,6 +188,7 @@ select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(2
 .rtbl td { padding:8px 10px; border-bottom:1px solid var(--bdr); font-size:12px; vertical-align:middle; }
 .rtbl tbody tr:last-child td { border-bottom:none; }
 .rtbl tr.row-main { cursor:pointer; }
+.rtbl tr.row-out td { opacity:.62; }
 .rtbl tr.row-main:hover td { background:var(--surf2); }
 .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .ss-name { font-weight:600; }
@@ -288,6 +310,17 @@ details.foldable[open] > summary::before { content:'▾ '; }
   </div>
 
   <div class="frow">
+    <div class="flabel">供給区域（管轄）<div class="fnote">一般送配電事業者が違う変電所には連系できません</div></div>
+    <div class="fcontrol">
+      <select id="areasel">
+        <option value="auto" selected>自動判定（市区町村界から）</option>
+        <option value="all">判定しない（全エリアを対象にする）</option>
+      </select>
+      <span class="fnote" id="areasel-msg"></span>
+    </div>
+  </div>
+
+  <div class="frow">
     <div class="flabel">並び順・表示</div>
     <div class="fcontrol">
       <select id="sortby">
@@ -298,6 +331,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <div class="opt-row">
         <label class="chk"><input type="checkbox" id="f-gate"> ゲート除外の変電所も表示</label>
         <label class="chk"><input type="checkbox" id="f-nodata" checked> 空容量データ無し（OSM由来）も表示</label>
+        <label class="chk"><input type="checkbox" id="f-outarea"> 管轄外エリアの変電所も表示</label>
       </div>
     </div>
   </div>
@@ -314,6 +348,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <span class="card-title">総合評価</span>
       <span class="card-note" id="res-coord"></span>
     </div>
+    <div class="area-bar" id="area-bar" style="display:none"></div>
     <div class="sum-grid">
       <div class="sum-cell">
         <div class="sum-label">最有力候補（総合スコア）</div>
@@ -405,6 +440,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
 </div><!-- /wrap -->
 
 <script src="data/substations.js"></script>
+<script src="data/supply_areas.js"></script>
 <script>
 'use strict';
 
@@ -464,6 +500,129 @@ const curtail = row => D.dict.curtail[row[F.curtail]] || '—';
 const acc = row => D.dict.acc[row[F.acc]] || '';
 const memoOf = row => MEMO[area(row) + String(val(row, 'name')).trim()] || null;
 
+// ── 供給区域（一般送配電事業者）の判定 ──────────────────────────────
+// 変電所リストの「エリア」は変電所側の所属でしかない。候補地がどの一般送配電
+// 事業者の供給区域にあるかを別に判定しないと、供給区域をまたいだ変電所（実際
+// には連系できない）を最有力候補として出してしまう。
+// 例: 愛媛県今治市吉海町（大島）は県は愛媛だが供給区域は中国電力ネットワーク。
+//     9.5km先の波止浜変電所（四国電力送配電）は系統ランクSだが連系できない。
+const SA = window.SUPPLY_AREA_DATA || null;
+const UTILITY = {
+  '北海道': '北海道電力ネットワーク', '東北': '東北電力ネットワーク',
+  '東京': '東京電力パワーグリッド', '中部': '中部電力パワーグリッド',
+  '北陸': '北陸電力送配電', '関西': '関西電力送配電',
+  '中国': '中国電力ネットワーク', '四国': '四国電力送配電',
+  '九州': '九州電力送配電', '沖縄': '沖縄電力',
+};
+// 変電所リストのエリアのうち、供給区域と対応しないもの（電源開発の変電所）は
+// 管轄でふるいにかけない。連系先は結局その土地の一般送配電事業者になるため。
+const NON_UTILITY_AREA = { 'J-POWER': 1 };
+
+const UNIT_M = 111320 / (SA ? SA.meta.scale : 10000);  // 量子化1単位あたりの距離(m)
+let saPolys = null, saBnd = null, saRev = null;
+
+function saDecode(str) {
+  // build_supply_areas.py の enc_ring と対。可変長6bit＋zigzagの差分列を
+  // [x0,y0,x1,y1,...]（量子化整数）に戻す。
+  const out = [];
+  let i = 0, x = 0, y = 0;
+  while (i < str.length) {
+    let dx = 0, dy = 0;
+    for (let k = 0; k < 2; k++) {
+      let shift = 0, res = 0, b;
+      do { b = saRev[str.charAt(i++)]; res |= (b & 31) << shift; shift += 5; } while (b & 32);
+      const v = (res >>> 1) ^ -(res & 1);
+      if (k === 0) dx = v; else dy = v;
+    }
+    x += dx; y += dy;
+    out.push(x, y);
+  }
+  return out;
+}
+
+function saInit() {
+  if (saPolys || !SA) return;
+  saRev = {};
+  for (let i = 0; i < SA.meta.alpha.length; i++) saRev[SA.meta.alpha.charAt(i)] = i;
+  const poly = p => ({ b: p.b, r: p.r.map(saDecode) });
+  saPolys = SA.polys.map(p => { const o = poly(p); o.a = p.a; return o; });
+  saBnd = SA.boundary.map(b => ({ p: b.p, m: b.m, a: b.a, n: b.n, g: b.g.map(poly) }));
+}
+
+function saInRing(px, py, r) {
+  let inside = false;
+  for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
+    const xi = r[i], yi = r[i + 1], xj = r[j], yj = r[j + 1];
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function saHit(px, py, p) {
+  if (px < p.b[0] || px > p.b[2] || py < p.b[1] || py > p.b[3]) return false;
+  if (!saInRing(px, py, p.r[0])) return false;
+  for (let k = 1; k < p.r.length; k++) if (saInRing(px, py, p.r[k])) return false;  // 穴
+  return true;
+}
+
+// 点と線分の距離の2乗（経度方向は緯度に応じて縮める）
+function saSegDist2(px, py, x1, y1, x2, y2, kx) {
+  const dx = (x2 - x1) * kx, dy = y2 - y1;
+  const wx = (px - x1) * kx, wy = py - y1;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 ? (wx * dx + wy * dy) / len2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const ex = wx - t * dx, ey = wy - t * dy;
+  return ex * ex + ey * ey;
+}
+
+// 海上・埋立地など、どの区域ポリゴンにも入らない点のための最寄り判定
+function saNearestArea(px, py, kx, maxM) {
+  const lim = maxM / UNIT_M, lim2 = lim * lim;
+  let best = null, bestD2 = Infinity;
+  for (const p of saPolys) {
+    if (px < p.b[0] - lim || px > p.b[2] + lim || py < p.b[1] - lim || py > p.b[3] + lim) continue;
+    const r = p.r[0];
+    for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
+      const d2 = saSegDist2(px, py, r[j], r[j + 1], r[i], r[i + 1], kx);
+      if (d2 < bestD2) { bestD2 = d2; best = p; }
+    }
+  }
+  if (!best || bestD2 > lim2) return null;
+  return { area: SA.areas[best.a], distM: Math.sqrt(bestD2) * UNIT_M };
+}
+
+/**
+ * 候補地の供給区域を判定する。
+ * 返り値 { area, method:'polygon'|'nearest', distM, boundary } / 判定不能なら null。
+ * boundary は市区町村より細かい例外がある市町村（富士市など）に入ったときの注記。
+ */
+function resolveSupplyArea(lat, lon) {
+  if (!SA) return null;
+  saInit();
+  const sc = SA.meta.scale;
+  const px = Math.round(lon * sc), py = Math.round(lat * sc);
+  const kx = Math.cos(lat * Math.PI / 180);
+
+  let res = null;
+  for (const p of saPolys) {
+    if (saHit(px, py, p)) { res = { area: SA.areas[p.a], method: 'polygon', distM: 0 }; break; }
+  }
+  if (!res) {
+    const n = saNearestArea(px, py, kx, 8000);
+    if (!n) return null;
+    res = { area: n.area, method: 'nearest', distM: n.distM };
+  }
+  res.boundary = null;
+  for (const b of saBnd) {
+    if (b.g.some(g => saHit(px, py, g))) {
+      res.boundary = { pref: b.p, muni: b.m, note: b.n };
+      break;
+    }
+  }
+  return res;
+}
+
 let lastResults = [];
 
 // ── 算出 ──
@@ -476,46 +635,81 @@ function run() {
   const radius = parseInt($('radius').value, 10);
   const showGate = $('f-gate').checked;
   const showNoData = $('f-nodata').checked;
+  const showOutArea = $('f-outarea').checked;
   const sortBy = $('sortby').value;
 
+  // 候補地の供給区域。'auto' なら座標から判定、エリア名なら手動指定、'all' なら絞り込まない。
+  const areaSel = $('areasel').value;
+  const site = areaSel === 'auto' ? resolveSupplyArea(lat, lon) : null;
+  let siteArea = null;
+  if (areaSel === 'auto') siteArea = site ? site.area : null;
+  else if (areaSel !== 'all') siteArea = areaSel;
+
   const hits = [];
-  let nearestAny = null, hiddenGate = 0, hiddenNoData = 0;
+  let nearestAny = null, nearestIn = null, hiddenGate = 0, hiddenNoData = 0;
+  let outArea = [], outAreaCount = 0;
   for (const row of D.rows) {
     const la = val(row, 'lat'), lo = val(row, 'lon');
     if (la == null || lo == null) continue;
     const d = distanceM(lat, lon, la, lo);
+    // 管轄外（供給区域が違う一般送配電事業者の変電所）は連系先になり得ない
+    const out = !!(siteArea && !NON_UTILITY_AREA[area(row)] && area(row) !== siteArea);
     if (!nearestAny || d < nearestAny.dist) nearestAny = { row, dist: d };
+    if (!out && (!nearestIn || d < nearestIn.dist)) nearestIn = { row, dist: d };
     if (radius && d > radius) continue;
     const rk = rank(row);
-    // 非表示にした分も件数だけは数える。候補地の近くにゲート除外しか無いことが
-    // 分かればその候補地を落とせるため、存在自体は隠さない。
-    if (!showGate && rk === '除外') { hiddenGate++; continue; }
-    if (!showNoData && rk === 'データ無') { hiddenNoData++; continue; }
+    if ((!showGate && rk === '除外') || (!showNoData && rk === 'データ無')) {
+      // 非表示にした分も件数だけは数える。候補地の近くにゲート除外しか無いことが
+      // 分かればその候補地を落とせるため、存在自体は隠さない。ただし管轄外は
+      // そもそも候補にならないので、この件数には混ぜない。
+      if (!out) { if (rk === '除外') hiddenGate++; else hiddenNoData++; }
+      continue;
+    }
     const s7 = s7Points(d);
-    hits.push({ row, dist: d, s7, grid: val(row, 'grid'), total: val(row, 'grid') + s7 });
+    const h = { row, dist: d, s7, grid: val(row, 'grid'), total: val(row, 'grid') + s7, out };
+    if (out) {
+      outAreaCount++;
+      outArea.push(h);
+      if (!showOutArea) continue;
+    }
+    hits.push(h);
   }
 
-  if (sortBy === 'dist') hits.sort((a, b) => a.dist - b.dist);
-  else if (sortBy === 'grid') hits.sort((a, b) => b.grid - a.grid || a.dist - b.dist);
-  else hits.sort((a, b) => b.total - a.total || a.dist - b.dist);
+  const bySort = (a, b) =>
+    sortBy === 'dist' ? a.dist - b.dist
+      : sortBy === 'grid' ? (b.grid - a.grid || a.dist - b.dist)
+        : (b.total - a.total || a.dist - b.dist);
+  // 管轄外を表示する場合も、管内の候補を先に並べる（実際に検討できる順にする）
+  hits.sort((a, b) => (a.out === b.out ? 0 : a.out ? 1 : -1) || bySort(a, b));
+  outArea.sort(bySort);
 
   lastResults = hits;
-  render(hits, { lat, lon, radius, nearestAny, hiddenGate, hiddenNoData });
+  render(hits, { lat, lon, radius, nearestAny, nearestIn, hiddenGate, hiddenNoData,
+                 site, siteArea, areaSel, outArea, outAreaCount, showOutArea });
   $('result').classList.add('show');
   $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function render(hits, ctx) {
-  const { lat, lon, radius, nearestAny, hiddenGate, hiddenNoData } = ctx;
+  const { lat, lon, radius, nearestAny, nearestIn, hiddenGate, hiddenNoData,
+          site, siteArea, areaSel, outArea, outAreaCount, showOutArea } = ctx;
   $('res-coord').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}　/　` +
     (radius ? `半径${radius / 1000}km` : '全国');
   $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
 
-  // サマリー
-  const scored = hits.filter(h => rank(h.row) !== 'データ無' && rank(h.row) !== '除外');
-  const best = hits.length ? hits.reduce((a, b) => (b.total > a.total ? b : a)) : null;
-  const near = hits.length ? hits.reduce((a, b) => (b.dist < a.dist ? b : a)) : nearestAny;
-  const saCount = hits.filter(h => ['S', 'A'].includes(rank(h.row))).length;
+  renderAreaBar(ctx);
+
+  // サマリー。管轄外は「連系できない」ので、最有力候補・最寄り・S/A件数からは必ず外す
+  // （表示チェックを入れて一覧に出ていても集計には入れない）。
+  const inArea = hits.filter(h => !h.out);
+  const scored = inArea.filter(h => rank(h.row) !== 'データ無' && rank(h.row) !== '除外');
+  const best = inArea.length ? inArea.reduce((a, b) => (b.total > a.total ? b : a)) : null;
+  // 範囲内に管内の変電所が無い場合は、検索範囲の外でも管内の最寄りを見せる
+  // （「近くに何も無い」のか「範囲の切り方が狭いだけ」かを区別できないと判断を誤る）
+  const nearIn = inArea.length ? inArea.reduce((a, b) => (b.dist < a.dist ? b : a)) : null;
+  const near = nearIn || (siteArea ? nearestIn : nearestAny);
+  const nearOutOfRange = !nearIn && !!near;
+  const saCount = inArea.filter(h => ['S', 'A'].includes(rank(h.row))).length;
 
   if (best) {
     $('sum-best').innerHTML = `${best.total} <span style="font-size:12px;color:var(--txt3)">/100</span> ` +
@@ -524,26 +718,70 @@ function render(hits, ctx) {
       `<br>系統${best.grid} ＋ 近接${best.s7}　${fmtDist(best.dist)}　系統ランク <span class="rk ${rkClass(rank(best.row))}">${esc(rank(best.row))}</span>`;
   } else {
     $('sum-best').textContent = '—';
-    $('sum-best-sub').textContent = '範囲内に該当なし';
+    $('sum-best-sub').textContent = siteArea && outAreaCount
+      ? `範囲内の${siteArea}エリアに該当なし（管轄外は${outAreaCount}件）`
+      : '範囲内に該当なし';
   }
 
   if (near) {
     const nrow = near.row;
     $('sum-near').textContent = fmtDist(near.dist);
     $('sum-near-sub').innerHTML = `${esc(val(nrow, 'name'))}（${esc(area(nrow))}${val(nrow, 'pref') ? ' / ' + esc(val(nrow, 'pref')) : ''}）` +
-      `<br>座標精度: ${esc(acc(nrow))}　S7=${s7Points(near.dist)}点`;
+      (nearOutOfRange
+        ? '<br><b>' + (radius && near.dist > radius ? '検索範囲の外です' : '表示条件から外れています（ゲート除外／空容量データ無）') +
+          '</b>（範囲内に' + esc(siteArea || '') + 'エリアの候補なし）'
+        : `<br>座標精度: ${esc(acc(nrow))}　S7=${s7Points(near.dist)}点`);
+  } else {
+    $('sum-near').textContent = '—';
+    $('sum-near-sub').textContent = siteArea ? `${siteArea}エリアに座標付きの変電所がありません` : '該当なし';
   }
 
   $('sum-sa').textContent = saCount + ' 件';
-  $('sum-sa-sub').textContent = `範囲内${hits.length}件のうち、空容量データがある変電所は${scored.length}件`;
+  $('sum-sa-sub').textContent = `範囲内${inArea.length}件のうち、空容量データがある変電所は${scored.length}件` +
+    (siteArea ? `（${siteArea}エリアのみ）` : '');
 
   const notes = [];
-  if (!hits.length) notes.push('指定範囲に変電所が見つかりませんでした。検索範囲を広げてください。');
+  if (!hits.length && !outAreaCount) notes.push('指定範囲に変電所が見つかりませんでした。検索範囲を広げてください。');
+  // 管轄外の存在は必ず知らせる。特に「管轄外の方が高得点」のときは黙って消すと
+  // スコアが下がった理由が分からず、逆に管轄違いのまま検討を進めてしまう。
+  if (siteArea && outAreaCount) {
+    const bo = outArea.length ? outArea.reduce((a, b) => (b.total > a.total ? b : a)) : null;
+    let msg = `この地点は<b>${esc(UTILITY[siteArea] || siteArea)}</b>の供給区域です。` +
+      `範囲内の<b>管轄外エリアの変電所${outAreaCount}件</b>は一般送配電事業者が違うため連系できません`;
+    msg += showOutArea ? '（一覧では「管轄外」と表示しています）。' : '（ランキングから除いています）。';
+    if (bo && (!best || bo.total > best.total)) {
+      msg += `<b>最高得点は管轄外の${esc(val(bo.row, 'name'))}（${esc(area(bo.row))}・総合${bo.total}点）でしたが、` +
+        `供給区域が違うため候補になりません。</b>`;
+    }
+    notes.push(msg);
+  }
+  if (!siteArea && areaSel === 'auto') {
+    notes.push('供給区域を判定できませんでした（陸地から離れた座標の可能性があります）。' +
+      '管轄でのふるい分けをしていないため、<b>供給区域をまたいだ変電所が混ざっている場合があります</b>。' +
+      '「供給区域（管轄）」で手動指定できます。');
+  }
+  if (areaSel === 'all') {
+    notes.push('「判定しない」を選んでいるため、<b>供給区域が違う変電所も混ざります</b>。' +
+      '一般送配電事業者が違う変電所には連系できないので、採用前に管轄を確認してください。');
+  }
+  if (site && site.boundary) {
+    notes.push(`この地点は<b>${esc(site.boundary.pref)}${esc(site.boundary.muni)}</b>で、` +
+      `市区町村の中で供給区域が分かれます（${esc(site.boundary.note)}）。` +
+      `本ツールは<b>${esc(UTILITY[siteArea] || siteArea)}</b>として扱っていますが、` +
+      `実際の管轄は送配電事業者に確認してください。`);
+  }
+  if (site && site.method === 'nearest') {
+    notes.push(`入力座標が市区町村の区域の外（海上・埋立地など）にあるため、` +
+      `約${Math.round(site.distM)}m先の陸地から<b>${esc(UTILITY[siteArea] || siteArea)}</b>と推定しました。`);
+  }
   // ゲート除外は既定で表に出さないが、件数は必ず知らせる。近くに除外しか無いことが
   // 分かればその候補地を落とせるため、「該当なし」と区別できないと判断を誤る。
   if (hiddenGate) notes.push(`範囲内に<b>ゲート除外の変電所が${hiddenGate}件</b>あります（表に出すには「ゲート除外の変電所も表示」にチェック）。` +
     (hits.length ? '' : '<b>この範囲で連系できる変電所はこれだけです。</b>候補地としては見送りが妥当です。'));
   if (hiddenNoData) notes.push(`範囲内に空容量が未公表の変電所が${hiddenNoData}件あります（表に出すにはチェックを入れてください）。`);
+  if (siteArea && !NON_UTILITY_AREA[siteArea] && inArea.some(h => NON_UTILITY_AREA[area(h.row)])) {
+    notes.push('一覧に電源開発（J-POWER）の変電所が含まれています。一般送配電事業者ではないため管轄の判定対象外です。');
+  }
   if (best && best.s7 === 0) notes.push('最有力候補までの距離が5kmを超えており、近接スコアは0点です。負担金は高圧線の亘長にほぼ比例するため、より近い候補地を探すことを推奨します。');
   if (scored.length === 0 && hits.length) notes.push('範囲内の変電所はすべて空容量が未公表（OSM由来）です。系統の空きは送配電事業者の公表マップか接続検討で確認してください。');
   notes.push('近接スコアは<b>変電所までの直線距離</b>で判定しています。実際の負担金は既設高圧配電線までの亘長と工事内容で決まるため、目安として扱ってください。');
@@ -556,11 +794,11 @@ function render(hits, ctx) {
   top.forEach((h, i) => {
     const row = h.row, rk = rank(row), memo = memoOf(row);
     const tr = document.createElement('tr');
-    tr.className = 'row-main';
+    tr.className = 'row-main' + (h.out ? ' row-out' : '');
     tr.innerHTML = `
       <td class="num">${i + 1}</td>
       <td>
-        <span class="ss-name">${esc(val(row, 'name'))}</span>
+        <span class="ss-name">${esc(val(row, 'name'))}</span>${h.out ? '<span class="out-tag">管轄外</span>' : ''}
         <div class="ss-meta">${esc(area(row))}${val(row, 'pref') ? ' / ' + esc(val(row, 'pref')) : ''}
           ${val(row, 'vmax') != null ? ' ・ ' + val(row, 'vmax') + 'kV' : ''}
           ${val(row, 'vsec') != null ? '→' + val(row, 'vsec') + 'kV' : ''}</div>
@@ -588,7 +826,53 @@ function render(hits, ctx) {
   $('tbl-empty').style.display = hits.length ? 'none' : '';
   $('tbl-empty').textContent = '該当する変電所がありません。検索範囲を広げるか、フィルタを外してください。';
 
-  renderNoCoord(near ? area(near.row) : null, near ? val(near.row, 'pref') : null);
+  // 座標未取得の一覧も、候補地の供給区域で引く（管轄外を出しても意味がない）
+  const ncArea = siteArea || (near ? area(near.row) : null);
+  const ncPref = near ? val(near.row, 'pref') : null;
+  renderNoCoord(ncArea, ncPref);
+}
+
+// ── 供給区域バナー ──
+function renderAreaBar(ctx) {
+  const bar = $('area-bar');
+  const { site, siteArea, areaSel, outAreaCount } = ctx;
+  if (!SA) { bar.style.display = 'none'; return; }
+
+  let cls = 'area-bar', tag = '供給区域', body = '', note = '';
+  if (areaSel === 'all') {
+    cls += ' warn';
+    tag = '供給区域 判定なし';
+    body = '<span class="area-name">全エリアを対象にしています</span>';
+    note = '一般送配電事業者が違う変電所には連系できません。採用前に管轄を確認してください。';
+  } else if (!siteArea) {
+    cls += ' warn';
+    tag = '供給区域 不明';
+    body = '<span class="area-name">判定できませんでした</span>';
+    note = '陸地から離れた座標の可能性があります。「供給区域（管轄）」で手動指定してください。';
+  } else {
+    const manual = areaSel !== 'auto';
+    cls += site && site.boundary ? ' warn' : ' info';
+    body = `<span class="area-name">${esc(UTILITY[siteArea] || siteArea)}</span>` +
+      `<span class="area-note">（変電所リストのエリア表記: ${esc(siteArea)}）</span>`;
+    if (manual) {
+      tag = '供給区域 手動指定';
+      note = '手動で指定した管轄で絞り込んでいます。';
+    } else if (site && site.method === 'nearest') {
+      tag = '供給区域 推定';
+      note = `座標が市区町村の区域外のため、約${Math.round(site.distM)}m先の陸地から推定しました。`;
+    } else {
+      tag = '供給区域 自動判定';
+      note = '市区町村界（国土数値情報）から判定しています。';
+    }
+    if (site && site.boundary) {
+      note += `　⚠ ${esc(site.boundary.pref)}${esc(site.boundary.muni)}は市区町村の中で供給区域が分かれます` +
+        `（${esc(site.boundary.note)}）。`;
+    }
+    if (outAreaCount) note += `　管轄外の変電所${outAreaCount}件は候補から除いています。`;
+  }
+  bar.className = cls;
+  bar.innerHTML = `<span class="area-tag">${esc(tag)}</span><div>${body}<div class="area-note">${note}</div></div>`;
+  bar.style.display = '';
 }
 
 function detailHtml(h) {
@@ -712,6 +996,26 @@ function renderStatic() {
     `本ツールは事前スクリーニング用の簡易評価です。空容量は特高側の公表値であり、高圧連系の可否・負担金・工期の確定は接続検討の申込によってのみ行えます。`;
 }
 
+// ── 供給区域セレクタの初期化 ──
+function initAreaSelect() {
+  const sel = $('areasel'), msg = $('areasel-msg');
+  if (!SA) {
+    // 区域データが無くても変電所検索自体は動かす。ただし管轄でふるいにかけられない。
+    sel.value = 'all';
+    sel.disabled = true;
+    msg.textContent = '供給区域データ（data/supply_areas.js）が読み込めないため、管轄での絞り込みはできません。';
+    return;
+  }
+  D.dict.area.forEach(a => {
+    if (NON_UTILITY_AREA[a] || !UTILITY[a]) return;
+    const o = document.createElement('option');
+    o.value = a;
+    o.textContent = `${UTILITY[a]}（${a}）に限定`;
+    sel.insertBefore(o, sel.querySelector('option[value="all"]'));
+  });
+  msg.textContent = `市区町村界から判定します（${SA.meta.source}）。`;
+}
+
 // ── 初期化 ──
 function init() {
   if (!D) {
@@ -721,6 +1025,7 @@ function init() {
     return;
   }
   renderStatic();
+  initAreaSelect();
 
   $('btn-run').addEventListener('click', run);
   $('paste').addEventListener('input', e => {
@@ -737,9 +1042,10 @@ function init() {
   ['lat', 'lon'].forEach(id => $(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') run();
   }));
-  ['radius', 'sortby', 'f-gate', 'f-nodata'].forEach(id => $(id).addEventListener('change', () => {
-    if ($('result').classList.contains('show')) run();
-  }));
+  ['radius', 'sortby', 'f-gate', 'f-nodata', 'f-outarea', 'areasel'].forEach(id =>
+    $(id).addEventListener('change', () => {
+      if ($('result').classList.contains('show')) run();
+    }));
 
   // URLパラメータ（index.html からの引き継ぎ）
   const q = new URLSearchParams(location.search);
