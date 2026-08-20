@@ -209,7 +209,12 @@ def main():
     ws.title = "スクリーニング"
     cols = ["No.", "所在（地番）", "土地面積", "用途", "地目", "緯度", "経度",
             "所在地(座標から)", "所在地の一致",
-            "最寄り変電所", "エリア", "距離", "系統(80)", "S7(20)", "総合(100)", "ランク"]
+            "最寄り変電所", "エリア", "距離",
+            # S1とゲートを決めるのは空容量なので、点数だけでなく実数を並べる。
+            # 「上位系考慮」が優先で、無ければ「当該設備」で代用する（S1と同じ扱い）。
+            "空容量\n上位系MW", "空容量\n当該MW", "採用空容量\nMW",
+            "運用容量\nMW", "予想潮流\nMW", "N-1電制", "出力制御", "二次電圧\nkV",
+            "系統(80)", "S7(20)", "総合(100)", "ランク"]
     cols += [h for h, _, _ in HAZARDS] if not args.no_hazard else []
     ws.cell(1, 1, "候補地スクリーニング　緑=総合ランクS/A ／ 赤=ハザード該当").font = Font(bold=True, size=11)
     for c, h in enumerate(cols, 1):
@@ -240,10 +245,14 @@ def main():
                     round(s["lat"], 6) if first else "", round(s["lon"], 6) if first else "",
                     (f"{muni} {aza}".strip() if first else ""), (match if first else "")]
             if sub is None:
-                vals += [f"（半径{args.radius:g}km内に該当なし）", "", "", "", "", "", ""]
+                vals += [f"（半径{args.radius:g}km内に該当なし）"] + [""] * 14
             else:
+                eff = S.effective_capacity(sub["avail"], sub["avail_up"])
                 vals += [sub["name"], sub["area"],
                          f"{dist/1000:.2f} km" if dist >= 1000 else f"{int(dist)} m",
+                         S._num(sub["avail_up"]), S._num(sub["avail"]), eff,
+                         S._num(sub["opcap"]), S._num(sub["flow"]),
+                         sub["n1"], sub["curtail"], S._num(sub["vsec"]),
                          sub["sc"]["grid_score"], s7, total, sub["sc"]["rank"]]
             if not args.no_hazard:
                 vals += [haz[n] if first else "" for n, _, _ in HAZARDS]
@@ -263,7 +272,8 @@ def main():
             summary.append((s.get("地図NO"), addr, None, None, None, None,
                             [n for n in haz if haz.get(n) == "該当"]))
 
-    widths = [6, 34, 10, 8, 12, 10, 11, 18, 9, 18, 7, 9, 8, 7, 8, 7] + [13] * len(HAZARDS)
+    widths = ([6, 34, 10, 8, 12, 10, 11, 18, 9, 18, 7, 9,
+               10, 9, 10, 9, 9, 13, 9, 8, 8, 7, 8, 7] + [13] * len(HAZARDS))
     for c, w in enumerate(widths[:len(cols)], 1):
         ws.column_dimensions[get_column_letter(c)].width = w
     ws.freeze_panes = "C3"
@@ -271,6 +281,11 @@ def main():
 
     note = wb.create_sheet("読み方・出典")
     lines = [
+        ("空容量の読み方", "S1とゲートを決めるのは空容量。「上位系考慮」を優先し、無ければ"),
+        ("", "「当該設備」で代用する（採用空容量の列がS1に使った値）。"),
+        ("", "採用空容量≦0 かつ N-1電制が「可」でない変電所はゲート除外となり、この表には出ない。"),
+        ("", "空容量は各社の公表時点の値で、申し込み状況で変わる。実際の可否は接続検討の回答による。"),
+        ("", ""),
         ("変電所スコア", "系統スコア80点（S1空容量35/S2 N-1電制10/S3潮流15/S4出力制御5/S5配変10/S6エリア・実績5）"),
         ("", "＋近接スコアS7 20点＝総合100点。substation.html と同じ計算。"),
         ("", "ゲート除外・データ無の変電所は候補から外している（申し込み対象にならないため）。"),
