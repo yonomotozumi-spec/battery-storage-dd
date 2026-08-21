@@ -175,9 +175,9 @@ def cmd_monitor(args):
     today = date.today().isoformat()
     new_pages = {}
     changed, added, failed = [], [], []
-    for e in reg["entries"]:
-        url = e["url"]
-        label = f"{e['muni'] or e['pref'] or '国'}: {e['title']}"
+    targets = [(e["url"], f"{e['muni'] or e['pref'] or '国'}: {e['title']}") for e in reg["entries"]]
+    targets += [(w["url"], f"定点: {w['title']}") for w in reg.get("watchpoints", [])]
+    for url, label in targets:
         try:
             h, size = digest(url)
         except Exception as exc:  # ネットワーク・404等はエラー扱いで報告して続行
@@ -191,7 +191,7 @@ def cmd_monitor(args):
         elif prev[url]["hash"] != h:
             changed.append((label, url, prev[url].get("checked", "?")))
 
-    print(f"監視対象 {len(reg['entries'])}件 ／ 変更 {len(changed)} ／ 初回登録 {len(added)} ／ 取得失敗 {len(failed)}")
+    print(f"監視対象 {len(targets)}件 ／ 変更 {len(changed)} ／ 初回登録 {len(added)} ／ 取得失敗 {len(failed)}")
     print()
     if changed:
         print("## 🔄 前回から内容が変わったページ（規制の改正・追加の可能性）")
@@ -248,6 +248,11 @@ def cmd_report(args):
             f"| {e['level']} | {where} | [{e['title']}]({e['url']}) | {e['reg_type']} "
             f"| {req} | {e['effective_date'] or '−'} | {e['last_verified']} |"
         )
+    wps = reg.get("watchpoints", [])
+    if wps:
+        lines += ["", "## 定点監視ページ（規制そのものではないが新規制の早期検知に使う）", ""]
+        for w in wps:
+            lines.append(f"- [{w['title']}]({w['url']}) — {w['why']}（最終確認 {w['last_verified']}）")
     lines += ["", "## 各エントリの詳細", ""]
     for e in reg["entries"]:
         where = e["muni"] or e["pref"] or "全国"

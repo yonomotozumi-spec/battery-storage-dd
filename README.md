@@ -418,12 +418,22 @@ xlsxとJSの両方を再生成してください。
 ## 条例リスク定期監視（ordinance_watch）
 
 国交省の技術的助言「国都計第7号」（2025-04-08）を受けて、危険物を含有する系統用蓄電池を
-**第一種特定工作物として開発許可の対象にする自治体が急増**しています（千葉市 2025-09、浜松市
-2025-12 ほか）。案件進行中に許可要件が増えるリスクを定期的に洗うため、次の仕組みを備えています。
+**第一種特定工作物として開発許可の対象にする自治体が急増**しています。2026-08-21の全国一括
+スイープ（開発許可権者151者の全数調査）では、兵庫県・徳島県・熊本県の3県と千葉市・浜松市・
+神戸市・熊本市・福島市・高崎市・太田市・所沢市・大津市・鳥取市・呉市・大分市・加古川市の
+13市（権者ベース16者）で公表を確認済み。神戸市の太陽光条例への蓄電所追加（2025-07改正）や
+福島市・浜松市の独自ガイドラインなど、開発許可以外の条例型規制も出始めています。
 
-- `data/ordinance_registry.json` — 条例・開発許可運用・国の通知の台帳（一次情報URL付き）
+案件進行中に許可要件が増えるリスクを定期的に洗うため、次の仕組みを備えています。
+
+- `data/ordinance_registry.json` — 条例・開発許可運用・国の通知の台帳（一次情報URL付き）。
+  RILG「条例の動き」等の定点監視ページ（watchpoints）も収録
+- `data/kaihatsu_kyokasha.json` — **開発許可権者151者の全数リスト**（調査状況・週次ローテーション組付き）。
+  技術的助言の宛先（都道府県47・政令市20・中核市62・施行時特例市22）と同一なので、
+  このリストの監視で千葉市型のリスクは全国を漏れなくカバーできる
+- `data/priority_munis.json` — S/Aランク変電所の所在市区町村（＝土地を探すエリアの優先監視対象）
 - `docs/条例リスク台帳.md` — 台帳の閲覧用Markdown（`report` コマンドで自動生成）
-- `.github/workflows/ordinance-watch.yml` — **毎週月曜9時（JST）に全URLの変更・消失を自動検知し、
+- `.github/workflows/ordinance-watch.yml` — **毎週月曜9時（JST）に全URL＋定点の変更・消失を自動検知し、
   変化があれば `ordinance-watch` ラベルのIssueを起票**
 
 ```bash
@@ -434,11 +444,15 @@ python scripts/ordinance_watch.py check --pref 千葉県 --muni 千葉市
 python scripts/ordinance_watch.py list
 python scripts/ordinance_watch.py monitor --update
 python scripts/ordinance_watch.py report
+
+# S/Aランク変電所の所在自治体リストを再生成（変電所リスト更新後）
+python scripts/build_priority_munis.py
 ```
 
 台帳に無い自治体でも同様の運用がいつでも始まりうるため、`check` が出力する共通チェックリスト
 （開発許可担当への事前照会・所轄消防協議・例規集検索）を案件ごとに実施してください。
-新規自治体の発見スイープ（Web検索）を含む運用の全体像は `docs/ordinance_watch_運用手順.md` を参照。
+週次スイープ（新着検索＋権者ローテーション総当たり・約5週で全国一巡）を含む運用の全体像は
+`docs/ordinance_watch_運用手順.md` を参照。
 
 ## 公開方法
 

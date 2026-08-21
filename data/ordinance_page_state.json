@@ -43,7 +43,7 @@
     },
     "https://www.city.takasaki.gunma.jp/page/67886.html": {
       "hash": "b38b14ef08c1b513f8de2f02a7a86f0336fda071f862ebcf47a8437a82444eb8",
-      "bytes": 18335,
+      "bytes": 18333,
       "checked": "2026-08-21"
     },
     "https://www.city.okegawa.lg.jp/soshiki/toshiseibi/kenchiku/machidukuri/kyoka/14211.html": {
@@ -63,17 +63,82 @@
     },
     "https://www.city.sanda.lg.jp/soshiki/36/faq/faq_jigyosha/1/33032.html": {
       "hash": "db3811f95533ef3ad29ee4592b6c84c506683706edf642c50a0696d480e711c4",
-      "bytes": 42482,
+      "bytes": 42481,
       "checked": "2026-08-21"
     },
     "https://www.city.kure.lg.jp/soshiki/49/keitouyou-kaihatu.html": {
       "hash": "8dc60a83889430f15c5496f43cf2f39769e02944612cf3cd9fd77bc43f508380",
-      "bytes": 12559,
+      "bytes": 12558,
       "checked": "2026-08-21"
     },
     "https://www.city.tajimi.lg.jp/kurashi_tetsuduzuki/machizukuri/1005830/1005831/1005832.html": {
       "hash": "3f3b8060329b54a9fadc390483967c5c179bd863f3a6c27e6fb901a471014800",
       "bytes": 46695,
+      "checked": "2026-08-21"
+    },
+    "https://www.pref.tokushima.lg.jp/ippannokata/kendozukuri/toshikeikaku/7309866/": {
+      "hash": "1e79f7034b25be1ad98e559ca332e18382a71fd0a2b4dbd2d55bd50fe2260785",
+      "bytes": 34587,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.tottori.lg.jp/page/45059.html": {
+      "hash": "e90aa8b2575b544ea9eb15c22b4466a09389c1d200205f497e117b8cce9d155c",
+      "bytes": 37565,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.oita.oita.jp/o173/tikudennti.html": {
+      "hash": "f781466b9fb6c384328329ef4bfb83f2958b39df6f48e6a7697a03d2a5c97f40",
+      "bytes": 18130,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.fukushima.fukushima.jp/soshiki/5/1018/2/15311.html": {
+      "hash": "fed55dacf7ab71a32432c944a30dd8e3ed136eb1e166f81cfe6accb94a74cad3",
+      "bytes": 70509,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.hamamatsu.shizuoka.jp/documents/13411/tikuden-guideline.pdf": {
+      "hash": "6835bfddc5c961d6e82b3658763e833b97918b78a1ab752aec5ee13d66b2d83f",
+      "bytes": 639997,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.ota.gunma.jp/page/1053359.html": {
+      "hash": "84e2988cffd2f574921c2c14e383fc6e2349b5fefd0b5cba1ad92c004ba71190",
+      "bytes": 22253,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.tokorozawa.saitama.jp/kurashi/jutaku/kaihatukyoka/keitouyoutikudenti_toriatukai.html": {
+      "hash": "af643bb7e430da9e2645bb8315a51f82924536636614ea86a038b719c7117191",
+      "bytes": 20473,
+      "checked": "2026-08-21"
+    },
+    "https://web.pref.hyogo.lg.jp/ks29/press/kaihatu_chikudenchi.html": {
+      "hash": "7f28e82768a6bf2a2a73e7d9a2261dc74f7e868564ca357aef4a9d255e76af0f",
+      "bytes": 17616,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.kobe.lg.jp/a33173/business/kaihatsu/kaihatsukyoka/chosekuiki/qa.html": {
+      "hash": "738a4d16e34e1e2f0aa4be6fdb18c75c900d131b4397451a67d21f4b792afb65",
+      "bytes": 72047,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.kobe.lg.jp/a66958/business/kaihatsu/plan/sp.html": {
+      "hash": "439dc040e25bd7d97a7af252e91b593aabdb15b9c022f999781e40a75f00c513",
+      "bytes": 35555,
+      "checked": "2026-08-21"
+    },
+    "https://www.rilg.or.jp/htdocs/reikilink.html": {
+      "hash": "1c199ce5711c167bcc8811a940782c417a469d857c4f423dc955172f316234a0",
+      "bytes": 44647,
+      "checked": "2026-08-21"
+    },
+    "https://www.rilg.or.jp/htdocs/img/reiki/005_solar.htm": {
+      "hash": "9f5018d68118c610fbee8d0d532e5f0e68c415542f0e77cd643677d916a62d12",
+      "bytes": 278258,
+      "checked": "2026-08-21"
+    },
+    "https://www.rilg.or.jp/htdocs/img/reiki/122_renewable_energy.htm": {
+      "hash": "9eb1b13d7588efb39f0fcffb5519d462805ee8e8e8a5b7c0594dfe9934c883de",
+      "bytes": 75222,
       "checked": "2026-08-21"
     }
   }
