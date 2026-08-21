@@ -1,0 +1,58 @@
+# 蓄電池条例リスクの週次監視
+# 台帳（data/ordinance_registry.json）の各URLを取得し、前回スナップショットとの差分・
+# ページ消失を検知したらIssueを起票する。詳細は docs/ordinance_watch_運用手順.md を参照。
+name: ordinance-watch
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # 毎週月曜 9:00 JST
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 台帳ページの変更を検知
+        id: monitor
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/ordinance_watch.py monitor --update | tee monitor_result.md
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: スナップショット更新をコミット
+        shell: bash
+        run: |
+          if ! git diff --quiet data/ordinance_page_state.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/ordinance_page_state.json
+            git commit -m "条例監視: ページスナップショットを更新 ($(date +%F))"
+            git push
+          fi
+
+      - name: 変更・取得失敗があればIssueを起票
+        if: steps.monitor.outputs.exit_code != '0'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create ordinance-watch --color D93F0B \
+            --description "条例リスク監視の自動検知" 2>/dev/null || true
+          {
+            echo "条例リスク台帳の監視で要確認事項を検知しました。"
+            echo "各ページを開いて規制の改正・追加・URL変更を確認し、"
+            echo "\`data/ordinance_registry.json\` を更新してください。"
+            echo ""
+            cat monitor_result.md
+          } > issue_body.md
+          gh issue create \
+            --title "条例リスク監視: 要確認 ($(date +%F))" \
+            --label ordinance-watch \
+            --body-file issue_body.md

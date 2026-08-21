@@ -1,0 +1,80 @@
+{
+  "updated": "2026-08-21",
+  "pages": {
+    "https://www.mlit.go.jp/toshi/city_plan/content/001883478.pdf": {
+      "hash": "84b234c82e60689e6c1469d2def7e0dac7f8dc13a598b8e9eb7e594d73d871d2",
+      "bytes": 121400,
+      "checked": "2026-08-21"
+    },
+    "https://www.meti.go.jp/policy/safety_security/industrial_safety/sangyo/electric/detail/denryokucyozousouchi.html": {
+      "hash": "fe60f56049a91d38096f92d8d5bdcde0cd0911e72079f71fa45a676fe6955330",
+      "bytes": 506221,
+      "checked": "2026-08-21"
+    },
+    "https://www.enecho.meti.go.jp/category/saving_and_new/saiene/kaitori/dl/fit_2017/legal/guideline_setsumeikai.pdf": {
+      "hash": "08c2079b4937faaeebc160d221862c79ed12364be880cb59baa61a12e99a6988",
+      "bytes": 807979,
+      "checked": "2026-08-21"
+    },
+    "https://www.fdma.go.jp/laws/tutatsu/": {
+      "hash": "0aae3d0fbd28a5d63071d96c6b7af593b3a56317ecb7487c617bf53303abf187",
+      "bytes": 34040,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.chiba.jp/toshi/kenchiku/takuchi/keitouyochikudenchi20250911.html": {
+      "hash": "a857276a162d7101566cc04214319fe38d605b08cf85bbb4f26cd14d313fb059",
+      "bytes": 16845,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.hamamatsu.shizuoka.jp/tochi/kaihatu/20251201.html": {
+      "hash": "7d0def4e705e6eb06e538946bd5a6a6bab783fecddd4170a582b5adf399b4166",
+      "bytes": 16545,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.kumamoto.jp/kiji00366662/index.html": {
+      "hash": "07627dbe0a0b3ece5f27b4122db2ea18673e9742d4f91c88e8cec91e8643fcfc",
+      "bytes": 72798,
+      "checked": "2026-08-21"
+    },
+    "https://www.pref.kumamoto.jp/soshiki/115/236234.html": {
+      "hash": "d7522012eaa91e3c13cd784bb15cc7f1e5cc70fa5d4f0b4a4ad0f67d44c68310",
+      "bytes": 22312,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.takasaki.gunma.jp/page/67886.html": {
+      "hash": "b38b14ef08c1b513f8de2f02a7a86f0336fda071f862ebcf47a8437a82444eb8",
+      "bytes": 18335,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.okegawa.lg.jp/soshiki/toshiseibi/kenchiku/machidukuri/kyoka/14211.html": {
+      "hash": "48fd7efca645c32db9f2c2ddd7499470988e81194166e465b9b4d6eac770722d",
+      "bytes": 54911,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.otsu.lg.jp/b/kk/73620.html": {
+      "hash": "e66e83fd70982e94c3687b9f89b903a18aefba1239d5c0008b6ae2d6963bf9c9",
+      "bytes": 67628,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.kakogawa.lg.jp/soshikikarasagasu/tosi_kekaku/kaihatsushidoka/keitouyouchikudenchi.html": {
+      "hash": "ed7f06a97ef5d477ec2cdec05cd0fd991393baf55acc7ac36e23977305c53c4b",
+      "bytes": 59423,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.sanda.lg.jp/soshiki/36/faq/faq_jigyosha/1/33032.html": {
+      "hash": "db3811f95533ef3ad29ee4592b6c84c506683706edf642c50a0696d480e711c4",
+      "bytes": 42482,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.kure.lg.jp/soshiki/49/keitouyou-kaihatu.html": {
+      "hash": "8dc60a83889430f15c5496f43cf2f39769e02944612cf3cd9fd77bc43f508380",
+      "bytes": 12559,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.tajimi.lg.jp/kurashi_tetsuduzuki/machizukuri/1005830/1005831/1005832.html": {
+      "hash": "3f3b8060329b54a9fadc390483967c5c179bd863f3a6c27e6fb901a471014800",
+      "bytes": 46695,
+      "checked": "2026-08-21"
+    }
+  }
+}

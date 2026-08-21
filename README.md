@@ -415,6 +415,31 @@ python scripts/build_substation_web_data.py \
 xlsx版（`score_substations.py`）とWeb版が同じ定義を参照します。配点を変えるときはこのファイルだけを直し、
 xlsxとJSの両方を再生成してください。
 
+## 条例リスク定期監視（ordinance_watch）
+
+国交省の技術的助言「国都計第7号」（2025-04-08）を受けて、危険物を含有する系統用蓄電池を
+**第一種特定工作物として開発許可の対象にする自治体が急増**しています（千葉市 2025-09、浜松市
+2025-12 ほか）。案件進行中に許可要件が増えるリスクを定期的に洗うため、次の仕組みを備えています。
+
+- `data/ordinance_registry.json` — 条例・開発許可運用・国の通知の台帳（一次情報URL付き）
+- `docs/条例リスク台帳.md` — 台帳の閲覧用Markdown（`report` コマンドで自動生成）
+- `.github/workflows/ordinance-watch.yml` — **毎週月曜9時（JST）に全URLの変更・消失を自動検知し、
+  変化があれば `ordinance-watch` ラベルのIssueを起票**
+
+```bash
+# 案件の所在自治体に効く規制を照合（案件着手時・申請前に必ず実行）
+python scripts/ordinance_watch.py check --pref 千葉県 --muni 千葉市
+
+# 台帳一覧 / ページ変更検知 / 台帳Markdown再生成
+python scripts/ordinance_watch.py list
+python scripts/ordinance_watch.py monitor --update
+python scripts/ordinance_watch.py report
+```
+
+台帳に無い自治体でも同様の運用がいつでも始まりうるため、`check` が出力する共通チェックリスト
+（開発許可担当への事前照会・所轄消防協議・例規集検索）を案件ごとに実施してください。
+新規自治体の発見スイープ（Web検索）を含む運用の全体像は `docs/ordinance_watch_運用手順.md` を参照。
+
 ## 公開方法
 
 静的HTML1枚なので、どこでもホスティングできます。
