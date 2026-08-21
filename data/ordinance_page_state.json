@@ -43,7 +43,7 @@
     },
     "https://www.city.takasaki.gunma.jp/page/67886.html": {
       "hash": "b38b14ef08c1b513f8de2f02a7a86f0336fda071f862ebcf47a8437a82444eb8",
-      "bytes": 18333,
+      "bytes": 18334,
       "checked": "2026-08-21"
     },
     "https://www.city.okegawa.lg.jp/soshiki/toshiseibi/kenchiku/machidukuri/kyoka/14211.html": {
@@ -58,17 +58,17 @@
     },
     "https://www.city.kakogawa.lg.jp/soshikikarasagasu/tosi_kekaku/kaihatsushidoka/keitouyouchikudenchi.html": {
       "hash": "ed7f06a97ef5d477ec2cdec05cd0fd991393baf55acc7ac36e23977305c53c4b",
-      "bytes": 59423,
+      "bytes": 59421,
       "checked": "2026-08-21"
     },
     "https://www.city.sanda.lg.jp/soshiki/36/faq/faq_jigyosha/1/33032.html": {
       "hash": "db3811f95533ef3ad29ee4592b6c84c506683706edf642c50a0696d480e711c4",
-      "bytes": 42481,
+      "bytes": 42482,
       "checked": "2026-08-21"
     },
     "https://www.city.kure.lg.jp/soshiki/49/keitouyou-kaihatu.html": {
       "hash": "8dc60a83889430f15c5496f43cf2f39769e02944612cf3cd9fd77bc43f508380",
-      "bytes": 12558,
+      "bytes": 12559,
       "checked": "2026-08-21"
     },
     "https://www.city.tajimi.lg.jp/kurashi_tetsuduzuki/machizukuri/1005830/1005831/1005832.html": {
@@ -103,7 +103,7 @@
     },
     "https://www.city.ota.gunma.jp/page/1053359.html": {
       "hash": "84e2988cffd2f574921c2c14e383fc6e2349b5fefd0b5cba1ad92c004ba71190",
-      "bytes": 22253,
+      "bytes": 22252,
       "checked": "2026-08-21"
     },
     "https://www.city.tokorozawa.saitama.jp/kurashi/jutaku/kaihatukyoka/keitouyoutikudenti_toriatukai.html": {
@@ -113,7 +113,7 @@
     },
     "https://web.pref.hyogo.lg.jp/ks29/press/kaihatu_chikudenchi.html": {
       "hash": "7f28e82768a6bf2a2a73e7d9a2261dc74f7e868564ca357aef4a9d255e76af0f",
-      "bytes": 17616,
+      "bytes": 17617,
       "checked": "2026-08-21"
     },
     "https://www.city.kobe.lg.jp/a33173/business/kaihatsu/kaihatsukyoka/chosekuiki/qa.html": {
@@ -124,6 +124,16 @@
     "https://www.city.kobe.lg.jp/a66958/business/kaihatsu/plan/sp.html": {
       "hash": "439dc040e25bd7d97a7af252e91b593aabdb15b9c022f999781e40a75f00c513",
       "bytes": 35555,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.tatebayashi.gunma.jp/s062/jigyousya/060/060/130/180/20260702110114.html": {
+      "hash": "6b317da8d402e292b1423ad9eb8453cbc2b53f543146a97eec18474b6b1b37e5",
+      "bytes": 13900,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.katagami.lg.jp/soshiki/kensetsubu/toshikensetsu/toshikeikaku/toshikeikaku/5667.html": {
+      "hash": "e139c3535e3e1d76e1ffdbbc681f2551c0f50a137008345c117a841dc1592fc2",
+      "bytes": 49719,
       "checked": "2026-08-21"
     },
     "https://www.rilg.or.jp/htdocs/reikilink.html": {
