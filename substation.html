@@ -393,20 +393,22 @@ details.foldable[open] > summary::before { content:'▾ '; }
   <div class="card" id="card-nocoord" style="display:none">
     <div class="card-head">
       <span class="sec-tag">補足</span>
-      <span class="card-title">同エリアの高スコア変電所（座標未取得のため距離判定できず）</span>
+      <span class="card-title">同エリアの変電所（座標未取得のため距離判定できず）</span>
       <span class="card-note" id="nocoord-note"></span>
     </div>
     <div class="tbl-scroll">
       <table class="rtbl">
         <thead>
-          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>ランク</th></tr>
+          <tr><th>変電所</th><th>都道府県</th><th class="num">二次電圧<br>(kV)</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>ランク</th></tr>
         </thead>
         <tbody id="nctbody"></tbody>
       </table>
     </div>
     <div class="msg" style="border-top:1px solid var(--bdr);font-size:11.5px">
       これらは送配電事業者の公表データに載っているが座標が未取得の変電所です。距離が計算できないため上のランキングには出てきません。
-      所在地から候補地の近くにありそうなものは、地図で位置を確認してください。
+      所在地から候補地の近くにありそうなものは、地図で位置を確認してください。<br>
+      <b>連系先は最寄りの変電所とは限りません。</b>実際にどの変電所につながるかは既設の高圧配電線のたどり先で決まり、
+      送配電事業者の接続検討で確定します。高圧2MW連系の受け皿になるのは二次電圧が6.6/6.0kVの配電用変電所です。
     </div>
   </div>
 
@@ -951,26 +953,36 @@ function detailHtml(h) {
     </div>`;
 }
 
-// ── 座標未取得の高スコア変電所（同エリア）──
+// ── 座標未取得の変電所（同エリア）──
+// 連系先は最寄りとは限らず、実際は既設高圧配電線のたどり先で決まる。座標が無くて
+// 距離判定できない変電所こそ現実的な候補のことがあるため、S/AだけでなくBまで出す
+// （例: 今治市大島の周辺で中国エリアのS/Aは1件だけだが、大三島・生名の2件がBにある）。
+const NOCOORD_RANKS = ['S', 'A', 'B'];
+const NOCOORD_MAX = 20;
+
 function renderNoCoord(areaName, pref) {
   const card = $('card-nocoord'), tb = $('nctbody');
   if (!areaName) { card.style.display = 'none'; return; }
   const list = D.rows.filter(r =>
-    val(r, 'lat') == null && area(r) === areaName && ['S', 'A'].includes(rank(r)));
+    val(r, 'lat') == null && area(r) === areaName && NOCOORD_RANKS.includes(rank(r)));
   if (!list.length) { card.style.display = 'none'; return; }
-  // 同じ都道府県を先に、そのあと系統スコア降順
+  // 同じ都道府県を先に、そのあと系統スコア降順（S/AがBより上に来る）
   list.sort((a, b) => (val(b, 'pref') === pref) - (val(a, 'pref') === pref) || val(b, 'grid') - val(a, 'grid'));
-  tb.innerHTML = list.slice(0, 20).map(r => `
+  tb.innerHTML = list.slice(0, NOCOORD_MAX).map(r => `
     <tr>
       <td><span class="ss-name">${esc(val(r, 'name'))}</span>
         <div class="ss-meta">${esc(val(r, 'addr') || '所在地不明')}</div></td>
       <td>${esc(val(r, 'pref') || '—')}</td>
+      <td class="num">${fmtNum(val(r, 'vsec'))}</td>
       <td class="num">${fmtNum(val(r, 'availUp') != null ? val(r, 'availUp') : val(r, 'availCur'))}</td>
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
       <td><span class="rk ${rkClass(rank(r))}">${esc(rank(r))}</span></td>
     </tr>`).join('');
-  $('nocoord-note').textContent = `${areaName}エリア ${list.length}件中 上位${Math.min(20, list.length)}件`;
+  const shown = Math.min(NOCOORD_MAX, list.length);
+  $('nocoord-note').textContent =
+    `${areaName}エリアのランク${NOCOORD_RANKS.join('/')} ${list.length}件中 ` +
+    (shown < list.length ? `系統スコア上位${shown}件` : `${shown}件すべて`);
   card.style.display = '';
 }
 
@@ -992,7 +1004,8 @@ function renderStatic() {
   $('disclaimer').innerHTML =
     `元データ: ${esc(D.meta.source)}（生成 ${esc(D.meta.generated)}）。スコア定義は substation_scoring.py と共通で、xlsx版と同じ配点です。<br>` +
     `<b>制約</b>: 座標が未取得の${noCoord.toLocaleString()}件は距離判定の対象外です（送配電事業者の公表データには載っているが座標が取れていない変電所）。` +
-    `高スコアの変電所はこちらに多く含まれるため、上の「同エリアの高スコア変電所」も必ず確認してください。<br>` +
+    `高スコアの変電所はこちらに多く含まれるため、上の「同エリアの変電所（座標未取得）」も必ず確認してください。` +
+    `連系先は最寄りの変電所とは限らず、既設高圧配電線のたどり先で決まるため、距離が出せない変電所が実際の候補になることがあります。<br>` +
     `本ツールは事前スクリーニング用の簡易評価です。空容量は特高側の公表値であり、高圧連系の可否・負担金・工期の確定は接続検討の申込によってのみ行えます。`;
 }
 
