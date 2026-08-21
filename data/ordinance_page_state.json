@@ -43,7 +43,7 @@
     },
     "https://www.city.takasaki.gunma.jp/page/67886.html": {
       "hash": "b38b14ef08c1b513f8de2f02a7a86f0336fda071f862ebcf47a8437a82444eb8",
-      "bytes": 18334,
+      "bytes": 18335,
       "checked": "2026-08-21"
     },
     "https://www.city.okegawa.lg.jp/soshiki/toshiseibi/kenchiku/machidukuri/kyoka/14211.html": {
@@ -58,7 +58,7 @@
     },
     "https://www.city.kakogawa.lg.jp/soshikikarasagasu/tosi_kekaku/kaihatsushidoka/keitouyouchikudenchi.html": {
       "hash": "ed7f06a97ef5d477ec2cdec05cd0fd991393baf55acc7ac36e23977305c53c4b",
-      "bytes": 59421,
+      "bytes": 59423,
       "checked": "2026-08-21"
     },
     "https://www.city.sanda.lg.jp/soshiki/36/faq/faq_jigyosha/1/33032.html": {
@@ -103,7 +103,7 @@
     },
     "https://www.city.ota.gunma.jp/page/1053359.html": {
       "hash": "84e2988cffd2f574921c2c14e383fc6e2349b5fefd0b5cba1ad92c004ba71190",
-      "bytes": 22252,
+      "bytes": 22253,
       "checked": "2026-08-21"
     },
     "https://www.city.tokorozawa.saitama.jp/kurashi/jutaku/kaihatukyoka/keitouyoutikudenti_toriatukai.html": {
@@ -128,12 +128,27 @@
     },
     "https://www.city.tatebayashi.gunma.jp/s062/jigyousya/060/060/130/180/20260702110114.html": {
       "hash": "6b317da8d402e292b1423ad9eb8453cbc2b53f543146a97eec18474b6b1b37e5",
-      "bytes": 13900,
+      "bytes": 13899,
       "checked": "2026-08-21"
     },
     "https://www.city.katagami.lg.jp/soshiki/kensetsubu/toshikensetsu/toshikeikaku/toshikeikaku/5667.html": {
       "hash": "e139c3535e3e1d76e1ffdbbc681f2551c0f50a137008345c117a841dc1592fc2",
       "bytes": 49719,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.saitama.lg.jp/005/003/021/001/p132748.html": {
+      "hash": "c76f0fdb31c1e6e0db260c790e80a5bd4c693d4f8ff26c293e9f39cdd192b501",
+      "bytes": 34963,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.sakura.lg.jp/soshiki/shigaichiseibika/otoiawase/19447.html": {
+      "hash": "836f0172fae55b054ed65da7157237af6dc73bfd02fc82f6804f4cffe7635001",
+      "bytes": 57808,
+      "checked": "2026-08-21"
+    },
+    "https://www.city.sakata.lg.jp/jyutaku/toshikeikaku/kaihatdukyoka/kaihatsu_tikudenti.html": {
+      "hash": "f53690f0ef068997719d4a8c61000d24a924591820fbe7f07879f2be25df52bf",
+      "bytes": 23659,
       "checked": "2026-08-21"
     },
     "https://www.rilg.or.jp/htdocs/reikilink.html": {
