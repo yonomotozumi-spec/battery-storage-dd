@@ -34,6 +34,7 @@ def main():
             "generated": date.today().isoformat(),
             "registry_updated": reg["updated"],
             "authorities_updated": kk["updated"],
+            "initialImport": reg.get("initial_import"),
         },
         "entries": [
             {
@@ -43,6 +44,7 @@ def main():
                 "scope": e["scope"], "requirement": e["requirement"],
                 "summary": e["summary"], "ddImpact": e["dd_impact"],
                 "verified": e["last_verified"], "notes": e.get("notes"),
+                "added": e.get("added", e["last_verified"]),
                 "choseiNg": chosei_ng(e),
             }
             for e in reg["entries"]

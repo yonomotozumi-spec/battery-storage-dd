@@ -158,5 +158,8 @@ python scripts/ordinance_watch.py check --pref 千葉県 --muni 千葉市
 
 - 出典は必ず一次情報（自治体・省庁の公式ページ）。ニュース記事は `notes` に補足として書く
 - 内容を確認した日を `last_verified` に必ず入れる（古い確認日のエントリは再確認対象）
+- 新規エントリには収録日 `added` を必ず入れる。`ordinance.html` の「直近の動き（注意事項）」は
+  `announced_date`・`effective_date`・`added` から自動表示される（`initial_import` 以前の
+  一括収録分は「新規収録」アラートの対象外）
 - 廃止・URL移転が判明したら削除せず `notes` に経緯を残してURLを差し替える
 - 施行日が「予定」の段階でも載せる（施行前に把握することが目的のため）
