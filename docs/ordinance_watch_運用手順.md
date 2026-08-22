@@ -40,8 +40,13 @@
 - `data/ordinance_page_state.json` — 各URLの正規化本文ハッシュのスナップショット（自動更新）
 - `scripts/ordinance_watch.py` — list / check / monitor / report の4コマンド
 - `scripts/build_priority_munis.py` — S/A変電所の逆ジオコード→優先自治体リスト生成
+- `scripts/build_ordinance_web_data.py` — Web閲覧用データ `data/ordinances.js` の生成
+- `ordinance.html` — **条例リスクDBの閲覧画面**（台帳検索・案件照合・権者調査状況。誰でもブラウザで確認可）
 - `docs/条例リスク台帳.md` — 台帳から自動生成する閲覧用Markdown
 - `.github/workflows/ordinance-watch.yml` — 週次の自動監視（層①）
+
+台帳・権者リスト・優先自治体のいずれかを更新したら、`report`（台帳Markdown）と
+`build_ordinance_web_data.py`（Web用データ）の両方を再生成してコミットに含めること。
 
 ## 層①: 既知ページの変更監視（自動）
 

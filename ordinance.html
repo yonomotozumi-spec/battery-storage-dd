@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="系統用蓄電池（蓄電所）の設置に影響する条例・開発許可運用の全国データベース。開発許可権者151者の調査状況と案件所在地の照合機能付き。">
+<title>蓄電池条例リスクDB（全国）</title>
+<style>
+/* ── Design tokens（index.html / substation.html と共通）── */
+:root {
+  --bg:#F0F3F9; --surf:#FFFFFF; --surf2:#E8EDF8; --bdr:#CDD5E8;
+  --txt:#16213D; --txt2:#465070; --txt3:#8390AC;
+  --acc:#1B55CC; --acc-h:#1444AA; --link:#1B55CC;
+  --pass:#0B9966; --pass-bg:#E8FAF3;
+  --warn:#BF7800; --warn-bg:#FEF8E0;
+  --fail:#CC2A20; --fail-bg:#FEECEA;
+  --r:8px;
+  --sh:0 1px 3px rgba(16,32,80,.07),0 1px 2px rgba(16,32,80,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#0B1221; --surf:#161F35; --surf2:#1D2B48; --bdr:#273450;
+    --txt:#E3EBFC; --txt2:#7D91BA; --txt3:#4A5A7A;
+    --acc:#4D82F7; --acc-h:#6896F9; --link:#6896F9;
+    --pass:#18BB82; --pass-bg:rgba(24,187,130,.13);
+    --warn:#F0A800; --warn-bg:rgba(240,168,0,.12);
+    --fail:#EF4C42; --fail-bg:rgba(239,76,66,.13);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0B1221;--surf:#161F35;--surf2:#1D2B48;--bdr:#273450;
+  --txt:#E3EBFC;--txt2:#7D91BA;--txt3:#4A5A7A;
+  --acc:#4D82F7;--acc-h:#6896F9;--link:#6896F9;
+  --pass:#18BB82;--pass-bg:rgba(24,187,130,.13);
+  --warn:#F0A800;--warn-bg:rgba(240,168,0,.12);
+  --fail:#EF4C42;--fail-bg:rgba(239,76,66,.13);
+}
+:root[data-theme="light"] {
+  --bg:#F0F3F9;--surf:#FFFFFF;--surf2:#E8EDF8;--bdr:#CDD5E8;
+  --txt:#16213D;--txt2:#465070;--txt3:#8390AC;
+  --acc:#1B55CC;--acc-h:#1444AA;--link:#1B55CC;
+  --pass:#0B9966;--pass-bg:#E8FAF3;
+  --warn:#BF7800;--warn-bg:#FEF8E0;
+  --fail:#CC2A20;--fail-bg:#FEECEA;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:var(--bg); color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans','Yu Gothic UI','Meiryo',system-ui,sans-serif;
+  font-size:14px; line-height:1.6;
+}
+.wrap { max-width:1000px; margin:0 auto; padding:28px 16px 80px; }
+a { color:var(--link); }
+
+/* ── Header ── */
+.pg-head { margin-bottom:18px; display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.pg-title { font-size:17px; font-weight:700; letter-spacing:-.02em; display:flex; align-items:center; gap:8px; }
+.pg-sub { font-size:12px; color:var(--txt3); margin-top:3px; }
+.px-badge { font-size:10px; font-weight:700; letter-spacing:.06em; background:var(--acc); color:#fff; padding:2px 8px; border-radius:4px; text-transform:uppercase; }
+.head-links { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+.head-link { font-size:12px; color:var(--link); text-decoration:none; border:1px solid var(--bdr); border-radius:6px; padding:6px 12px; background:var(--surf); white-space:nowrap; }
+.head-link:hover { background:var(--surf2); border-color:var(--acc); }
+
+/* ── Stat tiles ── */
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
+.stat { background:var(--surf); border:1px solid var(--bdr); border-radius:var(--r); box-shadow:var(--sh); padding:12px 14px; }
+.stat-num { font-size:22px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.stat-lbl { font-size:11px; color:var(--txt3); margin-top:2px; line-height:1.4; }
+
+/* ── Cards ── */
+.card { background:var(--surf); border:1px solid var(--bdr); border-radius:var(--r); box-shadow:var(--sh); margin-bottom:12px; overflow:hidden; }
+.card-head { display:flex; align-items:center; gap:8px; padding:10px 16px; background:var(--surf2); border-bottom:1px solid var(--bdr); flex-wrap:wrap; }
+.sec-tag { font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--acc); background:rgba(27,85,204,.1); padding:2px 7px; border-radius:4px; flex-shrink:0; }
+.card-title { font-size:13px; font-weight:600; }
+.card-note { font-size:11px; color:var(--txt3); margin-left:auto; text-align:right; }
+.card-body { padding:12px 16px; }
+
+/* ── Filters ── */
+.filters { display:flex; gap:8px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--bdr); }
+select, input[type="text"] {
+  appearance:none; background:var(--bg); border:1px solid var(--bdr); border-radius:6px;
+  color:var(--txt); font:inherit; font-size:13px; padding:7px 10px;
+}
+select:focus, input:focus { outline:2px solid var(--acc); outline-offset:-1px; }
+.filters input[type="text"] { flex:1; min-width:160px; }
+
+/* ── Entry rows ── */
+.entry { border-bottom:1px solid var(--bdr); }
+.entry:last-child { border-bottom:none; }
+.entry-head { display:flex; align-items:center; gap:8px; padding:10px 16px; cursor:pointer; flex-wrap:wrap; }
+.entry-head:hover { background:var(--surf2); }
+.entry-where { font-weight:600; font-size:13px; white-space:nowrap; }
+.entry-title { font-size:12.5px; color:var(--txt2); flex:1; min-width:200px; }
+.entry-date { font-size:11px; color:var(--txt3); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.badge { font-size:10px; font-weight:700; padding:1px 7px; border-radius:10px; white-space:nowrap; }
+.b-level  { background:var(--surf2); color:var(--txt2); border:1px solid var(--bdr); }
+.b-kuni   { background:rgba(27,85,204,.1); color:var(--acc); }
+.b-jorei  { background:var(--warn-bg); color:var(--warn); }
+.b-guide  { background:var(--pass-bg); color:var(--pass); }
+.b-ng     { background:var(--fail-bg); color:var(--fail); }
+.b-pri    { background:var(--warn-bg); color:var(--warn); }
+.entry-detail { display:none; padding:4px 16px 14px; }
+.entry.open .entry-detail { display:block; }
+.dl { display:grid; grid-template-columns:110px 1fr; gap:4px 12px; font-size:12.5px; }
+.dl dt { color:var(--txt3); }
+.dl dd { color:var(--txt); overflow-wrap:anywhere; }
+
+/* ── 照合結果 ── */
+.match-warn { background:var(--fail-bg); border:1px solid var(--fail); border-radius:6px; padding:10px 12px; font-size:12.5px; margin-bottom:10px; }
+.match-ok   { background:var(--pass-bg); border:1px solid var(--pass); border-radius:6px; padding:10px 12px; font-size:12.5px; margin-bottom:10px; }
+.checklist { font-size:12px; color:var(--txt2); margin-top:8px; padding-left:18px; }
+.checklist li { margin-bottom:3px; }
+
+/* ── 権者テーブル ── */
+.auth-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:6px; padding:12px 16px; }
+.auth { display:flex; align-items:center; gap:6px; font-size:12px; padding:5px 9px; border:1px solid var(--bdr); border-radius:6px; background:var(--bg); }
+.auth-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.dot-y { background:var(--fail); }
+.dot-n { background:var(--txt3); opacity:.45; }
+.auth-type { font-size:9.5px; color:var(--txt3); margin-left:auto; white-space:nowrap; }
+.legend { font-size:11px; color:var(--txt3); display:flex; gap:14px; align-items:center; padding:0 16px 10px; flex-wrap:wrap; }
+.legend .dot { display:inline-block; vertical-align:middle; margin-right:4px; }
+
+.empty { padding:18px 16px; font-size:12.5px; color:var(--txt3); }
+.foot { font-size:11px; color:var(--txt3); margin-top:20px; line-height:1.7; }
+@media (max-width:560px) { .dl { grid-template-columns:1fr; } .dl dt { margin-top:6px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="pg-head">
+  <div>
+    <div class="pg-title"><span class="px-badge">DB</span>蓄電池条例リスクDB（全国）</div>
+    <div class="pg-sub" id="sub-updated">系統用蓄電池の設置に影響する条例・開発許可運用の台帳と開発許可権者151者の調査状況</div>
+  </div>
+  <div class="head-links">
+    <a class="head-link" href="index.html">DDチェックシートへ →</a>
+    <a class="head-link" href="substation.html">変電所スコア検索へ →</a>
+  </div>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<!-- 案件照合 -->
+<section class="card">
+  <div class="card-head">
+    <span class="sec-tag">Check</span>
+    <span class="card-title">案件所在地の照合</span>
+    <span class="card-note">案件着手時・申請前に必ず実施</span>
+  </div>
+  <div class="filters">
+    <select id="chk-pref"><option value="">都道府県を選択</option></select>
+    <input type="text" id="chk-muni" list="muni-list" placeholder="市区町村名（例: 千葉市）">
+    <datalist id="muni-list"></datalist>
+  </div>
+  <div class="card-body" id="chk-result">
+    <div class="empty">都道府県・市区町村を選ぶと、該当する規制と共通チェックリストを表示します。</div>
+  </div>
+</section>
+
+<!-- 台帳一覧 -->
+<section class="card">
+  <div class="card-head">
+    <span class="sec-tag">Registry</span>
+    <span class="card-title">条例・運用の台帳</span>
+    <span class="card-note" id="reg-count"></span>
+  </div>
+  <div class="filters">
+    <select id="f-level">
+      <option value="">レベル: 全て</option>
+      <option>国</option><option>都道府県</option><option>市区町村</option>
+    </select>
+    <select id="f-type"><option value="">種別: 全て</option></select>
+    <select id="f-ng">
+      <option value="">調整区域: 全て</option>
+      <option value="ng">実質設置不可・基準未整備のみ</option>
+    </select>
+    <input type="text" id="f-text" placeholder="自治体名・キーワードで絞り込み">
+  </div>
+  <div id="reg-list"></div>
+</section>
+
+<!-- 開発許可権者151者 -->
+<section class="card">
+  <div class="card-head">
+    <span class="sec-tag">Authorities</span>
+    <span class="card-title">開発許可権者の調査状況</span>
+    <span class="card-note" id="auth-count"></span>
+  </div>
+  <div class="filters">
+    <select id="a-status">
+      <option value="">全て</option>
+      <option value="公表あり">公表あり</option>
+      <option value="公表確認できず">公表確認できず</option>
+    </select>
+    <select id="a-type">
+      <option value="">区分: 全て</option>
+      <option>都道府県</option><option>政令指定都市</option><option>中核市</option><option>施行時特例市</option>
+    </select>
+    <input type="text" id="a-text" placeholder="自治体名で絞り込み">
+  </div>
+  <div class="legend">
+    <span><span class="dot dot-y"></span>公表あり（クリックで出典）</span>
+    <span><span class="dot dot-n"></span>公表確認できず（規制なしの証明ではない）</span>
+  </div>
+  <div class="auth-grid" id="auth-list"></div>
+</section>
+
+<!-- 定点 -->
+<section class="card">
+  <div class="card-head">
+    <span class="sec-tag">Watch</span>
+    <span class="card-title">定点監視ページ</span>
+    <span class="card-note">週次で変更を自動検知</span>
+  </div>
+  <div class="card-body" id="wp-list"></div>
+</section>
+
+<p class="foot">
+台帳に無い自治体でも、国交省技術的助言（国都計第7号・2025-04-08）を根拠とする開発許可運用や独自条例がいつでも始まりうる。
+「公表確認できず」は規制なしの証明ではない。最終確認は必ず各行政窓口（開発許可担当・所轄消防）への照会で行うこと。<br>
+データ: <code>data/ordinance_registry.json</code>（台帳）／<code>data/kaihatsu_kyokasha.json</code>（権者）／
+<code>data/priority_munis.json</code>（S/Aランク変電所の所在自治体）。更新手順は <code>docs/ordinance_watch_運用手順.md</code> を参照。
+</p>
+
+</div>
+
+<script src="data/ordinances.js"></script>
+<script>
+'use strict';
+const D = window.ORDINANCE_DATA;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PRI = new Map(D.priority.map(p => [p.pref + '|' + p.muni, p]));
+
+/* ── 概況タイル ── */
+(function stats() {
+  const munis = D.entries.filter(e => e.level !== '国');
+  const ngs = new Set(D.entries.filter(e => e.choseiNg).map(e => (e.muni || e.pref)));
+  const authYes = D.authorities.filter(a => a.status === '公表あり').length;
+  const priReg = munis.filter(e => e.muni && PRI.has(e.pref + '|' + e.muni)).length;
+  $('stats').innerHTML = [
+    [D.entries.length, '台帳エントリ（国' + D.entries.filter(e=>e.level==='国').length + '・県' +
+      D.entries.filter(e=>e.level==='都道府県').length + '・市' + D.entries.filter(e=>e.level==='市区町村').length + '）'],
+    [authYes + ' / ' + D.authorities.length, '開発許可権者の公表あり'],
+    [ngs.size, '市街化調整区域が実質設置不可・基準未整備'],
+    [priReg, '優先監視自治体（S/A変電所所在）で規制あり'],
+  ].map(([n, l]) => `<div class="stat"><div class="stat-num">${esc(n)}</div><div class="stat-lbl">${esc(l)}</div></div>`).join('');
+  $('sub-updated').textContent =
+    `台帳更新 ${D.meta.registry_updated} ／ データ生成 ${D.meta.generated} ／ 権者151者・優先監視${D.priority.length}自治体`;
+})();
+
+/* ── バッジ ── */
+function typeBadge(e) {
+  if (e.regType === '条例') return '<span class="badge b-jorei">条例</span>';
+  if (e.regType === '指導要綱' || e.regType === 'ガイドライン') return '<span class="badge b-guide">ガイドライン</span>';
+  if (e.level === '国') return '<span class="badge b-kuni">' + esc(e.regType) + '</span>';
+  return '<span class="badge b-level">' + esc(e.regType) + '</span>';
+}
+function priBadge(e) {
+  const p = e.muni && PRI.get(e.pref + '|' + e.muni);
+  return p ? `<span class="badge b-pri" title="S/Aランク変電所の所在自治体">優先 S${p.S}/A${p.A}</span>` : '';
+}
+
+/* ── 台帳一覧 ── */
+function entryRow(e) {
+  const where = e.muni || e.pref || '全国';
+  return `<div class="entry" data-id="${esc(e.id)}">
+    <div class="entry-head" onclick="this.parentNode.classList.toggle('open')">
+      <span class="badge b-level">${esc(e.level)}</span>
+      <span class="entry-where">${esc(where)}</span>
+      ${typeBadge(e)}
+      ${e.choseiNg ? '<span class="badge b-ng">調整区域NG</span>' : ''}
+      ${priBadge(e)}
+      <span class="entry-title">${esc(e.title)}</span>
+      <span class="entry-date">${esc(e.announced || e.effective || '—')}</span>
+    </div>
+    <div class="entry-detail"><dl class="dl">
+      <dt>対象</dt><dd>${esc(e.scope)}</dd>
+      <dt>手続き</dt><dd>${esc(e.requirement)}</dd>
+      <dt>公表 / 施行</dt><dd>${esc(e.announced || '不明')} ／ ${esc(e.effective || '不明')}</dd>
+      <dt>内容</dt><dd>${esc(e.summary)}</dd>
+      <dt>DDへの影響</dt><dd>${esc(e.ddImpact)}</dd>
+      ${e.notes ? `<dt>備考</dt><dd>${esc(e.notes)}</dd>` : ''}
+      <dt>出典</dt><dd><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.url)}</a>（最終確認 ${esc(e.verified)}）</dd>
+    </dl></div>
+  </div>`;
+}
+
+function renderRegistry() {
+  const lv = $('f-level').value, ty = $('f-type').value, ng = $('f-ng').value;
+  const q = $('f-text').value.trim();
+  const rows = D.entries.filter(e =>
+    (!lv || e.level === lv) &&
+    (!ty || e.regType === ty) &&
+    (!ng || e.choseiNg) &&
+    (!q || [e.pref, e.muni, e.title, e.summary, e.requirement].filter(Boolean).join(' ').includes(q))
+  );
+  $('reg-count').textContent = `${rows.length} / ${D.entries.length} 件`;
+  $('reg-list').innerHTML = rows.length
+    ? rows.map(entryRow).join('')
+    : '<div class="empty">条件に一致するエントリはありません。</div>';
+}
+(function initRegFilters() {
+  const types = [...new Set(D.entries.map(e => e.regType))];
+  $('f-type').insertAdjacentHTML('beforeend', types.map(t => `<option>${esc(t)}</option>`).join(''));
+  ['f-level','f-type','f-ng'].forEach(id => $(id).addEventListener('change', renderRegistry));
+  $('f-text').addEventListener('input', renderRegistry);
+  renderRegistry();
+})();
+
+/* ── 案件照合 ── */
+const PREFS = [...new Set([...D.authorities.map(a => a.pref), ...D.entries.map(e => e.pref).filter(Boolean)])];
+$('chk-pref').insertAdjacentHTML('beforeend', PREFS.map(p => `<option>${esc(p)}</option>`).join(''));
+const KNOWN_MUNIS = [...new Set([
+  ...D.entries.map(e => e.muni).filter(Boolean),
+  ...D.authorities.filter(a => a.name !== a.pref).map(a => a.name),
+  ...D.priority.map(p => p.muni),
+])].sort();
+$('muni-list').innerHTML = KNOWN_MUNIS.map(m => `<option value="${esc(m)}">`).join('');
+
+const CHECKLIST_HTML = `
+  <ol class="checklist">
+    <li>開発許可担当課への事前照会（系統用蓄電池を第一種特定工作物として扱うか・運用基準の有無・市街化調整区域の扱い）</li>
+    <li>所轄消防への事前協議（火災予防条例の蓄電池設備基準・届出）</li>
+    <li>例規集で「蓄電」「再生可能エネルギー」「開発」等の条例・要綱を検索</li>
+    <li>議会会議録・パブリックコメントで条例制定の動きを検索（施行前の察知）</li>
+    <li>市街化調整区域の場合は開発許可の要否と標準処理期間を必ず確認</li>
+  </ol>`;
+
+function renderCheck() {
+  const pref = $('chk-pref').value, muni = $('chk-muni').value.trim();
+  if (!pref && !muni) {
+    $('chk-result').innerHTML = '<div class="empty">都道府県・市区町村を選ぶと、該当する規制と共通チェックリストを表示します。</div>';
+    return;
+  }
+  const local = D.entries.filter(e =>
+    (e.level === '都道府県' && pref && e.pref === pref) ||
+    (e.level === '市区町村' && muni && e.muni === muni && (!pref || e.pref === pref))
+  );
+  const kuni = D.entries.filter(e => e.level === '国');
+  const auth = D.authorities.find(a => (muni && a.name === muni) || (!muni && pref && a.name === pref));
+  const p = muni && pref && PRI.get(pref + '|' + muni);
+  let html = '';
+  if (local.length) {
+    html += `<div class="match-warn">⚠ <strong>${esc(pref)} ${esc(muni)}</strong> に該当する規制が <strong>${local.length}件</strong> あります。下記の出典と窓口を必ず確認してください。</div>`;
+    html += local.map(entryRow).join('');
+  } else {
+    html += `<div class="match-ok"><strong>${esc(pref)} ${esc(muni)}</strong> に該当する台帳エントリはありません。ただし<strong>未収録＝規制なしではありません</strong>。` +
+      (auth ? `（${esc(auth.name)}は開発許可権者・調査状況: ${esc(auth.status)}${auth.lastSwept ? '・最終調査 ' + esc(auth.lastSwept) : ''}）` :
+              '（この市区町村は開発許可権者ではないため、都道府県の窓口も確認してください）') +
+      '</div>';
+  }
+  if (p) html += `<div class="match-warn">📍 この自治体はS/Aランク変電所の所在地（S${p.S}・A${p.A}）＝優先監視対象です。</div>`;
+  html += '<div style="font-size:12.5px;font-weight:600;margin-top:10px;">全国共通で適用される枠組み</div>';
+  html += '<ul class="checklist">' + kuni.map(e =>
+    `<li><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a> — ${esc(e.requirement)}</li>`).join('') + '</ul>';
+  html += '<div style="font-size:12.5px;font-weight:600;margin-top:10px;">台帳ヒットの有無に関わらず確認すること</div>' + CHECKLIST_HTML;
+  $('chk-result').innerHTML = html;
+}
+$('chk-pref').addEventListener('change', renderCheck);
+$('chk-muni').addEventListener('input', renderCheck);
+
+/* ── 権者一覧 ── */
+function renderAuth() {
+  const st = $('a-status').value, ty = $('a-type').value, q = $('a-text').value.trim();
+  const rows = D.authorities.filter(a =>
+    (!st || a.status === st) && (!ty || a.type === ty) && (!q || (a.pref + a.name).includes(q))
+  );
+  $('auth-count').textContent =
+    `公表あり ${D.authorities.filter(a=>a.status==='公表あり').length} ／ 全${D.authorities.length}者中 ${rows.length}者を表示`;
+  $('auth-list').innerHTML = rows.map(a => {
+    const yes = a.status === '公表あり';
+    const name = (a.name === a.pref) ? a.pref : `${a.pref} ${a.name}`;
+    const inner = `<span class="dot ${yes ? 'dot-y' : 'dot-n'}"></span><span class="auth-name">${esc(name)}</span><span class="auth-type">${esc(a.type.replace('指定都市','市').replace('施行時特例市','特例市'))}</span>`;
+    return yes && a.url
+      ? `<a class="auth" href="${esc(a.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">${inner}</a>`
+      : `<div class="auth" title="${esc(a.status)}">${inner}</div>`;
+  }).join('') || '<div class="empty">条件に一致する権者はありません。</div>';
+}
+['a-status','a-type'].forEach(id => $(id).addEventListener('change', renderAuth));
+$('a-text').addEventListener('input', renderAuth);
+renderAuth();
+
+/* ── 定点 ── */
+$('wp-list').innerHTML = '<ul class="checklist">' + D.watchpoints.map(w =>
+  `<li><a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.title)}</a> — ${esc(w.why)}（最終確認 ${esc(w.last_verified)}）</li>`
+).join('') + '</ul>';
+</script>
+</body>
+</html>
