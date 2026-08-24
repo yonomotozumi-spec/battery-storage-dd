@@ -182,6 +182,26 @@ select:focus, input:focus { outline:2px solid var(--acc); outline-offset:-1px; }
   </div>
 </section>
 
+<!-- 制定前の動き -->
+<section class="card" id="sec-pipeline">
+  <div class="card-head" data-toggle>
+    <span class="chev">▾</span>
+    <span class="sec-tag" style="color:var(--warn);background:var(--warn-bg);">Pipeline</span>
+    <span class="card-title">制定前の動き（パブコメ・検討中）</span>
+    <span class="card-note" id="pl-note"></span>
+  </div>
+  <div class="sec-body">
+    <div class="sec-why">まだ規制になっていないが、規制化しうる動き（パブリックコメント・条例案・適用範囲の未確認事項）。施行前に察知するための層で、週次スイープが更新する。国のパブコメは <a href="https://public-comment.e-gov.go.jp/" target="_blank" rel="noopener">e-Gov</a> に一元化されているが、自治体のパブコメは各サイトに分散しているためキーワード検索で拾っている。二次情報のみの案件は台帳に入れず、ここで一次情報の確認を待つ。</div>
+    <div class="filters">
+      <select id="pl-filter">
+        <option value="active">進行中のみ</option>
+        <option value="all">判定済み（対象外等）も表示</option>
+      </select>
+    </div>
+    <div id="pl-list"></div>
+  </div>
+</section>
+
 <!-- 案件照合 -->
 <section class="card" id="sec-check">
   <div class="card-head" data-toggle>
@@ -375,6 +395,7 @@ function renderStats() {
   $('stats').innerHTML = [
     [alerts.length, `直近${win}日の動き（公表・施行・新規収録）`, alerts.length > 0],
     [D.entries.length, `台帳エントリ（国${D.entries.filter(e=>e.level==='国').length}・県${D.entries.filter(e=>e.level==='都道府県').length}・市${D.entries.filter(e=>e.level==='市区町村').length}）`, false],
+    [D.pipeline.filter(x => !x.resolved).length, '制定前の動き（パブコメ・検討中）', D.pipeline.some(x => !x.resolved && x.stage === 'パブコメ募集中')],
     [authYes + ' / ' + D.authorities.length, '開発許可権者の公表あり', false],
     [ngs.size, '市街化調整区域が実質設置不可・基準未整備', false],
   ].map(([n, l, hot]) => `<div class="stat${hot ? ' hot' : ''}"><div class="stat-num">${esc(n)}</div><div class="stat-lbl">${esc(l)}</div></div>`).join('');
@@ -401,6 +422,47 @@ function renderAlerts() {
   renderStats();
 }
 $('alert-win').addEventListener('change', renderAlerts);
+
+/* ── 制定前の動き ── */
+const STAGE_BADGE = {
+  'パブコメ募集中':      '<span class="badge b-new">パブコメ募集中</span>',
+  'パブコメ終了・結果待ち': '<span class="badge b-eff">パブコメ終了・結果待ち</span>',
+  '議会審議中':          '<span class="badge b-eff">議会審議中</span>',
+  '検討情報あり':        '<span class="badge b-level">検討情報あり</span>',
+  '適用範囲要確認':      '<span class="badge b-level">適用範囲要確認</span>',
+  '対象外判定':          '<span class="badge b-level" style="opacity:.6">対象外判定</span>',
+};
+function renderPipeline() {
+  const showAll = $('pl-filter').value === 'all';
+  const items = D.pipeline.filter(x => showAll || !x.resolved);
+  const active = D.pipeline.filter(x => !x.resolved);
+  $('pl-note').textContent = `進行中 ${active.length}件`;
+  $('pl-list').innerHTML = items.length ? items.map(x => {
+    const where = x.muni ? `${x.pref} ${x.muni}` : (x.pref || '国');
+    let dl = '';
+    if (x.deadline) {
+      const n = Math.round(-dayDiff(x.deadline));
+      dl = n >= 0
+        ? ` <span class="badge b-new">締切 ${esc(x.deadline)}（残${n}日）</span>`
+        : ` <span style="color:var(--txt3);font-size:11px">締切 ${esc(x.deadline)}（終了）</span>`;
+    }
+    return `<div class="entry${x.resolved ? '" style="opacity:.55' : ''}">
+      <div class="entry-head" onclick="this.parentNode.classList.toggle('open')">
+        ${STAGE_BADGE[x.stage] || `<span class="badge b-level">${esc(x.stage)}</span>`}
+        <span class="entry-where">${esc(where)}</span>
+        <span class="entry-title">${esc(x.title)}${dl}</span>
+        <span class="entry-date">${esc(x.source_grade)}</span>
+      </div>
+      <div class="entry-detail"><dl class="dl">
+        <dt>状況</dt><dd>${esc(x.summary)}</dd>
+        <dt>追う理由</dt><dd>${esc(x.why_watch)}</dd>
+        ${x.resolved ? `<dt>判定</dt><dd>${esc(x.resolved)}</dd>` : ''}
+        <dt>出典</dt><dd>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.url)}</a>` : '一次情報URL未特定（' + esc(x.source_grade) + '）'}（最終確認 ${esc(x.last_verified)}）</dd>
+      </dl></div>
+    </div>`;
+  }).join('') : '<div class="empty">進行中の案件はありません。</div>';
+}
+$('pl-filter').addEventListener('change', renderPipeline);
 
 /* 台帳の該当行へジャンプして開く */
 function jumpTo(id) {
@@ -550,6 +612,7 @@ $('wp-list').innerHTML = '<ul class="checklist">' + D.watchpoints.map(w =>
    <span style="color:var(--txt3)">監視理由: ${esc(w.why)}（最終確認 ${esc(w.last_verified)}）</span></li>`
 ).join('') + '</ul>';
 
+renderPipeline();
 renderAlerts();
 </script>
 </body>
