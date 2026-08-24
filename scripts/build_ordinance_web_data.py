@@ -50,6 +50,7 @@ def main():
             for e in reg["entries"]
         ],
         "watchpoints": reg.get("watchpoints", []),
+        "pipeline": reg.get("pipeline", []),
         "authorities": [
             {"pref": a["pref"], "name": a["name"], "type": a["type"],
              "status": a["status"], "url": a["url"], "lastSwept": a["last_swept"]}
