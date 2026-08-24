@@ -43,7 +43,7 @@
     },
     "https://www.city.takasaki.gunma.jp/page/67886.html": {
       "hash": "b38b14ef08c1b513f8de2f02a7a86f0336fda071f862ebcf47a8437a82444eb8",
-      "bytes": 18334,
+      "bytes": 18335,
       "checked": "2026-08-24"
     },
     "https://www.city.okegawa.lg.jp/soshiki/toshiseibi/kenchiku/machidukuri/kyoka/14211.html": {
@@ -58,7 +58,7 @@
     },
     "https://www.city.kakogawa.lg.jp/soshikikarasagasu/tosi_kekaku/kaihatsushidoka/keitouyouchikudenchi.html": {
       "hash": "ed7f06a97ef5d477ec2cdec05cd0fd991393baf55acc7ac36e23977305c53c4b",
-      "bytes": 59422,
+      "bytes": 59423,
       "checked": "2026-08-24"
     },
     "https://www.city.sanda.lg.jp/soshiki/36/faq/faq_jigyosha/1/33032.html": {
@@ -68,7 +68,7 @@
     },
     "https://www.city.kure.lg.jp/soshiki/49/keitouyou-kaihatu.html": {
       "hash": "8dc60a83889430f15c5496f43cf2f39769e02944612cf3cd9fd77bc43f508380",
-      "bytes": 12558,
+      "bytes": 12559,
       "checked": "2026-08-24"
     },
     "https://www.city.tajimi.lg.jp/kurashi_tetsuduzuki/machizukuri/1005830/1005831/1005832.html": {
@@ -113,7 +113,7 @@
     },
     "https://web.pref.hyogo.lg.jp/ks29/press/kaihatu_chikudenchi.html": {
       "hash": "7f28e82768a6bf2a2a73e7d9a2261dc74f7e868564ca357aef4a9d255e76af0f",
-      "bytes": 17616,
+      "bytes": 17617,
       "checked": "2026-08-24"
     },
     "https://www.city.kobe.lg.jp/a33173/business/kaihatsu/kaihatsukyoka/chosekuiki/qa.html": {
@@ -149,6 +149,21 @@
     "https://www.city.sakata.lg.jp/jyutaku/toshikeikaku/kaihatdukyoka/kaihatsu_tikudenti.html": {
       "hash": "f53690f0ef068997719d4a8c61000d24a924591820fbe7f07879f2be25df52bf",
       "bytes": 23659,
+      "checked": "2026-08-24"
+    },
+    "https://www.enecho.meti.go.jp/category/electricity_and_gas/electric/summary/regulations/pdf/keito_renkei_20241201.pdf": {
+      "hash": "dade447cdf6dc5a07074d30e80196b4de783a58bdce0035425bbe7bbd2753780",
+      "bytes": 434937,
+      "checked": "2026-08-24"
+    },
+    "https://www.city.higashihiroshima.lg.jp/soshiki/toshi/2/6/42658.html": {
+      "hash": "f7ce0ddef2cfc7e88869f59c6fa6970fb86e344e2f370b58069ae6a18eede5bf",
+      "bytes": 39915,
+      "checked": "2026-08-24"
+    },
+    "https://www.town.sekigahara.gifu.jp/6979.htm": {
+      "hash": "24f5600421a56eedbad60eeb91effff6272e044a5d206685828bf9678f18d74c",
+      "bytes": 41152,
       "checked": "2026-08-24"
     },
     "https://www.rilg.or.jp/htdocs/reikilink.html": {
