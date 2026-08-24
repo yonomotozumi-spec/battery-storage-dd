@@ -12,6 +12,8 @@ xlsx生成（score_substations.py）とWeb用データ生成（build_substation_
   総合スコア100点 = 系統スコア80 + S7近接20（土地の座標が決まってから加算）
 ゲート: 空容量(上位系考慮)≦0 かつ N-1電制≠可 → 除外（上位系増強リスク。実績: 喜多方=工期10年2ヶ月）
 """
+import re
+
 
 GRID_MAX = 80    # 系統スコア満点
 S7_MAX = 20      # 近接スコア満点
@@ -63,6 +65,51 @@ AREA_POINTS = [
 ]
 AREA_POINT_MAP = {area: pts for area, pts, _ in AREA_POINTS}
 
+# ── S6を実績で置き換えるための工期→点（エリア点と同じ0〜5のスケール）──
+# エリア点は「その変電所の工期を知らないときの代理値」なので、実測があれば置き換える。
+# 刻みは実績19件の分布（3〜122ヶ月・中央値18）から引き、既存エリア点の根拠事例を
+# 再現するように置いた（由仁6ヶ月→5点＝北海道5点／王子3ヶ月→5点＝九州5点／
+# 中部の関市18ヶ月→3点・野尻24ヶ月→2点＝中部2点の近傍）。
+# 実績が置き換えるのはS6だけ。S1とゲートは触らない。実績時点の空容量は古く、
+# その案件自体が容量を使っている場合があるため（例: 由仁は実績6ヶ月だが現在の
+# 上位系考慮は0MWでゲート除外が正しい）。
+S6_ACTUAL_STEPS = [(6, 5), (12, 4), (18, 3), (24, 2), (36, 1)]   # (工期ヶ月以下, 点)。超過は0点
+
+
+def actual_months(text):
+    """実績の連系工期を月数にする。読めなければ None。
+
+    「入金後1年4ヶ月」「57カ月」「配電7ヶ月/上位系10年2ヶ月」「2年3ヶ月→2年10ヶ月」など
+    表記が揺れる。複数の期間が書かれている場合は**最長**を採る。上位系の増強が要る
+    ケースが併記されるためで、短い方を採ると楽観側に倒れる。
+
+    ただし「受付後」は入金後とは起点が違う別の時計なので数えない
+    （「入金後26ヶ月(受付後73ヶ月)」は26ヶ月として扱う）。
+    """
+    t = str(text or "")
+    if not t or "未読" in t:
+        return None
+    t = re.sub(r"受付後[^)）/]*", "", t)
+    vals = []
+    for m in re.finditer(r"(\d+)\s*年(?:\s*(\d+)\s*[ヶカか]?月)?", t):
+        vals.append(int(m.group(1)) * 12 + int(m.group(2) or 0))
+    # 「年」を伴わない単独の「Nヶ月」。年月表記の月部分を二重に拾わないよう除いてから探す
+    rest = re.sub(r"\d+\s*年(?:\s*\d+\s*[ヶカか]?月)?", "", t)
+    for m in re.finditer(r"(\d+)\s*[ヶカか]月", rest):
+        vals.append(int(m.group(1)))
+    return max(vals) if vals else None
+
+
+def s6_from_months(months):
+    """工期(月)→S6点。エリア点と同じ0〜5。"""
+    if months is None:
+        return None
+    for thr, pts in S6_ACTUAL_STEPS:
+        if months <= thr:
+            return pts
+    return 0
+
+
 # 接続検討回答 実績19件（2026-08-06更新。詳細: 接続検討回答_分析メモ_20260724.md＋追加実績メモ20260806）
 RESULTS_DB = [
     ("九州", "笠之原変電所", "鹿屋市上小原", "1,999kW", "約6,140万円(付箋値・要確認)", "入金後1年4ヶ月", "張替1,405m+SVC", "細線・SVC発動で高額長期", "負担金約6,140万・1年4ヶ月(張替1.4km+SVC)"),
@@ -87,6 +134,32 @@ RESULTS_DB = [
 ]
 
 # 分析メモ（2026-08-06追記・19件ベース）
+def results_for(area, name):
+    """エリア＋変電所名で実績DBを引く。同じ変電所に複数件あるので全件返す。"""
+    k = f"{area}{str(name or '').strip()}"
+    return [r for r in RESULTS_DB if f"{r[0]}{str(r[1]).strip()}" == k]
+
+
+def result_for(area, name):
+    """表示用に1件返す（工期が最長のもの）。無ければ None。"""
+    rs = results_for(area, name)
+    if not rs:
+        return None
+    return max(rs, key=lambda r: actual_months(r[5]) or -1)
+
+
+def s6_actual(area, name):
+    """その変電所の実績工期から出したS6点。実績が無い/工期が読めなければ None。
+
+    同じ変電所でも工事規模で工期が変わる（柏原変電所は48m新設が6ヶ月、
+    1,842m新設+SVR取替が24ヶ月）。どちらになるかは申し込むまで分からないので
+    **最長**を採る。短い方を採ると楽観側に倒れる。
+    """
+    ms = [actual_months(r[5]) for r in results_for(area, name)]
+    ms = [m for m in ms if m is not None]
+    return s6_from_months(max(ms)) if ms else None
+
+
 ANALYSIS_NOTES = [
     "①工期は「エリア×工事種別」で決まる: 九州は張替のみなら3〜6ヶ月(神崎3ヶ月・上鏡6ヶ月)。中部は最軽微(新設150mだけ)でも18ヶ月と標準工程が長い。S6エリア点(九州5・中部2)は実績と整合しており変更不要",
     "②負担金は工事量に比例: 198万(新設150m)→1,170万(張替1.2km)→2,536万(新設373m+張替735m+SVR+バンク対策)→3,246万(新設617m+張替1km+SVR2台)。推定式は「固定費200〜400万+延長(m)×0.7〜1.0万+SVR/SVC×500万+バンク対策500〜1,000万」に更新余地",
@@ -139,10 +212,13 @@ def effective_capacity(avail_cur, avail_up):
     return up if up is not None else cur
 
 
-def score_row(area, vsec, opcap, flow, avail_cur, avail_up, n1, curtail):
+def score_row(area, vsec, opcap, flow, avail_cur, avail_up, n1, curtail, name=None):
     """1変電所の系統スコアを算出する。xlsxの数式と同じ判定。
 
-    戻り値: {"gate", "s1".."s6", "grid_score", "rank"}
+    name を渡すと、その変電所の接続検討実績があるときS6を実測工期で置き換える
+    （エリア点は実績が無いときの代理値）。S1とゲートは実績で置き換えない。
+
+    戻り値: {"gate", "s1".."s6", "grid_score", "rank", "s6_src"}
     """
     eff = effective_capacity(avail_cur, avail_up)
     gate = "除外" if (eff is not None and eff <= 0 and n1 != "可") else ""
@@ -179,7 +255,9 @@ def score_row(area, vsec, opcap, flow, avail_cur, avail_up, n1, curtail):
     v = _num(vsec)
     s5 = 0 if v is None else (P["s5_1"]["pts"] if v <= P["s5_1"]["thr"] else P["s5_2"]["pts"])
 
-    s6 = AREA_POINT_MAP.get(area, 0)
+    act = s6_actual(area, name) if name is not None else None
+    s6 = act if act is not None else AREA_POINT_MAP.get(area, 0)
+    s6_src = "実績" if act is not None else "エリア"
 
     grid = s1 + s2 + s3 + s4 + s5 + s6
     if gate:
@@ -196,7 +274,7 @@ def score_row(area, vsec, opcap, flow, avail_cur, avail_up, n1, curtail):
         rank = "C"
 
     return {"gate": gate, "s1": s1, "s2": s2, "s3": s3, "s4": s4, "s5": s5, "s6": s6,
-            "grid_score": grid, "rank": rank}
+            "grid_score": grid, "rank": rank, "s6_src": s6_src}
 
 
 def s7_points(distance_m):

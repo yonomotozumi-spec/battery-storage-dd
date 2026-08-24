@@ -70,7 +70,7 @@ def main():
     with_coords = 0
     for (no, area, name, pref, vmax, vsec, lat, lon, acc, cap, opcap, flow,
          avail, avail_up, n1, curtail, addr) in src_rows:
-        sc = S.score_row(area, vsec, opcap, flow, avail, avail_up, n1, curtail)
+        sc = S.score_row(area, vsec, opcap, flow, avail, avail_up, n1, curtail, name=name)
         la, lo = num(lat, 5), num(lon, 5)
         if la is not None and lo is not None:
             with_coords += 1
@@ -101,6 +101,21 @@ def main():
             "s7Steps": [list(s) for s in S.S7_STEPS],
             "totalRankSteps": [list(s) for s in S.TOTAL_RANK_STEPS],
             "gridRank": {"S": S.P["rank_s"]["thr"], "A": S.P["rank_a"]["thr"], "B": S.P["rank_b"]["thr"]},
+            # Web版が「なぜその点数になったか」を出すための閾値。
+            # ここを渡さないと画面側に配点を書き写すことになり、
+            # substation_scoring.py を直したときに食い違う。
+            "thr": {
+                "s1": [[S.P["s1_t1"]["thr"], S.P["s1_t1"]["pts"]],
+                       [S.P["s1_t2"]["thr"], S.P["s1_t2"]["pts"]],
+                       [0, S.P["s1_t3"]["pts"]]],
+                "s2": S.P["s2"]["pts"],
+                "s3": [[S.P["s3_t1"]["thr"], S.P["s3_t1"]["pts"]],
+                       [S.P["s3_t2"]["thr"], S.P["s3_t2"]["pts"]],
+                       [S.P["s3_t3"]["thr"], S.P["s3_t3"]["pts"]]],
+                "s4": S.P["s4"]["pts"],
+                "s5": [S.P["s5_1"]["thr"], S.P["s5_1"]["pts"], S.P["s5_2"]["pts"]],
+            "s6Actual": [list(x) for x in S.S6_ACTUAL_STEPS],
+            },
         },
         "areaPoints": [list(a) for a in S.AREA_POINTS],
         "scoreDefs": [list(s) for s in S.SCORE_DEFS],

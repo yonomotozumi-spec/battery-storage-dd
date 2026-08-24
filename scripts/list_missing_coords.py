@@ -86,7 +86,7 @@ def load_targets(src, sheet, ranks=("S", "A"), include_gated=False):
         if isinstance(r["lat"], (int, float)):
             continue
         sc = S.score_row(r["area"], r["vsec"], r["opcap"], r["flow"],
-                         r["avail"], r["avail_up"], r["n1"], r["curtail"])
+                         r["avail"], r["avail_up"], r["n1"], r["curtail"], name=r["name"])
         if (sc["gate"] == "除外" and not include_gated) or sc["rank"] not in ranks:
             continue
         r["rank"] = sc["rank"]
