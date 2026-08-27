@@ -217,6 +217,44 @@ select:focus, input:focus {
 .auto-detected.warn { background:var(--warn-bg); color:var(--warn); }
 .auto-detected.fail { background:var(--fail-bg); color:var(--fail); }
 
+/* ── 自動反映（変電所・オンライン判定） ── */
+.auto-badge {
+  display:inline-block; font-size:9px; font-weight:700; letter-spacing:.04em;
+  padding:1px 5px; border-radius:3px; margin-left:6px; vertical-align:middle;
+  background:rgba(27,85,204,.12); color:var(--acc);
+}
+.auto-badge.pass { background:var(--pass-bg); color:var(--pass); }
+.auto-badge.warn { background:var(--warn-bg); color:var(--warn); }
+.auto-badge.fail { background:var(--fail-bg); color:var(--fail); }
+.auto-hint { font-size:11px; color:var(--txt3); line-height:1.45; margin-top:3px; }
+.auto-hint b { color:var(--txt2); font-weight:600; }
+.ss-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--bdr); border-bottom:1px solid var(--bdr); }
+.ss-cell { background:var(--surf); padding:11px 14px; }
+.ss-k { font-size:10px; font-weight:700; letter-spacing:.04em; color:var(--txt3); margin-bottom:4px; }
+.ss-v { font-size:18px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.2; }
+.ss-s { font-size:11px; color:var(--txt2); line-height:1.45; margin-top:3px; }
+.ss-tbl { width:100%; border-collapse:collapse; }
+.ss-tbl th { font-size:10px; font-weight:600; color:var(--txt3); text-align:left; padding:7px 10px; background:var(--surf2); border-bottom:1px solid var(--bdr); }
+.ss-tbl td { font-size:11px; padding:7px 10px; border-bottom:1px solid var(--bdr); vertical-align:middle; }
+.ss-tbl tr:last-child td { border-bottom:none; }
+.ss-tbl td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.rk { font-size:10px; font-weight:700; padding:1px 6px; border-radius:3px; white-space:nowrap; }
+.rk-S { background:var(--pass-bg); color:var(--pass); }
+.rk-A { background:rgba(27,85,204,.12); color:var(--acc); }
+.rk-B { background:var(--warn-bg); color:var(--warn); }
+.rk-C { background:var(--fail-bg); color:var(--fail); }
+.rk-n { background:var(--surf2); color:var(--txt3); }
+.rk-x { background:var(--fail-bg); color:var(--fail); }
+.ss-msg { font-size:11px; color:var(--txt2); line-height:1.6; padding:10px 16px; }
+.ss-msg a { color:var(--link); }
+.auto-lines { margin-top:6px; display:flex; flex-direction:column; gap:2px; }
+.auto-line { font-size:11px; color:var(--txt2); line-height:1.45; }
+.spin {
+  display:inline-block; width:11px; height:11px; border:2px solid var(--bdr);
+  border-top-color:var(--acc); border-radius:50%; animation:sp .7s linear infinite; vertical-align:-1px;
+}
+@keyframes sp { to { transform:rotate(360deg); } }
+
 /* ── TSO links ── */
 .tso-links { padding:10px 16px; display:flex; flex-wrap:wrap; gap:6px; }
 .tso-chip {
@@ -286,9 +324,9 @@ select:focus, input:focus {
   .coord-row{grid-template-columns:1fr;} .cat-bars{grid-template-columns:1fr;}
   .cat-bars>*:nth-child(odd){border-right:none;} .cat-bars>*:nth-child(2){border-bottom:1px solid var(--bdr);}
   .res-top{grid-template-columns:1fr;text-align:center;justify-items:center;}
-  .links-grid{grid-template-columns:1fr;}
+  .links-grid{grid-template-columns:1fr;} .ss-grid{grid-template-columns:1fr;}
 }
-@media(prefers-reduced-motion:reduce){ .cbar-fill{transition:none;} }
+@media(prefers-reduced-motion:reduce){ .cbar-fill{transition:none;} .spin{animation:none;} }
 </style>
 </head>
 <body>
@@ -341,6 +379,8 @@ select:focus, input:focus {
           <input type="number" id="lon" placeholder="141.5476" step="0.0001" oninput="updateLinks()">
         </div>
       </div>
+      <input type="text" id="coord-paste" placeholder="「38.101282, 139.437299」やGoogleマップURLを貼り付け" style="margin-top:6px;font-size:12px" oninput="onCoordPaste(this.value)">
+      <div class="fnote" id="paste-msg"></div>
     </div>
   </div>
   <div class="frow">
@@ -348,7 +388,7 @@ select:focus, input:focus {
     <div class="fcontrol"><input type="text" id="addr" placeholder="例：北海道恵庭市南島松〇番地"></div>
   </div>
   <div class="frow">
-    <div class="flabel">送配電エリア</div>
+    <div class="flabel">送配電エリア<span class="auto-badge" id="ab-tso" style="display:none">自動</span></div>
     <div class="fcontrol">
       <select id="tso" onchange="updateLinks()">
         <option value="">選択してください</option>
@@ -363,12 +403,13 @@ select:focus, input:focus {
         <option value="kyuden">九州電力送配電</option>
         <option value="okiden">沖縄電力</option>
       </select>
+      <div class="auto-hint" id="hint-tso"></div>
     </div>
   </div>
   <div class="frow">
     <div class="flabel">希望出力</div>
     <div class="fcontrol" style="flex-direction:row;align-items:center;gap:6px">
-      <input type="number" id="outkw" placeholder="例：2000" min="0" style="max-width:140px">
+      <input type="number" id="outkw" placeholder="例：2000" min="0" style="max-width:140px" oninput="onOutkwChange()">
       <span style="font-size:13px;color:var(--txt3)">kW</span>
     </div>
   </div>
@@ -410,6 +451,18 @@ select:focus, input:focus {
   </div>
 </div>
 
+<!-- ── 最寄り変電所（座標から自動反映） ── -->
+<div class="card">
+  <div class="card-head">
+    <span class="sec-tag">系統</span>
+    <span class="card-title">最寄り変電所（座標から自動反映）</span>
+    <span class="card-note" id="ss-meta">全国66kV以上リストで距離判定</span>
+  </div>
+  <div id="ss-body">
+    <div class="coord-needed">📍 緯度・経度を入力すると、最寄り変電所・系統スコア・空き容量を自動で反映します</div>
+  </div>
+</div>
+
 <!-- ── A. 系統接続変数 ── -->
 <div class="section-divider"><span>系統接続スクリーニング（PX新規追加変数）</span></div>
 
@@ -420,12 +473,12 @@ select:focus, input:focus {
     <span class="card-note">ウェイト 40%</span>
   </div>
   <div class="frow">
-    <div class="flabel">公表空き容量<div class="fnote">各社マップで事前確認</div></div>
+    <div class="flabel">公表空き容量<span class="auto-badge" id="ab-a1" style="display:none">自動</span><div class="fnote">各社マップで事前確認</div></div>
     <div class="fcontrol"><div class="rpills">
       <input type="radio" name="a1" id="a1p" data-sev="pass" data-score="2" data-msg=""><label for="a1p">空きあり（増強不要）</label>
       <input type="radio" name="a1" id="a1w" data-sev="warn" data-score="1" data-msg="空き容量が「要確認」。系統影響評価に進む可能性があり、回答期間が延びるリスク有り"><label for="a1w">要確認</label>
       <input type="radio" name="a1" id="a1f" data-sev="fail" data-score="0" data-msg="【重要】空き容量なし。系統増強が必要となり工事費が大幅に増加する可能性が高い"><label for="a1f">空きなし・不明</label>
-    </div></div>
+    </div><div class="auto-hint" id="hint-a1"></div></div>
   </div>
   <div class="frow">
     <div class="flabel">先行申込案件<div class="fnote">先着優先で容量を先取りされるリスク</div></div>
@@ -436,7 +489,7 @@ select:focus, input:focus {
     </div></div>
   </div>
   <div class="frow">
-    <div class="flabel">想定電圧階級</div>
+    <div class="flabel">想定電圧階級<span class="auto-badge" id="ab-a3" style="display:none">自動</span></div>
     <div class="fcontrol">
       <select id="a3" name="a3">
         <option value="">選択してください</option>
@@ -445,6 +498,7 @@ select:focus, input:focus {
         <option value="1" data-msg="66kV以上は系統影響評価の対象になりやすく、回答リードタイムが延びる場合がある">66 kV</option>
         <option value="0" data-msg="154kV以上は詳細系統影響評価が必要。来年度接続目標との整合を再確認">154 kV 以上</option>
       </select>
+      <div class="auto-hint" id="hint-a3"></div>
     </div>
   </div>
   <div class="frow">
@@ -474,12 +528,16 @@ select:focus, input:focus {
     <span class="card-note">ウェイト 30% ／ ◎=自動 ○=API ー=リンク確認</span>
   </div>
   <div class="autoload-row">
-    <label class="autoload-btn">
+    <button type="button" class="autoload-btn" id="btn-online" onclick="runOnlineJudge()">
+      <span>🌐</span>
+      <span>座標から自動判定</span>
+    </button>
+    <label class="autoload-btn" style="border-color:var(--bdr);color:var(--txt2)">
       <span>📥</span>
-      <span>自動判定JSONを読込</span>
+      <span>reinfolib JSONを読込</span>
       <input type="file" accept=".json,application/json" onchange="loadReinfolibJson(this.files[0])" style="display:none">
     </label>
-    <span class="autoload-status" id="auto-status">reinfolib_judge.py で出力した values.json を読み込むと、○（API）項目を座標から自動判定します</span>
+    <span class="autoload-status" id="auto-status">緯度・経度を入れると、住所・浸水・土砂災害・液状化・地形を公開データから自動判定します（座標のみを国土地理院・重ねるハザードマップ・J-SHIS へ送信）。用途地域・区域区分・自然公園は reinfolib_judge.py の values.json 読込で反映します</span>
   </div>
   <div style="overflow-x:auto">
   <table class="permit-table">
@@ -554,12 +612,12 @@ select:focus, input:focus {
     </div></div>
   </div>
   <div class="frow">
-    <div class="flabel">造成工事の必要度</div>
+    <div class="flabel">造成工事の必要度<span class="auto-badge" id="ab-d3" style="display:none">自動</span></div>
     <div class="fcontrol"><div class="rpills">
       <input type="radio" name="d3" id="d3a" data-sev="pass" data-score="2" data-msg=""><label for="d3a">軽微（平坦・良地盤）</label>
       <input type="radio" name="d3" id="d3b" data-sev="warn" data-score="1" data-msg="中程度の造成が必要。地盤調査を踏まえて造成費を精査すること"><label for="d3b">中程度</label>
       <input type="radio" name="d3" id="d3c" data-sev="fail" data-score="0" data-msg="大規模造成が必要。工事費・工期とも増大リスクあり。事業採算性を再検討すること"><label for="d3c">大規模</label>
-    </div></div>
+    </div><div class="auto-hint" id="hint-d3"></div></div>
   </div>
   <div class="frow">
     <div class="flabel">地権者との契約状況</div>
@@ -611,12 +669,12 @@ select:focus, input:focus {
 <script>
 // ── PX DD 17項目定義 ──
 const DD_ITEMS = [
-  { no:1,  name:'住所',         auto:'◎', link:null, detail:'GSI逆ジオコーダで自動入力' },
+  { no:1,  name:'住所',         auto:'◎', link:'google', detail:'地理院 逆ジオコーダで自動入力' },
   { no:2,  name:'座標',         auto:'◎', link:null, detail:'緯度経度・度分秒変換' },
   { no:3,  name:'架線の敷地縦横断', auto:'ー', link:'gsi', detail:'GSI航空写真で目視確認' },
-  { no:4,  name:'ハザード・浸水', auto:'○', link:'hazard', detail:'reinfolib XKT026-028' },
-  { no:5,  name:'ハザード・土砂災害', auto:'○', link:'hazard', detail:'reinfolib XKT029' },
-  { no:6,  name:'液状化危険度',  auto:'○', link:'jshis', detail:'reinfolib XKT025' },
+  { no:4,  name:'ハザード・浸水', auto:'○', link:'hazard', detail:'重ねるハザードマップ（洪水/高潮/津波）を座標判定' },
+  { no:5,  name:'ハザード・土砂災害', auto:'○', link:'hazard', detail:'重ねるハザードマップ（土砂災害警戒区域）を座標判定' },
+  { no:6,  name:'液状化危険度',  auto:'○', link:'jshis', detail:'J-SHIS 微地形区分から液状化発生傾向を推定' },
   { no:7,  name:'垂直積雪量',   auto:'ー', link:'google', detail:'自治体建築基準法施行細則' },
   { no:8,  name:'市街化区域',   auto:'○', link:'hazard', detail:'reinfolib XKT001' },
   { no:9,  name:'市街化調整区域', auto:'○', link:'hazard', detail:'reinfolib XKT001' },
@@ -672,6 +730,7 @@ function updateLinks() {
       '<div class="coord-needed">📍 上記に緯度・経度を入力すると確認マップが開けるリンクを生成します</div>';
     updatePermitLinks(null, null);
     if (ssLink) ssLink.href = 'substation.html';
+    resetAutoPanels();
     return;
   }
 
@@ -703,6 +762,7 @@ function updateLinks() {
   `;
 
   updatePermitLinks(lat, lon);
+  scheduleAutoReflect();
 }
 
 // ── Update permit table link cells ──
@@ -872,17 +932,11 @@ function applyAutoValues(data){
   Object.keys(values).forEach(k=>{
     const no=parseInt(k);
     const sel=document.querySelector(`select[name="p${no}"]`);
-    const box=document.getElementById(`pauto-val-${no}`);
     if(!sel){ skipped++; return; }
     const j=judgeFromValue(no, values[k].value);
     if(j<0){ skipped++; return; }
-    sel.value=String(j);
+    setAutoItem(no, values[k].value, j, values[k].comment);
     applied++;
-    if(box){
-      const sev=j===2?'pass':j===1?'warn':'fail';
-      box.innerHTML=`<span class="auto-detected ${sev}">自動</span>${escapeHtml(values[k].value||'')}`;
-      box.title=values[k].comment||'';
-    }
   });
   const missing=Array.isArray(data.missing)?data.missing:[];
   let msg=`✅ ${applied}項目を座標から自動判定しました（reinfolib）`;
@@ -926,8 +980,624 @@ function exportGridJson(){
   URL.revokeObjectURL(a.href);
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   座標から自動反映（変電所スコア ＋ DDチェック）
+   ・変電所: data/substations.js（全国66kV以上）をオフライン距離判定
+   ・DD    : 公開API（地理院・重ねるハザードマップ・J-SHIS）から判定
+   ══════════════════════════════════════════════════════════════════ */
+
+// ── 手動で触った項目は自動上書きしない ──
+const userTouched = new Set();
+function bindTouchGuards() {
+  ['a1', 'd3'].forEach(n => document.querySelectorAll(`input[name="${n}"]`).forEach(el =>
+    el.addEventListener('change', e => { if (e.isTrusted) userTouched.add(n); })));
+  ['tso', 'a3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', e => { if (e.isTrusted) userTouched.add(id); });
+  });
+  document.querySelectorAll('#permit-rows select').forEach(el =>
+    el.addEventListener('change', e => { if (e.isTrusted) userTouched.add(el.name); }));
+}
+
+function markAuto(id, sev) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'inline-block';
+  el.className = 'auto-badge' + (sev ? ' ' + sev : '');
+  el.textContent = '自動';
+}
+function clearAuto(ids) { ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; }); }
+function setHint(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html || ''; }
+
+function autoRadio(name, id, badgeId, sev, hintId, hint) {
+  if (userTouched.has(name)) { setHint(hintId, hint ? hint + '<br>※手動で選択済みのため自動判定は反映していません' : ''); return; }
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.checked = true;
+  markAuto(badgeId, sev);
+  setHint(hintId, hint);
+}
+function autoSelectIndex(id, idx, badgeId, sev, hintId, hint) {
+  if (userTouched.has(id)) { setHint(hintId, hint ? hint + '<br>※手動で選択済みのため自動判定は反映していません' : ''); return; }
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.selectedIndex = idx;
+  markAuto(badgeId, sev);
+  setHint(hintId, hint);
+}
+
+// ── DD項目セルへの自動反映（オンライン判定・JSON読込 共通） ──
+function setAutoItem(no, value, judge, comment) {
+  const sel = document.querySelector(`select[name="p${no}"]`);
+  const box = document.getElementById(`pauto-val-${no}`);
+  const locked = userTouched.has('p' + no);
+  if (sel && judge >= 0 && !locked) sel.value = String(judge);
+  if (box) {
+    const sev = judge === 2 ? 'pass' : judge === 1 ? 'warn' : judge === 0 ? 'fail' : '';
+    box.innerHTML = `<span class="auto-detected ${sev}">自動</span>${escapeHtml(value || '')}` +
+      (locked ? '<br><span style="color:var(--txt3)">※手動選択を優先</span>' : '');
+    box.title = comment || '';
+  }
+  return !locked;
+}
+
+/* ───────────────────────── 変電所（オフライン） ───────────────────────── */
+
+let ssPromise = null;
+function loadSubstationData() {
+  if (window.SUBSTATION_DATA) return Promise.resolve(window.SUBSTATION_DATA);
+  if (ssPromise) return ssPromise;
+  ssPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'data/substations.js';
+    s.onload = () => window.SUBSTATION_DATA
+      ? resolve(window.SUBSTATION_DATA)
+      : reject(new Error('変電所データの形式が不正です'));
+    s.onerror = () => { ssPromise = null; reject(new Error('data/substations.js を読み込めませんでした')); };
+    document.head.appendChild(s);
+  });
+  return ssPromise;
+}
+
+function distanceM(lat1, lon1, lat2, lon2) {
+  const R = 6371008.8, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
+const rkCls = r => ({ S: 'rk-S', A: 'rk-A', B: 'rk-B', C: 'rk-C' }[r] || (r === '除外' ? 'rk-x' : 'rk-n'));
+
+const AREA_TO_TSO = {
+  '北海道': 'hepco', '東北': 'tohoku', '東京': 'tepco', '中部': 'chubu', '北陸': 'hokuriku',
+  '関西': 'kepco', '中国': 'chugoku', '四国': 'yonden', '九州': 'kyuden', '沖縄': 'okiden',
+};
+
+const SS_RADIUS = 10000;   // 自動反映の判定半径
+
+async function reflectSubstations(lat, lon) {
+  const body = document.getElementById('ss-body');
+  body.innerHTML = '<div class="coord-needed"><span class="spin"></span> 変電所データ（全国66kV以上）を読み込み中…</div>';
+
+  let D;
+  try { D = await loadSubstationData(); }
+  catch (e) {
+    body.innerHTML = `<div class="coord-needed">⚠️ ${escapeHtml(e.message)}<br>` +
+      `<a href="substation.html?lat=${lat}&lon=${lon}" target="_blank" rel="noopener">変電所スコア検索を別画面で開く</a></div>`;
+    return;
+  }
+  if (currentLat !== lat || currentLon !== lon) return;   // 座標が変わっていたら破棄
+
+  const F = {}; D.fields.forEach((n, i) => { F[n] = i; });
+  const s7of = m => { for (const [lim, p] of D.params.s7Steps) if (m <= lim) return p; return 0; };
+  const rankOf = row => D.dict.rank[row[F.rank]];
+  const areaOf = row => D.dict.area[row[F.area]];
+  const n1Of = row => D.dict.n1[row[F.n1]] || '—';
+  const curtailOf = row => D.dict.curtail[row[F.curtail]] || '—';
+  const totalRankOf = t => { for (const [thr, rk] of D.params.totalRankSteps) if (t >= thr) return rk; return 'C'; };
+
+  const hits = [];
+  let nearest = null, nearestD = Infinity, dist6 = Infinity, near6 = null, excluded = 0;
+  for (const row of D.rows) {
+    const la = row[F.lat], lo = row[F.lon];
+    if (la == null || lo == null) continue;
+    const d = distanceM(lat, lon, la, lo);
+    if (d < nearestD) { nearestD = d; nearest = row; }
+    const vs = row[F.vsec];
+    if (typeof vs === 'number' && vs <= 7 && d < dist6) { dist6 = d; near6 = row; }
+    if (d > SS_RADIUS) continue;
+    if (rankOf(row) === '除外') { excluded++; continue; }
+    const s7 = s7of(d);
+    hits.push({ row, d, s7, grid: row[F.grid], total: row[F.grid] + s7 });
+  }
+  hits.sort((a, b) => b.total - a.total || a.d - b.d);
+
+  const best = hits[0] || null;
+  const withCap = hits.filter(h => h.row[F.availUp] != null);
+  const bestCap = withCap.length
+    ? withCap.reduce((a, b) => (b.row[F.availUp] > a.row[F.availUp] ? b : a))
+    : null;
+
+  // ── パネル描画 ──
+  const cellNear = nearest ? `
+    <div class="ss-cell">
+      <div class="ss-k">最寄り変電所</div>
+      <div class="ss-v">${fmtDist(nearestD)}</div>
+      <div class="ss-s">${escapeHtml(nearest[F.name])}（${escapeHtml(areaOf(nearest))}${nearest[F.pref] ? ' / ' + escapeHtml(nearest[F.pref]) : ''}）<br>
+        ${nearest[F.vmax] ? escapeHtml(nearest[F.vmax]) + 'kV　' : ''}近接スコア S7 = ${s7of(nearestD)}点</div>
+    </div>` : '<div class="ss-cell"><div class="ss-k">最寄り変電所</div><div class="ss-v">—</div></div>';
+
+  const cellBest = best ? `
+    <div class="ss-cell">
+      <div class="ss-k">最有力候補（10km内）</div>
+      <div class="ss-v">${best.total} <span style="font-size:11px;color:var(--txt3)">/100</span>
+        <span class="rk ${rkCls(totalRankOf(best.total))}">${totalRankOf(best.total)}</span></div>
+      <div class="ss-s">${escapeHtml(best.row[F.name])}　${fmtDist(best.d)}<br>
+        系統${best.grid} ＋ 近接${best.s7}　系統ランク <span class="rk ${rkCls(rankOf(best.row))}">${escapeHtml(rankOf(best.row))}</span></div>
+    </div>` : `
+    <div class="ss-cell">
+      <div class="ss-k">最有力候補（10km内）</div>
+      <div class="ss-v">—</div>
+      <div class="ss-s">半径10km内に連系候補の変電所がありません</div>
+    </div>`;
+
+  const cellCap = bestCap ? `
+    <div class="ss-cell">
+      <div class="ss-k">空容量（上位系考慮・10km内最大）</div>
+      <div class="ss-v">${bestCap.row[F.availUp]} <span style="font-size:11px;color:var(--txt3)">MW</span></div>
+      <div class="ss-s">${escapeHtml(bestCap.row[F.name])}　${fmtDist(bestCap.d)}<br>
+        N-1電制 ${escapeHtml(n1Of(bestCap.row))}　／　出力制御 ${escapeHtml(curtailOf(bestCap.row))}</div>
+    </div>` : `
+    <div class="ss-cell">
+      <div class="ss-k">空容量（上位系考慮・10km内最大）</div>
+      <div class="ss-v">—</div>
+      <div class="ss-s">10km内に空容量の公表値を持つ変電所がありません（OSM由来の座標のみ）</div>
+    </div>`;
+
+  const top = hits.slice(0, 5);
+  const table = top.length ? `
+    <div style="overflow-x:auto">
+    <table class="ss-tbl">
+      <thead><tr>
+        <th>変電所</th><th>距離</th><th>最高電圧</th><th>空容量</th><th>系統ランク</th><th class="num">合計</th>
+      </tr></thead>
+      <tbody>
+        ${top.map(h => `<tr>
+          <td>${escapeHtml(h.row[F.name])}<br><span style="color:var(--txt3)">${escapeHtml(areaOf(h.row))}${h.row[F.pref] ? ' / ' + escapeHtml(h.row[F.pref]) : ''}</span></td>
+          <td class="num">${fmtDist(h.d)}</td>
+          <td class="num">${h.row[F.vmax] != null ? escapeHtml(h.row[F.vmax]) + ' kV' : '—'}</td>
+          <td class="num">${h.row[F.availUp] != null ? escapeHtml(h.row[F.availUp]) + ' MW' : '—'}</td>
+          <td><span class="rk ${rkCls(rankOf(h.row))}">${escapeHtml(rankOf(h.row))}</span></td>
+          <td class="num"><b>${h.total}</b></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>` : '';
+
+  const msgs = [];
+  if (excluded) msgs.push(`半径10km内に<b>ゲート除外の変電所が${excluded}件</b>あります（空容量≦0かつN-1電制不可）。上位系増強で工期・負担金が跳ねるため、この表からは外しています。`);
+  if (best && best.s7 === 0) msgs.push('最有力候補まで5km超のため近接スコアは0点です。負担金は高圧線の亘長にほぼ比例するので、より近い候補地の検討を推奨します。');
+  if (!withCap.length && hits.length) msgs.push('10km内の変電所は空容量が未公表（OSM由来）です。空きは送配電事業者の公表マップか接続検討で確認してください。');
+  msgs.push(`判定は<b>直線距離</b>です。実際の負担金は既設高圧配電線までの亘長で決まるため目安として扱ってください。` +
+    ` <a href="substation.html?lat=${lat}&lon=${lon}" target="_blank" rel="noopener">→ 変電所スコア検索で全件を見る</a>`);
+
+  body.innerHTML = `<div class="ss-grid">${cellNear}${cellBest}${cellCap}</div>${table}` +
+    `<div class="ss-msg">${msgs.map(m => '・' + m).join('<br>')}</div>`;
+
+  const meta = document.getElementById('ss-meta');
+  if (meta) meta.textContent = `全${D.meta.total.toLocaleString()}件・座標あり${D.meta.withCoords.toLocaleString()}件（${D.meta.generated}）`;
+
+  // ── 送配電エリアの自動反映 ──
+  const areaSrc = best ? best.row : nearest;
+  const areaName = areaSrc ? D.dict.area[areaSrc[F.area]] : '';
+  const tsoVal = AREA_TO_TSO[areaName];
+  if (tsoVal) {
+    const sel = document.getElementById('tso');
+    const idx = Array.from(sel.options).findIndex(o => o.value === tsoVal);
+    if (idx >= 0) autoSelectIndex('tso', idx, 'ab-tso', '', 'hint-tso',
+      `最寄り変電所「${escapeHtml(areaSrc[F.name])}」の管轄エリア（${escapeHtml(areaName)}）から自動選択`);
+  }
+
+  // ── A-1 公表空き容量の自動反映 ──
+  const needKw = parseFloat(document.getElementById('outkw').value);
+  const needMW = (isFinite(needKw) && needKw > 0 ? needKw : 2000) / 1000;
+  if (!hits.length) {
+    autoRadio('a1', 'a1f', 'ab-a1', 'fail', 'hint-a1',
+      `半径10km内に連系可能な変電所が見つかりません（ゲート除外 ${excluded}件）。候補地としての見送りを検討してください。`);
+  } else if (!bestCap) {
+    autoRadio('a1', 'a1w', 'ab-a1', 'warn', 'hint-a1',
+      '10km内の変電所は空容量が未公表です。送配電事業者の公表マップ（下のチップ）で確認してください。');
+  } else {
+    const cap = bestCap.row[F.availUp];
+    const where = `<b>${escapeHtml(bestCap.row[F.name])}</b>（${fmtDist(bestCap.d)}）の空容量 <b>${cap} MW</b>（上位系考慮）`;
+    if (cap >= needMW) {
+      autoRadio('a1', 'a1p', 'ab-a1', 'pass', 'hint-a1',
+        `${where} ＞ 希望出力 ${needMW.toFixed(1)} MW。特高側の公表値ベースの判定です。`);
+    } else if (cap > 0) {
+      autoRadio('a1', 'a1w', 'ab-a1', 'warn', 'hint-a1',
+        `${where} ＜ 希望出力 ${needMW.toFixed(1)} MW。減容または上位系増強の可能性があります。`);
+    } else {
+      autoRadio('a1', 'a1f', 'ab-a1', 'fail', 'hint-a1',
+        `${where}。N-1電制 ${escapeHtml(n1Of(bestCap.row))}。系統増強が必要になる可能性が高い水準です。`);
+    }
+  }
+
+  // ── A-3 想定電圧階級（希望出力＋最寄り配電用変電所から） ──
+  reflectVoltageClass(near6 ? near6[F.vsec] : null, dist6);
+}
+
+// A-3: 希望出力から連系電圧階級を推定し、6.6kV連系の受け皿（二次電圧≦7kV）の距離を添える
+function reflectVoltageClass(vsec6, dist6) {
+  const kw = parseFloat(document.getElementById('outkw').value);
+  if (!isFinite(kw) || kw <= 0) { setHint('hint-a3', '希望出力を入力すると、連系電圧階級の目安を自動判定します'); return; }
+  let idx, sev, label;
+  if (kw < 2000)       { idx = 1; sev = 'pass'; label = '2,000kW未満のため高圧（6.6kV）連系が基本'; }
+  else if (kw < 10000) { idx = 2; sev = 'pass'; label = '2,000kW以上のため特別高圧（22〜33kV）連系が基本'; }
+  else if (kw < 50000) { idx = 3; sev = 'warn'; label = '10MW超のため66kV連系の想定'; }
+  else                 { idx = 4; sev = 'fail'; label = '50MW超のため154kV以上の想定'; }
+
+  let extra = '';
+  if (vsec6 != null && isFinite(dist6)) {
+    extra = `<br>最寄りの配電用変電所（二次 ${vsec6}kV）まで <b>${fmtDist(dist6)}</b>`;
+    if (kw < 2000 && dist6 > 5000) extra += ' ─ 5km超のため高圧連系でも亘長負担が大きくなる可能性があります';
+  }
+  autoSelectIndex('a3', idx, 'ab-a3', sev, 'hint-a3', `希望出力 ${kw.toLocaleString()}kW：${label}${extra}`);
+}
+
+/* ───────────────────────── DDチェック（オンライン判定） ───────────────────────── */
+
+const TILE_Z = 16;
+
+// タイル1枚を取得して指定座標の画素を返す。
+// 404（タイル未整備）＝その区域の指定なし、通信失敗は error として区別する。
+async function tilePixel(layer, lat, lon, z) {
+  const n = 2 ** z;
+  const fx = (lon + 180) / 360 * n;
+  const fy = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+  const x = Math.floor(fx), y = Math.floor(fy);
+  const px = Math.min(255, Math.floor((fx - x) * 256));
+  const py = Math.min(255, Math.floor((fy - y) * 256));
+  const url = `https://disaportaldata.gsi.go.jp/raster/${layer}/${z}/${x}/${y}.png`;
+  let res;
+  try { res = await fetch(url); }
+  catch (e) { return { state: 'error' }; }
+  if (res.status === 404) return { state: 'none' };
+  if (!res.ok) return { state: 'error' };
+  try {
+    const bmp = await createImageBitmap(await res.blob());
+    const c = document.createElement('canvas');
+    c.width = bmp.width; c.height = bmp.height;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bmp, 0, 0);
+    const sx = Math.min(bmp.width - 1, Math.round(px * bmp.width / 256));
+    const sy = Math.min(bmp.height - 1, Math.round(py * bmp.height / 256));
+    const d = ctx.getImageData(sx, sy, 1, 1).data;
+    if (bmp.close) bmp.close();
+    return { state: 'ok', rgba: [d[0], d[1], d[2], d[3]] };
+  } catch (e) { return { state: 'error' }; }
+}
+
+// 浸水深の凡例（重ねるハザードマップ）: f=洪水 / t=津波・高潮
+const DEPTH_LEGEND = [
+  { c: [247, 245, 169], f: '0.5m未満',    t: '0.3m未満' },
+  { c: [255, 255, 179], f: '0.5m未満',    t: '0.3m未満' },
+  { c: [248, 225, 166], f: '0.5m未満',    t: '0.3〜1.0m' },
+  { c: [255, 216, 192], f: '0.5〜3.0m',   t: '1.0〜3.0m' },
+  { c: [255, 183, 183], f: '3.0〜5.0m',   t: '3.0〜5.0m' },
+  { c: [255, 145, 145], f: '5.0〜10.0m',  t: '5.0〜10.0m' },
+  { c: [242, 133, 201], f: '10〜20m',     t: '10〜20m' },
+  { c: [220, 122, 220], f: '20m以上',     t: '20m以上' },
+];
+function depthLabel(rgba, kind) {
+  let best = null, bd = Infinity;
+  for (const e of DEPTH_LEGEND) {
+    const d = (e.c[0] - rgba[0]) ** 2 + (e.c[1] - rgba[1]) ** 2 + (e.c[2] - rgba[2]) ** 2;
+    if (d < bd) { bd = d; best = e; }
+  }
+  return bd <= 2500 ? (kind === 'flood' ? best.f : best.t) : '';
+}
+
+async function judgeFlood(lat, lon) {
+  const layers = [
+    ['01_flood_l2_shinsuishin_data', '洪水浸水想定区域（想定最大規模）', 'flood'],
+    ['03_hightide_l2_shinsuishin_data', '高潮浸水想定区域', 'tide'],
+    ['04_tsunami_newlegend_data', '津波浸水想定', 'tide'],
+  ];
+  const res = await Promise.all(layers.map(l => tilePixel(l[0], lat, lon, TILE_Z)));
+  const errs = res.filter(r => r.state === 'error').length;
+  if (errs === layers.length) return null;
+  const hit = [];
+  res.forEach((r, i) => {
+    if (r.state !== 'ok' || r.rgba[3] === 0) return;
+    const dep = depthLabel(r.rgba, layers[i][2]);
+    hit.push(layers[i][1] + (dep ? `（浸水深 ${dep}）` : ''));
+  });
+  const partial = errs ? `（${errs}レイヤは取得できず未確認）` : '';
+  const comment = '重ねるハザードマップのタイルを座標で判定';
+  if (hit.length) return { value: hit.join(' / ') + partial, judge: 0, comment };
+  return { value: '該当なし（洪水・高潮・津波とも指定区域外）' + partial, judge: errs ? 1 : 2, comment };
+}
+
+async function judgeSediment(lat, lon) {
+  const layers = [
+    ['05_dosekiryukeikaikuiki', '土石流'],
+    ['05_kyukeishakeikaikuiki', '急傾斜地の崩壊'],
+    ['05_jisuberikeikaikuiki', '地すべり'],
+  ];
+  const res = await Promise.all(layers.map(l => tilePixel(l[0], lat, lon, TILE_Z)));
+  const errs = res.filter(r => r.state === 'error').length;
+  if (errs === layers.length) return null;
+  const hit = [];
+  let special = false;
+  res.forEach((r, i) => {
+    if (r.state !== 'ok' || r.rgba[3] === 0) return;
+    const [rr, gg, bb] = r.rgba;
+    const tokubetsu = rr >= 200 && gg <= 120 && bb <= 120;   // 赤系＝特別警戒区域
+    if (tokubetsu) special = true;
+    hit.push(`土砂災害${tokubetsu ? '特別警戒' : '警戒'}区域（${layers[i][1]}）`);
+  });
+  const partial = errs ? `（${errs}レイヤは取得できず未確認）` : '';
+  const comment = '重ねるハザードマップ（土砂災害警戒区域）のタイルを座標で判定';
+  if (hit.length) return { value: hit.join(' / ') + partial, judge: 0, special, comment };
+  return { value: '該当なし（土石流・急傾斜地・地すべりとも区域外）' + partial, judge: errs ? 1 : 2, special: false, comment };
+}
+
+// 微地形区分 → 液状化発生傾向（若松・松岡の地形分類にもとづく目安）
+const LIQ_HIGH = ['埋立地', '干拓地', '旧河道', '河原', '河道', '湖沼', '溜池', '三角州', '海岸低地', '砂丘間低地', '後背湿地', '旧水部'];
+const LIQ_MID  = ['自然堤防', '谷底低地', '扇状地', '砂州', '砂礫州', '砂丘', '海底', '海'];
+
+async function judgeLiquefaction(lat, lon) {
+  const url = `https://www.j-shis.bosai.go.jp/map/api/sstrct/V3/meshinfo.geojson?position=${lon},${lat}&epsg=4326`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('J-SHIS応答エラー');
+  const j = await r.json();
+  const p = j.features && j.features[0] && j.features[0].properties;
+  if (!p || !p.JNAME) return { value: '対象範囲外（J-SHIS微地形区分なし）', judge: -1, comment: 'J-SHIS 表層地盤データの範囲外' };
+  const name = String(p.JNAME);
+  const avs = p.AVS ? Number(p.AVS) : null;
+  let judge, tend;
+  if (LIQ_HIGH.some(k => name.includes(k)))      { judge = 0; tend = '高い'; }
+  else if (LIQ_MID.some(k => name.includes(k)))  { judge = 1; tend = '中程度'; }
+  else                                           { judge = 2; tend = '低い'; }
+  if (avs != null && avs < 150 && judge === 2)   { judge = 1; tend = '中程度（AVS30が低く軟弱地盤）'; }
+  return {
+    value: `微地形区分「${name}」${avs != null ? ` ／ AVS30 ${avs} m/s` : ''} → 液状化発生傾向 ${tend}`,
+    judge,
+    comment: 'J-SHIS 微地形区分（250mメッシュ）から推定。詳細は自治体の液状化危険度マップで確認',
+  };
+}
+
+async function fetchElevation(lat, lon) {
+  const r = await fetch(`https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}&outtype=JSON`);
+  if (!r.ok) throw new Error('標高APIエラー');
+  const j = await r.json();
+  return typeof j.elevation === 'number' ? { h: j.elevation, src: j.hsrc } : { h: null, src: j.hsrc };
+}
+
+// 半径100mの標高差から造成工事の必要度（D-3）を推定
+async function judgeTerrain(lat, lon) {
+  const dLat = 100 / 111320, dLon = 100 / (111320 * Math.cos(lat * Math.PI / 180));
+  const pts = [[lat, lon], [lat + dLat, lon], [lat - dLat, lon], [lat, lon + dLon], [lat, lon - dLon]];
+  const es = await Promise.all(pts.map(([a, b]) => fetchElevation(a, b).catch(() => ({ h: null }))));
+  const center = es[0];
+  if (center.h == null) return null;
+  const diffs = es.slice(1).filter(e => e.h != null).map(e => Math.abs(e.h - center.h));
+  const maxDiff = diffs.length ? Math.max(...diffs) : null;
+  return { elev: center.h, src: center.src, maxDiff, slope: maxDiff };   // 100m基線なので Δh(m) ≒ 傾斜(%)
+}
+
+// ── 逆ジオコーダ（住所）──
+let muniMap = null;
+async function loadMuniMap() {
+  if (muniMap) return muniMap;
+  const r = await fetch('https://maps.gsi.go.jp/js/muni.js');
+  if (!r.ok) throw new Error('自治体名データの取得に失敗');
+  const t = await r.text();
+  const m = {};
+  const re = /GSI\.MUNI_ARRAY\["(\d+)"\]\s*=\s*'([^']*)'/g;
+  let g;
+  while ((g = re.exec(t)) !== null) m[g[1]] = g[2];
+  muniMap = m;
+  return m;
+}
+
+async function judgeAddress(lat, lon) {
+  const r = await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lon}`);
+  if (!r.ok) throw new Error('逆ジオコーダ応答エラー');
+  const j = await r.json();
+  const res = j.results;
+  if (!res || !res.muniCd) return null;
+  let pref = '', muni = '';
+  try {
+    const map = await loadMuniMap();
+    const rec = map[res.muniCd] || map[String(parseInt(res.muniCd, 10))];
+    if (rec) {
+      const parts = rec.split(',');
+      pref = parts[1] || '';
+      muni = (parts[3] || '').replace(/[\s　]/g, '');
+    }
+  } catch (e) { /* 自治体名が引けなくても字名だけ返す */ }
+  const addr = `${pref}${muni}${res.lv01Nm || ''}`;
+  return { addr, pref, muni, aza: res.lv01Nm || '', muniCd: res.muniCd };
+}
+
+function toDMS(v, pos, neg) {
+  const dir = v >= 0 ? pos : neg, a = Math.abs(v);
+  const d = Math.floor(a), mf = (a - d) * 60, m = Math.floor(mf), s = ((mf - m) * 60).toFixed(2);
+  return `${d}°${m}'${s}"${dir}`;
+}
+
+/* ── オンライン自動判定の実行（多重実行しないよう直列化） ── */
+let judgeChain = Promise.resolve();
+function runOnlineJudge() {
+  judgeChain = judgeChain.then(doOnlineJudge, doOnlineJudge);
+  return judgeChain;
+}
+
+async function doOnlineJudge() {
+  const lat = currentLat, lon = currentLon;
+  const status = document.getElementById('auto-status');
+  if (lat == null || lon == null) {
+    status.innerHTML = '⚠️ 先に緯度・経度を入力してください';
+    status.style.color = 'var(--warn)';
+    return;
+  }
+  const btn = document.getElementById('btn-online');
+  if (btn) btn.disabled = true;
+  try {
+    await judgeAll(lat, lon, status);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function judgeAll(lat, lon, status) {
+  status.style.color = 'var(--txt2)';
+  status.innerHTML = '<span class="spin"></span> 公開データから判定中…（住所・浸水・土砂災害・液状化・地形）';
+
+  const lines = [];
+  const fail = [];
+  const stale = () => currentLat !== lat || currentLon !== lon;
+
+  // 1. 住所（DD1）＋ 座標（DD2）
+  try {
+    const a = await judgeAddress(lat, lon);
+    if (stale()) return;
+    if (a && a.addr) {
+      setAutoItem(1, a.addr, 2, '地理院 逆ジオコーダ（LonLatToAddress）');
+      lines.push(`住所: <b>${escapeHtml(a.addr)}</b>`);
+      const addrEl = document.getElementById('addr');
+      if (addrEl && !addrEl.value) addrEl.value = a.addr;
+      const locEl = document.getElementById('locname');
+      if (locEl && !locEl.value) locEl.value = a.addr;
+    } else { fail.push('住所'); }
+  } catch (e) { fail.push('住所'); }
+
+  const dms = `${toDMS(lat, 'N', 'S')} ${toDMS(lon, 'E', 'W')}`;
+  setAutoItem(2, `${lat}, ${lon}（${dms}）`, 2, '入力座標から度分秒に変換');
+  lines.push(`座標: <b>${escapeHtml(dms)}</b>`);
+
+  // 2. 浸水（DD4）
+  try {
+    const f = await judgeFlood(lat, lon);
+    if (stale()) return;
+    if (f) { setAutoItem(4, f.value, f.judge, f.comment); lines.push(`浸水: ${f.judge === 2 ? '' : '<b>'}${escapeHtml(f.value)}${f.judge === 2 ? '' : '</b>'}`); }
+    else fail.push('浸水');
+  } catch (e) { fail.push('浸水'); }
+
+  // 3. 土砂災害（DD5）
+  let sed = null;
+  try {
+    sed = await judgeSediment(lat, lon);
+    if (stale()) return;
+    if (sed) { setAutoItem(5, sed.value, sed.judge, sed.comment); lines.push(`土砂災害: ${sed.judge === 2 ? '' : '<b>'}${escapeHtml(sed.value)}${sed.judge === 2 ? '' : '</b>'}`); }
+    else fail.push('土砂災害');
+  } catch (e) { fail.push('土砂災害'); }
+
+  // 4. 液状化（DD6）
+  try {
+    const l = await judgeLiquefaction(lat, lon);
+    if (stale()) return;
+    setAutoItem(6, l.value, l.judge, l.comment);
+    lines.push(`液状化: ${l.judge === 2 ? '' : '<b>'}${escapeHtml(l.value)}${l.judge === 2 ? '' : '</b>'}`);
+  } catch (e) { fail.push('液状化'); }
+
+  // 5. 地形（標高・傾斜）→ D-3 造成工事の必要度
+  try {
+    const t = await judgeTerrain(lat, lon);
+    if (stale()) return;
+    if (t) {
+      const parts = [`標高 <b>${t.elev} m</b>（${escapeHtml(t.src || '')}）`];
+      if (t.maxDiff != null) {
+        parts.push(`半径100mの最大高低差 <b>${t.maxDiff.toFixed(1)} m</b>（傾斜 約${t.slope.toFixed(0)}%）`);
+        let id, sev, note;
+        if (t.slope <= 5)       { id = 'd3a'; sev = 'pass'; note = 'ほぼ平坦'; }
+        else if (t.slope <= 15) { id = 'd3b'; sev = 'warn'; note = '傾斜地。切盛りの土量を要精査'; }
+        else                    { id = 'd3c'; sev = 'fail'; note = '急傾斜。大規模造成・擁壁が必要な可能性'; }
+        autoRadio('d3', id, 'ab-d3', sev, 'hint-d3',
+          `地理院DEM：標高 ${t.elev}m ／ 半径100mの最大高低差 ${t.maxDiff.toFixed(1)}m（傾斜 約${t.slope.toFixed(0)}%）→ ${note}<br>※DEMによる目安です。造成土量は現地測量で確認してください`);
+      }
+      lines.push('地形: ' + parts.join(' ／ '));
+    } else fail.push('標高');
+  } catch (e) { fail.push('標高'); }
+
+  if (stale()) return;
+
+  // 土砂該当なら埋文・景観などの手動確認を促す注記
+  if (sed && sed.judge === 0) {
+    lines.push('<span style="color:var(--warn)">※土砂災害警戒区域に該当。' +
+      (sed.special ? '特別警戒区域（レッドゾーン）は建築制限があり、' : '') +
+      '砂防三法（地すべり等防止法・急傾斜地法・砂防法）の許認可も確認してください</span>');
+  }
+
+  const okCount = lines.length;
+  let head = `✅ 座標から ${okCount}件を自動判定しました`;
+  if (fail.length) head += ` ／ 取得できず: ${fail.join('・')}`;
+  status.innerHTML = head +
+    '<div class="auto-lines">' + lines.map(l => `<div class="auto-line">・${l}</div>`).join('') + '</div>' +
+    '<div class="auto-line" style="margin-top:5px;color:var(--txt3)">出典: 地理院逆ジオコーダ／重ねるハザードマップ タイル／J-SHIS 微地形区分／地理院DEM。' +
+    '<b>用途地域・市街化区域/調整区域・自然公園</b>は公開APIが未対応のため、reinfolib の values.json 読込か右の確認リンクで判定してください。' +
+    '自動判定は事前スクリーニング用の目安であり、最終確認は必ず地図・自治体で行ってください。</div>';
+  status.style.color = 'var(--txt2)';
+}
+
+/* ── 座標変更時の自動実行 ── */
+let autoTimer = null, lastAutoKey = '';
+
+function scheduleAutoReflect() {
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => runAutoReflect(false), 700);
+}
+
+async function runAutoReflect(force) {
+  if (currentLat == null || currentLon == null) return;
+  const key = currentLat + ',' + currentLon;
+  if (!force && key === lastAutoKey) return;
+  lastAutoKey = key;
+  await reflectSubstations(currentLat, currentLon);
+  await runOnlineJudge();
+}
+
+function resetAutoPanels() {
+  lastAutoKey = '';
+  clearAuto(['ab-tso', 'ab-a1', 'ab-a3', 'ab-d3']);
+  ['hint-tso', 'hint-a1', 'hint-a3', 'hint-d3'].forEach(id => setHint(id, ''));
+  const body = document.getElementById('ss-body');
+  if (body) body.innerHTML = '<div class="coord-needed">📍 緯度・経度を入力すると、最寄り変電所・系統スコア・空き容量を自動で反映します</div>';
+}
+
+// ── 座標の貼り付け（「35.1, 139.4」/ GoogleマップURL）──
+function onCoordPaste(text) {
+  const msg = document.getElementById('paste-msg');
+  if (!text.trim()) { msg.textContent = ''; return; }
+  let m = text.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  if (!m) m = text.match(/[?&]lat=(-?\d+\.?\d*)&lon=(-?\d+\.?\d*)/);
+  if (!m) m = text.match(/[?&]q=(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
+  if (!m) m = text.match(/(-?\d{1,3}\.\d+)[,\s/]+(-?\d{1,3}\.\d+)/);
+  if (!m) { msg.textContent = '座標を読み取れませんでした'; return; }
+  const la = parseFloat(m[1]), lo = parseFloat(m[2]);
+  if (!isFinite(la) || !isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) {
+    msg.textContent = '座標を読み取れませんでした'; return;
+  }
+  document.getElementById('lat').value = la;
+  document.getElementById('lon').value = lo;
+  msg.textContent = `→ 緯度 ${la} / 経度 ${lo} を反映しました`;
+  updateLinks();
+}
+
+// ── 希望出力の変更で A-1/A-3 を再判定 ──
+let outkwTimer = null;
+function onOutkwChange() {
+  clearTimeout(outkwTimer);
+  outkwTimer = setTimeout(() => {
+    reflectVoltageClass(null, Infinity);
+    if (currentLat != null && currentLon != null) runAutoReflect(true);
+  }, 600);
+}
+
 // ── Init ──
 buildPermitTable();
+bindTouchGuards();
 
 // 変電所スコア検索からの座標引き継ぎ（?lat=..&lon=..）
 (function () {
