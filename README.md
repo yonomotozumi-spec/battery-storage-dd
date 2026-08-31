@@ -76,6 +76,41 @@ python scripts/build_px_checksheet.py \
 
 サンプル出力は `docs/` を参照。
 
+## 候補地リストの一括DD（scripts/build_land_list_dd.py）
+
+複数の候補地が並んだ「土地一覧」xlsx を丸ごと読み込み、**変電所スコア・条例リスク・DD許認可**を
+一度に突き合わせた確認用の一覧xlsxを作ります。1地点ずつ案件チェックシートを作る前の、
+一次スクリーニング用です。
+
+```bash
+pip install openpyxl
+
+# ① 各行のGoogleマップ短縮URLを解決してピンの実座標を取り、逆ジオコーダで自治体名を付けた geo.json を用意
+#    （{"1": {"lat":..., "lon":..., "pref":..., "muni":..., "lv01":...}, ...}）
+
+# ② reinfolibの自動判定（APIキーがある場合。キーは環境変数のみで扱う）
+export REINFOLIB_KEY=<APIキー>
+python scripts/fetch_reinfolib_batch.py --geo geo.json --outdir reinfolib_values
+
+# ③ 一覧xlsxを生成
+python scripts/build_land_list_dd.py \
+  --in "土地一覧.xlsx" --sheet Sheet1 --geo geo.json \
+  --values-dir reinfolib_values \
+  --out "土地一覧_DD確認.xlsx"
+```
+
+タブ構成：**①一覧（DD総括）**（1行1筆。座標・変電所スコア・条例リスク・DD要確認件数・確認リンク）／
+**②変電所_最寄5件**（半径10km・総合スコア順。空容量・N-1電制・座標精度まで）／
+**③条例・開発許可**（所在ごとの台帳照合・開発許可権者・次アクション）／
+**④DD許認可18項目**（全候補地 × 18項目。判定と確認先URL）／
+**⑤条例台帳（根拠）**／**⑥凡例・出典**
+
+`--values-dir` を省くと reinfolib の7項目は「要確認」となり、緯度経度で開く確認リンクだけが入ります。
+`fetch_reinfolib_batch.py` は `reinfolib_judge.py` を各地点に回すだけのバッチで、APIキーは
+環境変数 `REINFOLIB_KEY` からのみ読み、取得物にも出力にも残しません。
+
+サンプル出力は `docs/笹川総研様土地一覧_DD確認_20260831.xlsx`（19筆）を参照。
+
 ## 変電所スコアリング（scripts/）
 
 全国変電所リスト（66kV以上）のxlsxを読み込み、接続検討の実回答12件から校正した配点
