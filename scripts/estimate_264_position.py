@@ -14,9 +14,26 @@ P={p['地番']:np.array([(pt[1],pt[0]) for pt in p['ring']]) for p in ps}   # (E
 EQ_LAT,EQ_LON=34.962328,137.231498          # 配置図の設備重心（実座標）
 ANCHOR='27-1'
 KX=111320*math.cos(math.radians(EQ_LAT)); KY=110940.0
-c0=P[ANCHOR][:-1].mean(0)
-def to_ll(xy):   # 公図(E,N) → (lat,lon)  回転0と仮定
-    d=xy-c0; return EQ_LAT+d[:,1]/KY, EQ_LON+d[:,0]/KX
+a_=P['26-4']; th_=math.radians(90-166); u_=np.array([math.cos(th_),math.sin(th_)])
+s_=(a_-a_.mean(0))@u_; L0_=s_.min(); sel_=(s_-L0_>10)&(s_-L0_<65)
+c0=a_[sel_].mean(0)                                   # 公図の26番4可用部分中心（回転中心）
+ROT=math.radians(5.0)                                 # 公図ブロックを時計回りに5°回転（26番4の軸166°→道路171°）
+def rotE(xy):
+    d=xy-c0; e= d[:,0]*math.cos(ROT)+d[:,1]*math.sin(ROT); n=-d[:,0]*math.sin(ROT)+d[:,1]*math.cos(ROT); return np.stack([e,n],1)
+# 航空写真から読んだ市道西端の線（北端→分岐）
+RW=[(34.96350,137.23152),(34.96228,137.23175)]
+def road_w_lon(lat):
+    f=(RW[0][0]-lat)/(RW[0][0]-RW[1][0]); return RW[0][1]+f*(RW[1][1]-RW[0][1])
+T_LAT=34.962728                                       # 南北は求積図の分岐基準（前回どおり）
+# 東西：法面筆(26-3,29-2)の東端が道路西端に一致するように決める
+edge=np.vstack([rotE(P['26-3']),rotE(P['29-2'])]); k=np.argsort(edge[:,0])[-8:]; ep=edge[k]
+T_LON=137.2315
+for _ in range(5):
+    lats=T_LAT+ep[:,1]/KY; want=np.array([road_w_lon(l) for l in lats]); have=T_LON+ep[:,0]/KX
+    T_LON+= (want-have).mean()
+print('決定: 26番4中心 %.6f, %.6f  道路西端まで %.1f m'%(T_LAT,T_LON,(road_w_lon(T_LAT)-T_LON)*KX))
+def to_ll(xy):
+    d=rotE(xy); return T_LAT+d[:,1]/KY, T_LON+d[:,0]/KX
 # 26番4 の可用部分（北端から10〜65m）中心
 a=P['26-4']; lat,lon=to_ll(a)
 th=math.radians(90-166); u=np.array([math.cos(th),math.sin(th)])
@@ -33,7 +50,7 @@ print('地理院地図:  https://maps.gsi.go.jp/#17/%.6f/%.6f/'%(clat,clon))
 TILE=256; Z=18
 def ll2px(lo,la,z):
     n=TILE*2**z; return (lo+180)/360*n,(1-math.asinh(math.tan(math.radians(la)))/math.pi)/2*n
-CLAT,CLON=(clat+EQ_LAT)/2,(clon+EQ_LON)/2+0.0002
+CLAT,CLON=34.96255,137.23175
 mpp=156543.03392*math.cos(math.radians(CLAT))/2**Z; HW,HH=150/mpp,120/mpp
 cx,cy=ll2px(CLON,CLAT,Z); x0,x1,y0,y1=cx-HW,cx+HW,cy-HH,cy+HH
 tx0,tx1=int(x0//TILE),int(x1//TILE); ty0,ty1=int(y0//TILE),int(y1//TILE)
@@ -82,7 +99,7 @@ ax.annotate('26番4 推定中心\n%.5f, %.5f'%(clat,clon),xy=p,xytext=(18,14),te
 p2=PX(EQ_LON,EQ_LAT); ax.annotate('現行配置図の設備',xy=p2,xytext=(14,-22),textcoords='offset points',fontproperties=FP,fontsize=10,color='white',zorder=10,
             bbox=dict(fc='#E8352B',ec='none',alpha=0.9,boxstyle='round,pad=0.3'))
 ax.set_xlim(x0,x1); ax.set_ylim(y1,y0); ax.set_xticks([]); ax.set_yticks([])
-ax.set_title('26番4の推定位置（公図を27番1＝現行設備位置に合わせて平行移動・誤差±40m程度）',fontproperties=FP,fontsize=13,color='#1F4620',pad=10)
+ax.set_title('26番4の推定位置（求積図の道路分岐＝01キ401を基準・法面筆の東端を道路西端に合わせて補正・誤差±15m程度）',fontproperties=FP,fontsize=13,color='#1F4620',pad=10)
 h=[Line2D([],[],marker='s',ls='',ms=12,mfc='#F9D648',mec='#8A6D00',label='26番4（推定・破線）'),
    Line2D([],[],marker='s',ls='',ms=12,mfc='#D9534F',mec='#8C1D18',label='保安林の筆（推定・破線）'),
    Line2D([],[],marker='s',ls='',ms=12,mfc='#7A9B78',mec='#FFE24D',label='保安林（国土数値情報A13）'),
@@ -96,7 +113,7 @@ fig.subplots_adjust(left=0.02,right=0.98,top=0.94,bottom=0.02); fig.savefig('fig
 la,lo=to_ll(a)
 co=' '.join('%.7f,%.7f,0'%(o,l) for l,o in zip(la,lo))
 kml=('<Style id="est"><LineStyle><color>ff0090ff</color><width>2.5</width></LineStyle><PolyStyle><color>5548d6f9</color></PolyStyle></Style>'
-     '<Folder><name>26番4 推定位置（誤差±40m・法的位置ではない）</name>'
+     '<Folder><name>26番4 推定位置（求積図基準・誤差±20m・法的位置ではない）</name>'
      '<Placemark><name>26番4（推定）</name><styleUrl>#est</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>%s</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>'
      '<Placemark><name>26番4 推定中心</name><Point><coordinates>%.7f,%.7f,0</coordinates></Point></Placemark></Folder>'%(co,clon,clat))
 s=open('保安林_周辺_A13.kml',encoding='utf-8').read().replace('</Document></kml>',kml+'</Document></kml>')
