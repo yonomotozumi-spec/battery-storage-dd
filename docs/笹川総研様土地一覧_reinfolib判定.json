@@ -1,0 +1,677 @@
+{
+ "1": {
+  "values": {
+   "10": {
+    "value": "準工業地域（建蔽率60% 容積率200%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "洪水浸水想定区域（渡良瀬川／浸水深5〜10m）",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "やや液状化しにくい（扇状地（傾斜≧1/100）・傾向4/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "2": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "3": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "土砂災害警戒区域（急傾斜地の崩壊）",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "16": {
+    "req": "要",
+    "note": "土砂災害危険箇所/警戒区域に該当 (reinfolib XKT029)"
+   }
+  }
+ },
+ "4": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "土砂災害警戒区域（急傾斜地の崩壊）",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "16": {
+    "req": "要",
+    "note": "土砂災害危険箇所/警戒区域に該当 (reinfolib XKT029)"
+   }
+  }
+ },
+ "5": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "土砂災害警戒区域（急傾斜地の崩壊）",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "16": {
+    "req": "要",
+    "note": "土砂災害危険箇所/警戒区域に該当 (reinfolib XKT029)"
+   }
+  }
+ },
+ "6": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "土砂災害警戒区域（急傾斜地の崩壊）",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "16": {
+    "req": "要",
+    "note": "土砂災害危険箇所/警戒区域に該当 (reinfolib XKT029)"
+   }
+  }
+ },
+ "7": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "土砂災害警戒区域（急傾斜地の崩壊）",
+    "comment": "reinfolib XKT029より自動判定 ／ 大規模盛土造成地に該当"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "16": {
+    "req": "要",
+    "note": "土砂災害危険箇所/警戒区域に該当 (reinfolib XKT029)"
+   },
+   "7": {
+    "req": "要",
+    "note": "大規模盛土造成地に該当 (reinfolib XKT020)"
+   }
+  }
+ },
+ "8": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定 ／ 大規模盛土造成地に該当"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "7": {
+    "req": "要",
+    "note": "大規模盛土造成地に該当 (reinfolib XKT020)"
+   }
+  }
+ },
+ "9": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "10": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "11": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定 ／ 大規模盛土造成地に該当"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "7": {
+    "req": "要",
+    "note": "大規模盛土造成地に該当 (reinfolib XKT020)"
+   }
+  }
+ },
+ "12": {
+  "values": {
+   "10": {
+    "value": "第１種中高層住居専用地域（建蔽率60% 容積率200%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "13": {
+  "values": {
+   "10": {
+    "value": "第１種中高層住居専用地域（建蔽率60% 容積率200%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "14": {
+  "values": {
+   "10": {
+    "value": "第１種低層住居専用地域（建蔽率50% 容積率80%）",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域）"
+   },
+   "4": {
+    "value": "洪水浸水想定区域（椹野川／浸水深0.5〜3m）",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "やや液状化しやすい（扇状地（傾斜＜1/100）・傾向3/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "15": {
+  "values": {
+   "10": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（山麓地・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "16": {
+  "values": {
+   "10": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域外の可能性）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域外の可能性）"
+   },
+   "4": {
+    "value": "津波浸水想定",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "やや液状化しやすい（谷底低地（傾斜＜1/100）・傾向3/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "自然公園地域に該当",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "17": {
+  "values": {
+   "10": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域外の可能性）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域外の可能性）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（山地・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ },
+ "18": {
+  "values": {
+   "10": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化調整区域）"
+   },
+   "9": {
+    "value": "指定あり",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化調整区域）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "土砂災害特別警戒区域（急傾斜地の崩壊） / 土砂災害警戒区域（急傾斜地の崩壊）",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "液状化しにくい（火山性丘陵・傾向5/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {
+   "16": {
+    "req": "要",
+    "note": "土砂災害危険箇所/警戒区域に該当 (reinfolib XKT029)"
+   },
+   "15": {
+    "req": "要",
+    "note": "土砂災害特別警戒区域に該当 (reinfolib XKT029)"
+   }
+  }
+ },
+ "19": {
+  "values": {
+   "10": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT002より自動判定"
+   },
+   "8": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域外の可能性）"
+   },
+   "9": {
+    "value": "指定なし",
+    "comment": "reinfolib XKT001より自動判定（都市計画区域外の可能性）"
+   },
+   "4": {
+    "value": "該当なし",
+    "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+   },
+   "5": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT029より自動判定"
+   },
+   "6": {
+    "value": "やや液状化しにくい（谷底低地（傾斜≧1/100）・傾向4/6）",
+    "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+   },
+   "13": {
+    "value": "該当なし",
+    "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+   }
+  },
+  "permits": {}
+ }
+}
