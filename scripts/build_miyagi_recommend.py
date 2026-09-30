@@ -7,10 +7,12 @@
 - 立地区分は住所からの机上推定（現地未確認）。下の LOCATION を手で更新する。
 
 社外提示用には公表情報（変電所名・所在地・電圧・公表空容量）と当社のおすすめ度だけを載せ、
-社内スコアの配点・接続検討の実績・座標は載せない（NDA締結前のため）。
+社内スコアの配点・接続検討の実績は載せない（NDA締結前のため）。
+緯度経度は載せる（変電所の位置は公開情報。東北電力NWも県別の系統状況マップPDFで概略位置を公表）。
 """
 import argparse
 import json
+import math
 import time
 import urllib.request
 
@@ -103,6 +105,26 @@ def load_rows(path):
     return rows, d["meta"]["generated"]
 
 
+def osm_check(rows, osm_path):
+    """座標から100m以内にOSMの変電所があれば位置確認済みとする（名称一致でない座標の検証用）"""
+    pts = []
+    for e in json.load(open(osm_path, encoding="utf-8"))["elements"]:
+        c = e if "lat" in e else e.get("center")
+        if c:
+            pts.append((c["lat"], c["lon"]))
+    for r in rows:
+        r["pos_ok"] = None
+        if r["lat"] is None:
+            continue
+        if r["acc"].startswith("OSM"):
+            r["pos_ok"] = True
+            continue
+        d = min(6371000 * math.hypot(math.radians(p[0] - r["lat"]),
+                                     math.radians(p[1] - r["lon"]) * math.cos(math.radians(r["lat"])))
+                for p in pts)
+        r["pos_ok"] = d <= 100
+
+
 def reverse_geocode(rows, cache_path):
     try:
         cache = json.load(open(cache_path, encoding="utf-8"))
@@ -171,9 +193,16 @@ def build_external(rows, out, asof, today):
     for n, r in enumerate(picked, 1):
         tier, loc, note = LOCATION[r["name"]]
         table.append([n, tier, r["name"].replace("東北電力株式会社 ", ""), addr(r),
-                      f"{r['vmax']}kV" if r["vmax"] else "－", r["availCur"], loc, note])
-    write_table(ws, 5, ["No", "おすすめ度", "変電所名", "所在地", "最大電圧", "公表空容量\n(MW)", "立地", "ひとこと"],
-                table, [5, 9, 20, 30, 9, 11, 20, 60], tier_col=1)
+                      f"{r['vmax']}kV" if r["vmax"] else "－", r["availCur"], loc, note,
+                      round(r["lat"], 5), round(r["lon"], 5), "地図で開く",
+                      "確認済" if r["pos_ok"] else "目安（要現地確認）"])
+    write_table(ws, 5, ["No", "おすすめ度", "変電所名", "所在地", "最大電圧", "公表空容量\n(MW)", "立地", "ひとこと",
+                        "緯度", "経度", "地図", "位置"],
+                table, [5, 9, 20, 30, 9, 11, 20, 60, 10, 11, 11, 18], tier_col=1)
+    for i, r in enumerate(picked, 6):
+        cell = ws.cell(i, 11)
+        cell.hyperlink = f"https://www.google.com/maps?q={r['lat']},{r['lon']}"
+        cell.font = Font(color="0563C1", underline="single")
     end = 5 + len(table) + 2
     notes = [
         "【ご留意事項】",
@@ -181,6 +210,7 @@ def build_external(rows, out, asof, today):
         "・空容量は公表時点の値で、先行申込により変動します。最新値は東北電力ネットワークの空容量マップでご確認ください。",
         "・宮城県内の該当変電所は、いずれもN-1電制「不可」・出力制御「あり」の公表条件です。",
         "・立地区分は所在地からの推定で、現地・用途地域・ハザード（津波浸水等）は未確認です。",
+        "・緯度経度は地図データ（OpenStreetMap等）から当社が取得した変電所の位置です。「確認済」は地図上の変電所設備と一致したもの、「目安」は名称検索による位置で数百m〜数kmずれる可能性があります。",
         "・具体的な候補地・接続検討の実績等の詳細は、秘密保持契約の締結後にご案内いたします。",
     ]
     for i, t in enumerate(notes):
@@ -199,7 +229,7 @@ def build_internal(rows, out, asof, today):
     ws.title = "宮城県 全変電所"
     ws["A1"] = f"宮城県 変電所一覧（社内用・社外秘） 作成 {today} ／ スコアリングv1・{asof}データ"
     ws["A1"].font = Font(bold=True, size=12)
-    ws["A2"] = "社外提示=◎○のみ（別ファイル）。△=空容量小さめ/条件悪。都心=空容量はあるが用地確保困難。スコア・座標・実績は社外に出さないこと。"
+    ws["A2"] = "社外提示=◎○のみ（別ファイル）。△=空容量小さめ/条件悪。都心=空容量はあるが用地確保困難。スコア・実績は社外に出さないこと（座標は社外用にも掲載）。"
     ws["A2"].font = Font(size=9, color="C00000")
 
     def cls(r):
@@ -234,6 +264,7 @@ def build_internal(rows, out, asof, today):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/substations.js")
+    ap.add_argument("--osm", default="osm_cache/宮城県.json")
     ap.add_argument("--addr-cache", default="geo_cache/miyagi_addr.json")
     ap.add_argument("--today", default=time.strftime("%Y-%m-%d"))
     ap.add_argument("--out-ext", default="docs/宮城県_推奨変電所リスト_社外提示用(NDA前).xlsx")
@@ -241,6 +272,7 @@ def main():
     a = ap.parse_args()
     rows, asof = load_rows(a.data)
     reverse_geocode(rows, a.addr_cache)
+    osm_check(rows, a.osm)
     n = build_external(rows, a.out_ext, asof, a.today)
     build_internal(rows, a.out_int, asof, a.today)
     print(f"社外提示用 {n}件 → {a.out_ext}\n社内用 {len(rows)}件 → {a.out_int}")
