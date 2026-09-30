@@ -183,7 +183,8 @@ def build_external(rows, out, asof, today):
     ws.title = "宮城県 推奨変電所"
     ws["A1"] = "宮城県 系統用蓄電池（高圧・2MW級）向け 推奨変電所リスト"
     ws["A1"].font = Font(bold=True, size=14)
-    ws["A2"] = f"作成日 {today} ／ 空容量は東北電力ネットワークの公表値（当社調べ・{asof}時点）"
+    ws["A2"] = (f"作成日 {today} ／ 空容量は東北電力ネットワーク公表「変電所の予想潮流等一覧表」"
+                f"（{asof}）の空容量(当該設備)")
     ws["A3"] = "掲載基準：空容量に余裕があり、郊外で蓄電所用地を探しやすい変電所"
     for a in ("A2", "A3"):
         ws[a].font = Font(size=9, color="595959")
@@ -267,6 +268,7 @@ def main():
     ap.add_argument("--data", default="data/substations.js")
     ap.add_argument("--osm", default="osm_cache/宮城県.json")
     ap.add_argument("--addr-cache", default="geo_cache/miyagi_addr.json")
+    ap.add_argument("--published", help="空容量を照合した公表資料の版（例: 2026年7月3日作成版）")
     ap.add_argument("--today", default=time.strftime("%Y-%m-%d"))
     ap.add_argument("--out-ext", default="docs/宮城県_推奨変電所リスト_社外提示用(NDA前).xlsx")
     ap.add_argument("--out-int", default="docs/宮城県_変電所リスト_社内用.xlsx")
@@ -274,7 +276,7 @@ def main():
     rows, asof = load_rows(a.data)
     reverse_geocode(rows, a.addr_cache)
     osm_check(rows, a.osm)
-    n = build_external(rows, a.out_ext, asof, a.today)
+    n = build_external(rows, a.out_ext, a.published or f"当社調べ・{asof}時点", a.today)
     build_internal(rows, a.out_int, asof, a.today)
     print(f"社外提示用 {n}件 → {a.out_ext}\n社内用 {len(rows)}件 → {a.out_int}")
 
