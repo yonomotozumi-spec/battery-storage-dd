@@ -90,7 +90,7 @@ python scripts/score_substations.py \
 ```
 
 タブ構成：**スコアリング**（全行のゲート判定・S1〜S6・系統スコア・ランク・実績メモ。全て数式で入力に連動）／
-**スコアリング基準**（配点パラメータ表。黄色セルを変えると再計算）／**実績DB**（接続検討回答19件・2026-08-06更新＋分析メモ）
+**スコアリング基準**（配点パラメータ表。黄色セルを変えると再計算）／**実績DB**（接続検討回答の実績102件＝手入力18件＋検証一覧からの取込84件、＋分析メモ）
 
 ### スコア構成（系統スコア80点）
 
@@ -110,6 +110,28 @@ python scripts/score_substations.py \
 土地確定後に近接性S7（20点）を加えて100点満点で最終評価します。
 
 サンプル出力は `docs/変電所スコアリング_全国66kV以上_v1.xlsx` を参照。
+
+### 接続検討回答の実績DBへの取込（scripts/import_connection_results.py）
+
+「接続検討回答 検証一覧」xlsx（回答書1件=1行。`data/接続検討回答_検証一覧.xlsx`）を実績DBに取り込みます。
+`集計対象` が ○ の行（案件ごとの最新回答）を `data/connection_results.json` に書き出し、
+`substation_scoring.py` が手入力の実績の後ろに追加します。xlsx版の実績DBタブ・スコア表の実績メモと、
+Web版の実績表示（同じ変電所に複数の回答があれば全件）に反映されます。
+
+```bash
+python scripts/import_connection_results.py \
+  --in "data/接続検討回答_検証一覧.xlsx" \
+  --list "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out data/connection_results.json
+# 取込後に xlsx と Web用JS を再生成
+python scripts/score_substations.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
+python scripts/build_substation_web_data.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --out data/substations.js
+```
+
+- 変電所名は、回答書の「変電所」欄の先頭が全国変電所リストの名前と一致するときだけリスト表記に揃えます（84件中41件）。
+  一致しないもの（東北電力の回答書で変電所名の記載が無い・配電用変電所がリスト（66kV以上）に無い等）は
+  「－(原文)」として実績表には載りますが、変電所の検索結果には紐づきません
+- 手入力の実績と同じ案件（伊勢市特高・南関町・喜多方No071）は二重にしないよう除いています
+- 取込分はAIで回答書PDFを読み取った値です。配点（S6エリア点など）の校正には使っていないので、判断の前に原本で確認してください
 
 ## 変電所スコア検索（Web / substation.html）
 
