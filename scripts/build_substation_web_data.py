@@ -105,6 +105,7 @@ def main():
         "areaPoints": [list(a) for a in S.AREA_POINTS],
         "scoreDefs": [list(s) for s in S.SCORE_DEFS],
         "results": [list(r) for r in S.RESULTS_DB],
+        "resultsManual": S.RESULTS_MANUAL_COUNT,
         "notes": S.NOTES,
         "analysisNotes": S.ANALYSIS_NOTES,
         "rows": rows,

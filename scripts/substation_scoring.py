@@ -13,6 +13,9 @@ xlsx生成（score_substations.py）とWeb用データ生成（build_substation_
 ゲート: 空容量(上位系考慮)≦0 かつ N-1電制≠可 → 除外（上位系増強リスク。実績: 喜多方=工期10年2ヶ月）
 """
 
+import json
+import os
+
 GRID_MAX = 80    # 系統スコア満点
 S7_MAX = 20      # 近接スコア満点
 TOTAL_MAX = 100  # 総合スコア満点
@@ -63,14 +66,13 @@ AREA_POINTS = [
 ]
 AREA_POINT_MAP = {area: pts for area, pts, _ in AREA_POINTS}
 
-# 接続検討回答 実績19件（2026-08-06更新。詳細: 接続検討回答_分析メモ_20260724.md＋追加実績メモ20260806）
+# 接続検討回答 実績（手入力分。2026-08-06更新。詳細: 接続検討回答_分析メモ_20260724.md＋追加実績メモ20260806）
 RESULTS_DB = [
     ("九州", "笠之原変電所", "鹿屋市上小原", "1,999kW", "約6,140万円(付箋値・要確認)", "入金後1年4ヶ月", "張替1,405m+SVC", "細線・SVC発動で高額長期", "負担金約6,140万・1年4ヶ月(張替1.4km+SVC)"),
     ("北海道", "由仁変電所", "由仁町川端(1135)", "1,999kW", "410万円", "入金後6ヶ月", "計量設備のみ", "空容量潤沢なら最安最速", "負担金410万・6ヶ月(計量のみ)"),
     ("九州", "王子変電所", "大分市神崎(東盛)", "高圧", "920万円", "入金後3ヶ月", "張替1,006m+PGB", "バンク逆潮流対策済みは別格", "負担金920万・3ヶ月(バンク対策済み)"),
     ("九州", "久山変電所", "福岡県久山町(KMP)", "高圧", "1,630万円(税抜)", "入金後1年5ヶ月", "SVC300kvar+張替16m", "細線(177A)でSVC発動", "負担金1,630万・1年5ヶ月(SVC)"),
     ("東北", "－(須賀川上位系)", "喜多方市松山(PX No071)", "高圧", "特定負担は僅少", "配電7ヶ月/上位系10年2ヶ月", "SVR5000kVA+須賀川MT取替", "上位系増強=時間で死ぬ", "上位系増強で10年2ヶ月(ゲート根拠)"),
-    ("中国", "－", "東広島654(1129)", "高圧", "未読(PW付PDF)", "未読", "−", "−", "PW付未読"),
     ("中部", "小屋名変電所", "関市小屋名(B646G)", "高圧", "620万円+保証金31万", "入金後18ヶ月", "配電線増強", "中部の増強系は遅い", "負担金620万・18ヶ月(増強)"),
     ("中部", "柏原変電所", "信濃町柏原2390-1", "高圧", "850万円+保証金42.5万", "入金後6ヶ月", "新設48m+引込105m", "軽微工事なら中部でも速い", "850万・6ヶ月(新設48m)/同F21野尻は1,782万・24ヶ月"),
     ("中部", "柏原変電所", "信濃町野尻(契約申込=確定)", "1,998kW", "1,782万円(税抜)", "入金後24ヶ月", "電柱5本+新設1,842m+SVR取替", "新設km級は高額長期", "(同上メモ参照)"),
@@ -222,4 +224,17 @@ def results_key(area, name):
     return f"{area}{(name or '').strip()}"
 
 
-RESULTS_MEMO = {results_key(r[0], r[1]): r[8] for r in RESULTS_DB}
+# 接続検討回答 検証一覧からの取込分（scripts/import_connection_results.py で生成）。
+# 手入力の RESULTS_DB の後ろに追加する。ファイルが無ければ手入力分のみ。
+IMPORTED_RESULTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     "..", "data", "connection_results.json")
+RESULTS_MANUAL_COUNT = len(RESULTS_DB)
+if os.path.exists(IMPORTED_RESULTS_PATH):
+    with open(IMPORTED_RESULTS_PATH, encoding="utf-8") as _f:
+        RESULTS_DB = RESULTS_DB + [tuple(r) for r in json.load(_f)["records"]]
+
+# 同じ変電所に複数の回答があるときは要約を「／」でつなぐ
+RESULTS_MEMO = {}
+for _r in RESULTS_DB:
+    _k = results_key(_r[0], _r[1])
+    RESULTS_MEMO[_k] = f"{RESULTS_MEMO[_k]} ／ {_r[8]}" if _k in RESULTS_MEMO else _r[8]

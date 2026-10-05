@@ -390,10 +390,10 @@ details.foldable[open] > summary::before { content:'▾ '; }
 </details>
 
 <details class="card foldable">
-  <summary>接続検討回答の実績DB（このスコアの校正元）</summary>
+  <summary>接続検討回答の実績DB（<span id="rescount"></span>）</summary>
   <div class="tbl-scroll">
     <table class="def-tbl">
-      <thead><tr><th>エリア</th><th>変電所名</th><th>案件</th><th>負担金</th><th>連系工期</th><th>主な対策工事</th><th>教訓</th></tr></thead>
+      <thead><tr><th>エリア</th><th>変電所名</th><th>案件</th><th>負担金</th><th>連系工期</th><th>主な対策工事</th><th>教訓・律速</th></tr></thead>
       <tbody id="resbody"></tbody>
     </table>
   </div>
@@ -416,9 +416,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// ── 実績DB（エリア＋変電所名 で引き当て）──
+// ── 実績DB（エリア＋変電所名 で引き当て。同じ変電所の回答が複数あれば全件）──
 const MEMO = {};
-if (D) D.results.forEach(r => { MEMO[r[0] + String(r[1]).trim()] = r; });
+if (D) D.results.forEach(r => { (MEMO[r[0] + String(r[1]).trim()] ||= []).push(r); });
 
 // ── 距離（Haversine・地球半径6371.0088km）──
 function distanceM(lat1, lon1, lat2, lon2) {
@@ -564,7 +564,7 @@ function render(hits, ctx) {
         <div class="ss-meta">${esc(area(row))}${val(row, 'pref') ? ' / ' + esc(val(row, 'pref')) : ''}
           ${val(row, 'vmax') != null ? ' ・ ' + val(row, 'vmax') + 'kV' : ''}
           ${val(row, 'vsec') != null ? '→' + val(row, 'vsec') + 'kV' : ''}</div>
-        ${memo ? `<span class="memo-tag">実績: ${esc(memo[8])}</span>` : ''}
+        ${memo ? memo.map(m => `<span class="memo-tag">実績: ${esc(m[8])}</span>`).join('<br>') : ''}
       </td>
       <td class="num">${fmtDist(h.dist)}</td>
       <td class="num">${h.s7}</td>
@@ -618,9 +618,9 @@ function detailHtml(h) {
       <dt>所在地(参考)</dt><dd>${esc(val(row, 'addr') || '—')}</dd>
     </dl>`;
 
-  const memoHtml = memo ? `<div class="detail-note"><b>この変電所の接続検討 実績</b>：
-      ${esc(memo[2])}／出力${esc(memo[3])}／負担金 ${esc(memo[4])}／工期 ${esc(memo[5])}／対策 ${esc(memo[6])}
-      <br>教訓: ${esc(memo[7])}</div>` : '';
+  const memoHtml = memo ? memo.map(m => `<div class="detail-note"><b>この変電所の接続検討 実績</b>：
+      ${esc(m[2])}／出力${esc(m[3])}／負担金 ${esc(m[4])}／工期 ${esc(m[5])}／対策 ${esc(m[6])}
+      <br>教訓・律速: ${esc(m[7])}</div>`).join('') : '';
 
   const gateHtml = rank(row) === '除外'
     ? `<div class="detail-note" style="border-color:var(--fail);color:var(--fail)">
@@ -701,6 +701,9 @@ function renderStatic() {
   $('resbody').innerHTML = D.results.map(r =>
     `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[4])}</td>
       <td>${esc(r[5])}</td><td>${esc(r[6])}</td><td>${esc(r[7])}</td></tr>`).join('');
+  const nImp = D.results.length - D.resultsManual;
+  $('rescount').textContent = `${D.results.length}件：手入力${D.resultsManual}件＝スコアの校正元／` +
+    `接続検討回答 検証一覧から取込${nImp}件＝AI読取値のため判断前に原本確認`;
   $('analysislist').innerHTML = D.analysisNotes.map(n => `<li>${esc(n)}</li>`).join('');
 
   const noCoord = D.meta.total - D.meta.withCoords;

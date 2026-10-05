@@ -32,7 +32,8 @@ from openpyxl.formatting.rule import FormulaRule
 from openpyxl.utils import get_column_letter
 
 from substation_scoring import (
-    AREA_POINTS, ANALYSIS_NOTES, NOTES, PARAM_ROWS, RESULTS_DB, SCORE_DEFS,
+    AREA_POINTS, ANALYSIS_NOTES, NOTES, PARAM_ROWS, RESULTS_DB, RESULTS_MANUAL_COUNT,
+    RESULTS_MEMO, SCORE_DEFS, results_key,
 )
 
 HEADER_FILL = PatternFill("solid", fgColor="FCE4D6")
@@ -67,6 +68,8 @@ def build_base_sheet(ws):
     for row in SCORE_DEFS:
         r += 1
         for c, v in enumerate(row, 1):
+            if c == 9:  # スコア表は最初の一致行しか引けないため、同じ変電所の要約をまとめて載せる
+                v = RESULTS_MEMO[results_key(row[0], row[1])]
             cell = ws.cell(r, c, v); cell.border = BORDER; cell.alignment = WRAP
 
     # 配点パラメータ（数式の参照元。黄色セルを変えるとスコアリングタブが再計算される）
@@ -135,16 +138,19 @@ def add_rank_counts(ws, start_row, rank_col_range):
 
 def build_results_sheet(ws):
     """実績DBシート。戻り値: (要約列レンジ, キー列レンジ)"""
-    ws["A1"] = "接続検討回答 実績19件（2026-08-06更新。詳細: 接続検討回答_分析メモ_20260724.md＋追加実績メモ20260806）"
+    ws["A1"] = (f"接続検討回答 実績{len(RESULTS_DB)}件（手入力{RESULTS_MANUAL_COUNT}件: 2026-08-06更新／"
+                f"残り{len(RESULTS_DB) - RESULTS_MANUAL_COUNT}件: 接続検討回答 検証一覧から取込・AI読取値のため要原本確認）")
     ws["A1"].font = TITLE_FONT
     headers = ["エリア", "変電所名(リスト表記)", "案件", "出力", "負担金", "連系工期",
-               "主な対策工事", "教訓", "要約(スコア表参照用)", "キー(自動)"]
+               "主な対策工事", "教訓・律速", "要約(スコア表参照用・同じ変電所の回答はまとめて表示)", "キー(自動)"]
     for c, h in enumerate(headers, 1):
         cell = ws.cell(2, c, h)
         cell.fill = HEADER_FILL; cell.font = HDR_FONT; cell.alignment = CENTER; cell.border = BORDER
     for i, row in enumerate(RESULTS_DB):
         r = 3 + i
         for c, v in enumerate(row, 1):
+            if c == 9:  # スコア表は最初の一致行しか引けないため、同じ変電所の要約をまとめて載せる
+                v = RESULTS_MEMO[results_key(row[0], row[1])]
             cell = ws.cell(r, c, v); cell.border = BORDER; cell.alignment = WRAP
         kc = ws.cell(r, 10, f"=A{r}&TRIM(B{r})")
         kc.border = BORDER; kc.font = SMALL
