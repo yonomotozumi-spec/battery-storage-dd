@@ -1,0 +1,153 @@
+<title>Kエナジー案件リスクマップ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+Antique:wght@500;700;900&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: 案件台帳の体裁。サマリー → 案件×リスク区分のマトリクス → 案件カード（高リスク順） */
+:root{
+  --bg:#f3f5f2; --surface:#ffffff; --ink:#1d2621; --muted:#5d6a63; --line:#d6ddd8; --accent:#1f5c4a;
+  --lo:#2f7d55; --lo-bg:#e3f1e8; --md:#9a6a00; --md-bg:#fbf0d2; --hi:#b0322b; --hi-bg:#f8e0dd;
+  --f-display:"Zen Kaku Gothic Antique","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141a17; --surface:#1c2420; --ink:#e4ebe6; --muted:#9aa8a0; --line:#2f3a34; --accent:#7cc4a9;
+  --lo:#7fd1a2; --lo-bg:#1d3427; --md:#e9c063; --md-bg:#3a3018; --hi:#f0948c; --hi-bg:#432220; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a17; --surface:#1c2420; --ink:#e4ebe6; --muted:#9aa8a0; --line:#2f3a34; --accent:#7cc4a9;
+  --lo:#7fd1a2; --lo-bg:#1d3427; --md:#e9c063; --md-bg:#3a3018; --hi:#f0948c; --hi-bg:#432220; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:32px 64px;display:grid;gap:40px}
+a{color:var(--accent)} a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.35}
+h1{font-size:clamp(1.6rem,3.4vw,2.2rem);font-weight:900}
+h2{font-size:1.2rem;font-weight:700;display:flex;gap:10px;align-items:baseline}
+h2 small{font-family:var(--f-body);font-weight:400;font-size:.8rem;color:var(--muted)}
+.eyebrow{font-size:.75rem;letter-spacing:.12em;color:var(--muted);margin:0 0 6px}
+.lead{max-width:68ch;color:var(--muted);margin:10px 0 0}
+.tally{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
+.tally div{display:flex;align-items:baseline;gap:8px;padding:8px 14px;border-radius:6px;background:var(--surface);border:1px solid var(--line)}
+.tally b{font-family:var(--f-num);font-size:1.5rem}
+.tally .hi b{color:var(--hi)} .tally .md b{color:var(--md)} .tally .lo b{color:var(--lo)}
+.status{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+.status div{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.status dt{font-size:.78rem;color:var(--muted)} .status dd{margin:2px 0 0;font-weight:700}
+.status dd span{font-weight:400;color:var(--muted);font-size:.85rem;display:block}
+.tbl{overflow-x:auto;margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{padding:10px 8px;text-align:center;border-bottom:1px solid var(--line);font-size:.85rem}
+thead th{font-weight:700;color:var(--muted);font-size:.78rem;letter-spacing:.04em}
+tbody th{text-align:left;white-space:nowrap} tbody th a{text-decoration:none;color:var(--ink);font-weight:700}
+tbody tr:last-child>*{border-bottom:0}
+.no{font-family:var(--f-num);color:var(--muted);font-size:.75rem;margin-right:8px;font-weight:500}
+.cell,.pill{display:inline-block;min-width:2.6em;padding:2px 8px;border-radius:4px;font-weight:700}
+.cell.lo{color:var(--lo);background:var(--lo-bg)} .cell.md{color:var(--md);background:var(--md-bg)} .cell.hi{color:var(--hi);background:var(--hi-bg)}
+.pill{border-radius:99px;color:var(--surface)} .pill.lo{background:var(--lo)} .pill.md{background:var(--md)} .pill.hi{background:var(--hi)}
+.note{font-size:.8rem;color:var(--muted);margin:8px 0 0}
+.sites{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,500px),1fr));gap:16px;margin-top:14px}
+.site{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px;display:grid;gap:14px;align-content:start;min-width:0}
+.site header{display:flex;gap:14px;align-items:flex-start}
+.sev{flex:none;width:44px;height:44px;border-radius:6px;display:grid;place-items:center;font-family:var(--f-display);font-weight:900;font-size:1.2rem;color:var(--surface)}
+.sev.lo{background:var(--lo)} .sev.md{background:var(--md)} .sev.hi{background:var(--hi)}
+.hd{min-width:0} .site h3{font-size:1.15rem} .addr{margin:2px 0 0;font-size:.85rem;overflow-wrap:anywhere}
+.meta{margin:2px 0 0;font-size:.8rem;color:var(--muted)}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0}
+.facts div{border-top:2px solid var(--line);padding-top:6px;min-width:0}
+.facts dt{font-size:.7rem;color:var(--muted);line-height:1.4} .facts dd{margin:2px 0 0;font-family:var(--f-num);font-size:1rem;font-variant-numeric:tabular-nums}
+.facts small{font-size:.72rem;color:var(--muted)}
+.risks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.risks li{display:grid;grid-template-columns:7.5em 1fr;gap:10px;padding:8px 10px;border-radius:5px;font-size:.86rem;line-height:1.6}
+.risks li.md{background:var(--md-bg)} .risks li.hi{background:var(--hi-bg)}
+.risks .k{font-weight:700} .risks li.md .k{color:var(--md)} .risks li.hi .k{color:var(--hi)}
+.ok{margin:0;font-size:.8rem;color:var(--lo)}
+.next h4{font-size:.85rem;margin-bottom:4px} .next ol{margin:0;padding-left:1.4em;font-size:.86rem}
+.method{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px 20px}
+.method ul{margin:8px 0 0;padding-left:1.2em;font-size:.86rem;max-width:80ch}
+@media (max-width:560px){.facts{grid-template-columns:repeat(2,1fr)} .risks li{grid-template-columns:1fr;gap:2px}}
+</style>
+<div class="wrap">
+<section>
+  <p class="eyebrow">開発案件進捗管理表 v0.05 ／ パートナー：Kエナジー ／ 2026年10月6日時点</p>
+  <h1>Kエナジー持ち込み案件 リスクマップ</h1>
+  <p class="lead">10月1日に起票された特高7案件について、座標をもとに災害ハザード・法規制・地形・輸送・系統を机上で判定しました。赤（高）の項目から現地確認や行政相談を進めてください。</p>
+  <div class="tally"><div class="hi"><b>2</b>件 高リスク</div><div class="md"><b>5</b>件 中リスク</div><div class="lo"><b>0</b>件 低リスク</div></div>
+</section>
+
+<section>
+  <h2>案件リスト上のDD状況</h2>
+  <dl class="status">
+    <div><dt>DD（スクリーニング）</dt><dd>7件すべて「済」<span>各案件にDDチェックシートのリンクあり</span></dd></div>
+    <div><dt>輸送確認</dt><dd>7件すべて「済・判定△」<span>全件ストリートビューなし。北茨城・相馬は「道幅要確認」</span></dd></div>
+    <div><dt>接続検討</dt><dd>7件すべて未着手<span>提出日・回答・負担金の欄が空欄</span></dd></div>
+    <div><dt>地権者・土地種別</dt><dd>7件すべて空欄<span>販売リスト掲載の判断材料が未記入</span></dd></div>
+  </dl>
+</section>
+
+<section>
+  <h2>リスク区分マトリクス <small>高リスク順。セルにカーソルを合わせると根拠が出ます</small></h2>
+  <div class="tbl"><table>
+    <thead><tr><th scope="col" style="text-align:left">案件</th><th scope="col">総合</th><th scope="col">災害ハザード</th><th scope="col">法規制・区域</th><th scope="col">地形・造成</th><th scope="col">輸送・進入路</th><th scope="col">系統（変電所）</th><th scope="col">積雪・気象</th><th scope="col">座標・地番の整合</th></tr></thead>
+    <tbody><tr><th scope="row"><a href="#s1746"><span class="no">1746</span>北茨城</a></th><td><span class="pill hi">高</span></td><td><span class="cell lo" title="浸水・土砂・液状化いずれも該当なし">低</span></td><td><span class="cell md" title="都市計画区域外。花園花貫県立自然公園の境界まで約135m→区域図で確認要">中</span></td><td><span class="cell hi" title="200m内の高低差 約45m（勾配 約22%）。尾根上の地点で造成量が大きい恐れ">高</span></td><td><span class="cell hi" title="最寄道路まで約285m（幅3m未満）。幅3m以上の道路まで約1.2km、幅5.5m以上は1.5km圏内になし">高</span></td><td><span class="cell hi" title="近隣の木皿・手綱・磯原変電所(66kV)はいずれも空容量0（除外ランク）">高</span></td><td><span class="cell lo" title="特記なし">低</span></td><td><span class="cell md" title="座標の位置は「磯原町大塚」地区。住所の「木皿」と地区名が違う→座標と地番の照合が必要">中</span></td></tr><tr><th scope="row"><a href="#s1747"><span class="no">1747</span>伊豆の国</a></th><td><span class="pill hi">高</span></td><td><span class="cell lo" title="該当なし（土砂災害警戒区域「金井辻」まで約390m）">低</span></td><td><span class="cell hi" title="市街化調整区域。国の通知（国都計第7号）で蓄電池が開発許可の対象になり得る→市へ事前相談が必須">高</span></td><td><span class="cell hi" title="200m内の高低差 約46m（勾配 約23%）。丘の上の地点">高</span></td><td><span class="cell md" title="幅3m以上の道路まで約150m、幅5.5m以上まで約580m">中</span></td><td><span class="cell md" title="田方変電所(154kV) 4.6km・N-1電制可。近くの韮山・長岡は空容量0">中</span></td><td><span class="cell lo" title="特記なし">低</span></td><td><span class="cell lo" title="座標と住所の地区名は一致">低</span></td></tr><tr><th scope="row"><a href="#s1745"><span class="no">1745</span>猪苗代</a></th><td><span class="pill md">中</span></td><td><span class="cell lo" title="浸水・土砂・液状化いずれも該当なし">低</span></td><td><span class="cell lo" title="都市計画区域（区域区分なし）・用途地域なし・自然公園外">低</span></td><td><span class="cell lo" title="200m内の高低差 約10m（勾配 約5%）で平坦寄り">低</span></td><td><span class="cell md" title="隣接道路は幅3m未満。幅5.5m以上の道路まで直線 約740m">中</span></td><td><span class="cell md" title="最寄 更科変電所(66kV) 2.0km・スコアC・N-1電制不可・出力制御あり">中</span></td><td><span class="cell hi" title="猪苗代町は多雪地域。垂直積雪量（町の指定値）で架台・コンテナ仕様が変わる">高</span></td><td><span class="cell md" title="座標の位置は「更科」地区。住所の「磐根」と地区名が違う→座標と地番の照合が必要">中</span></td></tr><tr><th scope="row"><a href="#s1751"><span class="no">1751</span>姶良</a></th><td><span class="pill md">中</span></td><td><span class="cell lo" title="該当なし（大規模盛土まで約430m、急傾斜の警戒区域まで約490m）">低</span></td><td><span class="cell lo" title="都市計画区域（区域区分なし）・用途地域なし">低</span></td><td><span class="cell md" title="200m内の高低差 約27m（勾配 約13%）">中</span></td><td><span class="cell hi" title="地点に接する道路がない（最寄道路まで約330m）。進入路の新設や通行権の確保が必要な恐れ">高</span></td><td><span class="cell lo" title="加治木変電所(66kV) 4.9km・空容量 約7MW・スコアB">低</span></td><td><span class="cell lo" title="特記なし（九州エリアの出力制御は別途考慮）">低</span></td><td><span class="cell lo" title="座標と住所の地区名は一致">低</span></td></tr><tr><th scope="row"><a href="#s1749"><span class="no">1749</span>一関・千厩</a></th><td><span class="pill md">中</span></td><td><span class="cell md" title="区域外だが、土砂警戒区域まで約200m・大規模盛土造成地まで約100m・千厩川の浸水想定まで約600m">中</span></td><td><span class="cell lo" title="都市計画区域外・用途地域なし">低</span></td><td><span class="cell md" title="200m内の高低差 約30m（勾配 約15%）">中</span></td><td><span class="cell lo" title="幅5.5m以上の道路まで約40m。国道まで約870m">低</span></td><td><span class="cell md" title="千厩変電所(66kV) 3.8km・スコアC">中</span></td><td><span class="cell md" title="岩手県内陸。積雪・凍結時の搬入に配慮">中</span></td><td><span class="cell lo" title="座標と住所の地区名は一致">低</span></td></tr><tr><th scope="row"><a href="#s1748"><span class="no">1748</span>一関・東山</a></th><td><span class="pill md">中</span></td><td><span class="cell lo" title="該当なし（土砂警戒区域まで約670m、大規模盛土まで約1.1km）">低</span></td><td><span class="cell lo" title="都市計画区域（区域区分なし）・用途地域なし">低</span></td><td><span class="cell md" title="200m内の高低差 約36m（勾配 約18%）">中</span></td><td><span class="cell md" title="隣接道路は幅3m未満。幅5.5m以上の県道まで直線 約760m">中</span></td><td><span class="cell lo" title="東山変電所(66kV) 1.9km・スコアB">低</span></td><td><span class="cell md" title="岩手県内陸。積雪・凍結時の搬入に配慮">中</span></td><td><span class="cell lo" title="座標と住所の地区名は一致">低</span></td></tr><tr><th scope="row"><a href="#s1750"><span class="no">1750</span>相馬</a></th><td><span class="pill md">中</span></td><td><span class="cell lo" title="浸水・土砂・液状化いずれも該当なし">低</span></td><td><span class="cell lo" title="都市計画区域（区域区分なし）・用途地域なし">低</span></td><td><span class="cell md" title="200m内の高低差 約29m（勾配 約15%）">中</span></td><td><span class="cell md" title="隣接道路は幅3m未満。幅5.5m以上まで約730m（常磐道まで約870m）">中</span></td><td><span class="cell md" title="中村変電所(66kV) 4.6km・スコアC。駒ヶ嶺(154kV・N-1可)は10km">中</span></td><td><span class="cell lo" title="特記なし">低</span></td><td><span class="cell lo" title="座標と住所の地区名は一致">低</span></td></tr></tbody>
+  </table></div>
+  <p class="note">総合：「高」が2つ以上で高、「高」が1つか「中」が3つ以上で中、それ以外は低。</p>
+</section>
+
+<section>
+  <h2>案件ごとの詳細</h2>
+  <div class="sites"><article class="site" id="s1746">
+<header><div class="sev hi">高</div><div class="hd"><h3><span class="no">No.1746</span>北茨城</h3><p class="addr">茨城県北茨城市磯原町木皿字下ノ平703</p><p class="meta">東京エリア・特高 ／ <a href="https://www.google.com/maps?q=36.797417,140.678389" target="_blank" rel="noopener">地図</a> ・ <a href="https://maps.gsi.go.jp/#17/36.797417/140.678389/&amp;base=ort&amp;ls=ort&amp;disp=1" target="_blank" rel="noopener">航空写真</a> ・ <a href="https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=36.797417,140.678389&amp;z=15" target="_blank" rel="noopener">ハザード</a></p></div></header>
+<dl class="facts"><div><dt>標高</dt><dd>432<small>m</small></dd></div><div><dt>200m内の高低差</dt><dd>45<small>m</small></dd></div><div><dt>幅5.5m以上の道路まで</dt><dd><small>1.5km圏内なし</small></dd></div><div><dt>最寄り変電所</dt><dd>木皿<small> 3.5km</small></dd></div></dl>
+<ul class="risks"><li class="hi"><span class="k">地形・造成</span><span class="v">200m内の高低差 約45m（勾配 約22%）。尾根上の地点で造成量が大きい恐れ</span></li><li class="hi"><span class="k">輸送・進入路</span><span class="v">最寄道路まで約285m（幅3m未満）。幅3m以上の道路まで約1.2km、幅5.5m以上は1.5km圏内になし</span></li><li class="hi"><span class="k">系統（変電所）</span><span class="v">近隣の木皿・手綱・磯原変電所(66kV)はいずれも空容量0（除外ランク）</span></li><li class="md"><span class="k">法規制・区域</span><span class="v">都市計画区域外。花園花貫県立自然公園の境界まで約135m→区域図で確認要</span></li><li class="md"><span class="k">座標・地番の整合</span><span class="v">座標の位置は「磯原町大塚」地区。住所の「木皿」と地区名が違う→座標と地番の照合が必要</span></li></ul>
+<p class="ok">問題なし：災害ハザード・積雪・気象</p>
+<div class="next"><h4>次にやること</h4><ol><li>座標と地番（木皿703）の照合</li><li>県立自然公園の区域図確認</li><li>約1.2kmの狭い道を通る輸送ルートを現地踏査</li><li>接続検討の前に空容量を確認（近隣は空容量0）</li></ol></div>
+</article><article class="site" id="s1747">
+<header><div class="sev hi">高</div><div class="hd"><h3><span class="no">No.1747</span>伊豆の国</h3><p class="addr">静岡県伊豆の国市浮橋字土澤1600-107</p><p class="meta">中部エリア・特高 ／ <a href="https://www.google.com/maps?q=35.042056,139.005139" target="_blank" rel="noopener">地図</a> ・ <a href="https://maps.gsi.go.jp/#17/35.042056/139.005139/&amp;base=ort&amp;ls=ort&amp;disp=1" target="_blank" rel="noopener">航空写真</a> ・ <a href="https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=35.042056,139.005139&amp;z=15" target="_blank" rel="noopener">ハザード</a></p></div></header>
+<dl class="facts"><div><dt>標高</dt><dd>456<small>m</small></dd></div><div><dt>200m内の高低差</dt><dd>46<small>m</small></dd></div><div><dt>幅5.5m以上の道路まで</dt><dd>577<small>m</small></dd></div><div><dt>最寄り変電所</dt><dd>田方<small> 4.6km</small></dd></div></dl>
+<ul class="risks"><li class="hi"><span class="k">法規制・区域</span><span class="v">市街化調整区域。国の通知（国都計第7号）で蓄電池が開発許可の対象になり得る→市へ事前相談が必須</span></li><li class="hi"><span class="k">地形・造成</span><span class="v">200m内の高低差 約46m（勾配 約23%）。丘の上の地点</span></li><li class="md"><span class="k">輸送・進入路</span><span class="v">幅3m以上の道路まで約150m、幅5.5m以上まで約580m</span></li><li class="md"><span class="k">系統（変電所）</span><span class="v">田方変電所(154kV) 4.6km・N-1電制可。近くの韮山・長岡は空容量0</span></li></ul>
+<p class="ok">問題なし：災害ハザード・積雪・気象・座標・地番の整合</p>
+<div class="next"><h4>次にやること</h4><ol><li>伊豆の国市へ開発許可の事前相談（市街化調整区域）</li><li>丘の上の造成計画（切土・盛土量）を概算</li><li>田方変電所への接続可否を確認</li></ol></div>
+</article><article class="site" id="s1745">
+<header><div class="sev md">中</div><div class="hd"><h3><span class="no">No.1745</span>猪苗代</h3><p class="addr">福島県耶麻郡猪苗代町大字磐根字大谷地4100-29</p><p class="meta">東北エリア・特高 ／ <a href="https://www.google.com/maps?q=37.548778,140.0405" target="_blank" rel="noopener">地図</a> ・ <a href="https://maps.gsi.go.jp/#17/37.548778/140.0405/&amp;base=ort&amp;ls=ort&amp;disp=1" target="_blank" rel="noopener">航空写真</a> ・ <a href="https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=37.548778,140.0405&amp;z=15" target="_blank" rel="noopener">ハザード</a></p></div></header>
+<dl class="facts"><div><dt>標高</dt><dd>544<small>m</small></dd></div><div><dt>200m内の高低差</dt><dd>10<small>m</small></dd></div><div><dt>幅5.5m以上の道路まで</dt><dd>744<small>m</small></dd></div><div><dt>最寄り変電所</dt><dd>更科<small> 2.0km</small></dd></div></dl>
+<ul class="risks"><li class="hi"><span class="k">積雪・気象</span><span class="v">猪苗代町は多雪地域。垂直積雪量（町の指定値）で架台・コンテナ仕様が変わる</span></li><li class="md"><span class="k">輸送・進入路</span><span class="v">隣接道路は幅3m未満。幅5.5m以上の道路まで直線 約740m</span></li><li class="md"><span class="k">系統（変電所）</span><span class="v">最寄 更科変電所(66kV) 2.0km・スコアC・N-1電制不可・出力制御あり</span></li><li class="md"><span class="k">座標・地番の整合</span><span class="v">座標の位置は「更科」地区。住所の「磐根」と地区名が違う→座標と地番の照合が必要</span></li></ul>
+<p class="ok">問題なし：災害ハザード・法規制・区域・地形・造成</p>
+<div class="next"><h4>次にやること</h4><ol><li>座標と地番（磐根4100-29）の照合</li><li>町の垂直積雪量を確認</li><li>県道から約740mの進入ルートを現地で確認</li></ol></div>
+</article><article class="site" id="s1751">
+<header><div class="sev md">中</div><div class="hd"><h3><span class="no">No.1751</span>姶良</h3><p class="addr">鹿児島県姶良市上名字萩峯2186-2</p><p class="meta">九州エリア・特高 ／ <a href="https://www.google.com/maps?q=31.78,130.630667" target="_blank" rel="noopener">地図</a> ・ <a href="https://maps.gsi.go.jp/#17/31.78/130.630667/&amp;base=ort&amp;ls=ort&amp;disp=1" target="_blank" rel="noopener">航空写真</a> ・ <a href="https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=31.78,130.630667&amp;z=15" target="_blank" rel="noopener">ハザード</a></p></div></header>
+<dl class="facts"><div><dt>標高</dt><dd>99<small>m</small></dd></div><div><dt>200m内の高低差</dt><dd>27<small>m</small></dd></div><div><dt>幅5.5m以上の道路まで</dt><dd>557<small>m</small></dd></div><div><dt>最寄り変電所</dt><dd>加治木<small> 4.9km</small></dd></div></dl>
+<ul class="risks"><li class="hi"><span class="k">輸送・進入路</span><span class="v">地点に接する道路がない（最寄道路まで約330m）。進入路の新設や通行権の確保が必要な恐れ</span></li><li class="md"><span class="k">地形・造成</span><span class="v">200m内の高低差 約27m（勾配 約13%）</span></li></ul>
+<p class="ok">問題なし：災害ハザード・法規制・区域・系統（変電所）・積雪・気象・座標・地番の整合</p>
+<div class="next"><h4>次にやること</h4><ol><li>地点に接する道路がない→進入路（通行権・新設）を地権者に確認</li><li>加治木変電所で接続検討を申込</li></ol></div>
+</article><article class="site" id="s1749">
+<header><div class="sev md">中</div><div class="hd"><h3><span class="no">No.1749</span>一関・千厩</h3><p class="addr">岩手県一関市千厩町清田字融実81-6</p><p class="meta">東北エリア・特高 ／ <a href="https://www.google.com/maps?q=38.937056,141.359194" target="_blank" rel="noopener">地図</a> ・ <a href="https://maps.gsi.go.jp/#17/38.937056/141.359194/&amp;base=ort&amp;ls=ort&amp;disp=1" target="_blank" rel="noopener">航空写真</a> ・ <a href="https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=38.937056,141.359194&amp;z=15" target="_blank" rel="noopener">ハザード</a></p></div></header>
+<dl class="facts"><div><dt>標高</dt><dd>139<small>m</small></dd></div><div><dt>200m内の高低差</dt><dd>30<small>m</small></dd></div><div><dt>幅5.5m以上の道路まで</dt><dd>39<small>m</small></dd></div><div><dt>最寄り変電所</dt><dd>千厩<small> 3.8km</small></dd></div></dl>
+<ul class="risks"><li class="md"><span class="k">災害ハザード</span><span class="v">区域外だが、土砂警戒区域まで約200m・大規模盛土造成地まで約100m・千厩川の浸水想定まで約600m</span></li><li class="md"><span class="k">地形・造成</span><span class="v">200m内の高低差 約30m（勾配 約15%）</span></li><li class="md"><span class="k">系統（変電所）</span><span class="v">千厩変電所(66kV) 3.8km・スコアC</span></li><li class="md"><span class="k">積雪・気象</span><span class="v">岩手県内陸。積雪・凍結時の搬入に配慮</span></li></ul>
+<p class="ok">問題なし：法規制・区域・輸送・進入路・座標・地番の整合</p>
+<div class="next"><h4>次にやること</h4><ol><li>盛土造成地・土砂警戒区域との位置関係を現地確認</li><li>千厩変電所で接続検討を申込</li></ol></div>
+</article><article class="site" id="s1748">
+<header><div class="sev md">中</div><div class="hd"><h3><span class="no">No.1748</span>一関・東山</h3><p class="addr">岩手県一関市東山町長坂字南磐井里1-1</p><p class="meta">東北エリア・特高 ／ <a href="https://www.google.com/maps?q=39.009556,141.276444" target="_blank" rel="noopener">地図</a> ・ <a href="https://maps.gsi.go.jp/#17/39.009556/141.276444/&amp;base=ort&amp;ls=ort&amp;disp=1" target="_blank" rel="noopener">航空写真</a> ・ <a href="https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=39.009556,141.276444&amp;z=15" target="_blank" rel="noopener">ハザード</a></p></div></header>
+<dl class="facts"><div><dt>標高</dt><dd>172<small>m</small></dd></div><div><dt>200m内の高低差</dt><dd>36<small>m</small></dd></div><div><dt>幅5.5m以上の道路まで</dt><dd>758<small>m</small></dd></div><div><dt>最寄り変電所</dt><dd>東山<small> 1.9km</small></dd></div></dl>
+<ul class="risks"><li class="md"><span class="k">地形・造成</span><span class="v">200m内の高低差 約36m（勾配 約18%）</span></li><li class="md"><span class="k">輸送・進入路</span><span class="v">隣接道路は幅3m未満。幅5.5m以上の県道まで直線 約760m</span></li><li class="md"><span class="k">積雪・気象</span><span class="v">岩手県内陸。積雪・凍結時の搬入に配慮</span></li></ul>
+<p class="ok">問題なし：災害ハザード・法規制・区域・系統（変電所）・座標・地番の整合</p>
+<div class="next"><h4>次にやること</h4><ol><li>県道から約760mの進入ルート確認</li><li>造成計画の概算</li><li>東山変電所で接続検討を申込</li></ol></div>
+</article><article class="site" id="s1750">
+<header><div class="sev md">中</div><div class="hd"><h3><span class="no">No.1750</span>相馬</h3><p class="addr">福島県相馬市富沢字鳥倉2-1</p><p class="meta">東北エリア・特高 ／ <a href="https://www.google.com/maps?q=37.750556,140.892833" target="_blank" rel="noopener">地図</a> ・ <a href="https://maps.gsi.go.jp/#17/37.750556/140.892833/&amp;base=ort&amp;ls=ort&amp;disp=1" target="_blank" rel="noopener">航空写真</a> ・ <a href="https://disaportal.gsi.go.jp/hazardmap/maps/index.html?ll=37.750556,140.892833&amp;z=15" target="_blank" rel="noopener">ハザード</a></p></div></header>
+<dl class="facts"><div><dt>標高</dt><dd>109<small>m</small></dd></div><div><dt>200m内の高低差</dt><dd>29<small>m</small></dd></div><div><dt>幅5.5m以上の道路まで</dt><dd>730<small>m</small></dd></div><div><dt>最寄り変電所</dt><dd>中村<small> 4.6km</small></dd></div></dl>
+<ul class="risks"><li class="md"><span class="k">地形・造成</span><span class="v">200m内の高低差 約29m（勾配 約15%）</span></li><li class="md"><span class="k">輸送・進入路</span><span class="v">隣接道路は幅3m未満。幅5.5m以上まで約730m（常磐道まで約870m）</span></li><li class="md"><span class="k">系統（変電所）</span><span class="v">中村変電所(66kV) 4.6km・スコアC。駒ヶ嶺(154kV・N-1可)は10km</span></li></ul>
+<p class="ok">問題なし：災害ハザード・法規制・区域・積雪・気象・座標・地番の整合</p>
+<div class="next"><h4>次にやること</h4><ol><li>幅3m未満の進入路の拡幅要否を確認</li><li>接続先（中村／駒ヶ嶺）の比較</li></ol></div>
+</article></div>
+</section>
+
+<section class="method">
+  <h2>判定の根拠と限界</h2>
+  <ul>
+    <li>浸水・土砂・液状化・区域区分・用途地域・自然公園・大規模盛土は、国交省「不動産情報ライブラリ」のデータで座標の地点を判定しました。周辺の区域までの距離は、地点を含む約2km四方の範囲で測っています。</li>
+    <li>道路は国土地理院の道路中心線（1/25,000）の幅員区分から、地点からの直線距離で集計しました。実際の通行ルートの長さ・橋の重量制限・カーブは現地確認が必要です。</li>
+    <li>標高と高低差は国土地理院の標高API（地点と半径100mの8方向）から算出しました。</li>
+    <li>変電所は社内の変電所データ（66kV以上）の空容量・スコアを使っています。接続の可否は接続検討の回答で確定します。</li>
+    <li>農地・森林・鳥獣保護区・埋蔵文化財・景観・騒音・積雪量は自動で判定できないため、各チェックシートで「要確認」としています。</li>
+  </ul>
+</section>
+</div>
