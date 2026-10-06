@@ -76,6 +76,20 @@ tbody tr:last-child>*{border-bottom:0}
 .res{margin:10px 0 0;padding:10px 12px;border-radius:5px;background:var(--bg);font-size:.8rem}
 .res b{color:var(--hi)}
 .sub .tbl{margin-top:0}
+.rank{display:grid;gap:10px;margin-top:14px;counter-reset:none}
+.rk{display:grid;grid-template-columns:3.2em 1fr;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.rk .n{font-family:var(--f-display);font-weight:900;font-size:1.6rem;line-height:1;color:var(--muted);text-align:center}
+.rk .n small{display:block;font-size:.7rem;font-weight:700;margin-top:6px;padding:2px 0;border-radius:4px}
+.rk.A .n{color:var(--accent)} .rk.A .n small{background:var(--lo-bg);color:var(--lo)}
+.rk.B .n small{background:var(--md-bg);color:var(--md)} .rk.C .n small,.rk.X .n small{background:var(--hi-bg);color:var(--hi)}
+.rk.X{opacity:.85}
+.rk h3{font-size:1rem} .rk .head{margin:2px 0 8px;font-size:.88rem}
+.rk .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{font-size:.75rem;padding:1px 8px;border:1px solid var(--line);border-radius:99px;font-family:var(--f-num)}
+.gb{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.82rem}
+.gb ul{margin:0;padding-left:1.1em} .gb h4{font-size:.75rem;margin-bottom:2px;color:var(--muted)}
+.gb .g h4{color:var(--lo)} .gb .b h4{color:var(--hi)}
+@media (max-width:640px){.gb{grid-template-columns:1fr}}
 @media (max-width:560px){.facts{grid-template-columns:repeat(2,1fr)} .risks li{grid-template-columns:1fr;gap:2px}}
 </style>
 <div class="wrap">
@@ -94,6 +108,12 @@ tbody tr:last-child>*{border-bottom:0}
     <div><dt>接続検討</dt><dd>7件すべて未着手<span>提出日・回答・負担金の欄が空欄</span></dd></div>
     <div><dt>地権者・土地種別</dt><dd>7件すべて空欄<span>販売リスト掲載の判断材料が未記入</span></dd></div>
   </dl>
+</section>
+
+<section>
+  <h2>特高としての優先順位 <small>KE特高系統用蓄電池リスト（9/29）の地積・地目と送電線までの距離を加味</small></h2>
+  <p class="lead" style="margin-top:4px">7件中6件は送電線のすぐそばにあり、送電線から直接つなぐ前提の候補地です。違いが出るのは、送電線の電圧と上位系統の混み具合、土地の広さです。</p>
+  <div class="rank"><div class="rk A"><div class="n">1<small>A</small></div><div style="min-width:0"><h3><span class="no">No.1749</span>一関・千厩</h3><p class="head">154kVの送電線まで約14m。土地3.2haの原野で、道路も良い</p><div class="chips"><span class="chip">送電線 154kV・約14m</span><span class="chip">原野 31,759㎡</span><span class="chip">総合リスク 中</span></div><div class="gb"><div class="g"><h4>良い点</h4><ul><li>154kV送電線（2回線）が敷地のすぐ横（約14m）</li><li>3.2haの原野。山林ではないので林地開発の負担が小さい見込み</li><li>幅5.5m以上の道路まで約40mで、7件中いちばん運びやすい</li></ul></div><div class="b"><h4>懸念</h4><ul><li>上位の一関(154kV)は混雑度89%、水沢(275kV)は超過。近くの奥州市では上位系増強の回答が出ている</li><li>土砂警戒区域まで約200m、盛土造成地まで約100m</li></ul></div></div></div></div><div class="rk A"><div class="n">2<small>A</small></div><div style="min-width:0"><h3><span class="no">No.1745</span>猪苗代</h3><p class="head">154kVの送電線まで約26m。平坦で、上位の会津変電所にも余裕あり</p><div class="chips"><span class="chip">送電線 154kV・約26m</span><span class="chip">山林 4,926㎡</span><span class="chip">総合リスク 中</span></div><div class="gb"><div class="g"><h4>良い点</h4><ul><li>154kV送電線（2回線）まで約26m</li><li>上位の会津(154kV)は混雑度47%で、7件中いちばん余裕がある</li><li>高低差10mで平坦。ハザード・法規制も問題なし</li></ul></div><div class="b"><h4>懸念</h4><ul><li>土地が0.49haと狭く、規模は小さめになる</li><li>多雪地域</li><li>座標の位置（更科）と地番（磐根）が合っていない→送電線との距離も座標が前提</li></ul></div></div></div></div><div class="rk B"><div class="n">3<small>B</small></div><div style="min-width:0"><h3><span class="no">No.1748</span>一関・東山</h3><p class="head">154kVの送電線まで約10m（3回線）。千厩と同じ上位系の混雑が課題</p><div class="chips"><span class="chip">送電線 154kV・約10m</span><span class="chip">山林 20,480㎡</span><span class="chip">総合リスク 中</span></div><div class="gb"><div class="g"><h4>良い点</h4><ul><li>154kV送電線まで約10m</li><li>2.0haあり中規模が可能</li></ul></div><div class="b"><h4>懸念</h4><ul><li>上位系の混雑は千厩と同じ（一関・水沢）</li><li>山林2.0haで、1haを超えるため林地開発許可が必要になる可能性が高い</li><li>幅5.5m以上の道路まで約760m</li></ul></div></div></div></div><div class="rk B"><div class="n">4<small>B</small></div><div style="min-width:0"><h3><span class="no">No.1750</span>相馬</h3><p class="head">土地は27haと広いが、近くの送電線は66kVで、上位の駒ヶ嶺は増強待ち</p><div class="chips"><span class="chip">送電線 66kV・約12m</span><span class="chip">山林 269,499㎡</span><span class="chip">総合リスク 中</span></div><div class="gb"><div class="g"><h4>良い点</h4><ul><li>66kV送電線まで約12m</li><li>27haと広く、敷地の取り方に自由度がある</li></ul></div><div class="b"><h4>懸念</h4><ul><li>66kVなので受け入れられる規模に限りがある。中村(66kV)は空容量3MW</li><li>駒ヶ嶺(154kV)は混雑度179%で、154kV新駒線の増強待ち（実績17か月）</li><li>山林27ha→林地開発許可が必要</li></ul></div></div></div></div><div class="rk C"><div class="n">5<small>C</small></div><div style="min-width:0"><h3><span class="no">No.1747</span>伊豆の国</h3><p class="head">66kVの送電線が敷地上空（約2m）を通るが、市街化調整区域で系統にも余裕がない</p><div class="chips"><span class="chip">送電線 66kV・約2m</span><span class="chip">原野 27,058㎡</span><span class="chip">総合リスク 高</span></div><div class="gb"><div class="g"><h4>良い点</h4><ul><li>66kV送電線が敷地の真上（約2m）</li><li>2.7haの原野</li></ul></div><div class="b"><h4>懸念</h4><ul><li>市街化調整区域で開発許可が必要になり得る</li><li>周辺の66kVは空容量0、田方(154kV)は混雑度100%</li><li>丘の上で高低差46m</li></ul></div></div></div></div><div class="rk X"><div class="n">6<small>見送り候補</small></div><div style="min-width:0"><h3><span class="no">No.1751</span>姶良</h3><p class="head">近くに送電線がない（KE表記も「鉄塔無し」）。最寄りの66kVまで約4.4km</p><div class="chips"><span class="chip">送電線 66kV・約4,383m</span><span class="chip">山林 545,133㎡</span><span class="chip">総合リスク 中</span></div><div class="gb"><div class="g"><h4>良い点</h4><ul><li>54haと広い</li><li>加治木(66kV)は空容量7MW・出力制御なし</li></ul></div><div class="b"><h4>懸念</h4><ul><li>最寄りの送電線まで約4.4km（66kV）。220kVは約7km→自前の送電線が長く、費用が大きい</li><li>敷地に接する道路がない</li></ul></div></div></div></div><div class="rk X"><div class="n">7<small>見送り候補</small></div><div style="min-width:0"><h3><span class="no">No.1746</span>北茨城（KE表記：高萩）</h3><p class="head">275kVの送電線まで約13mだが、土地が0.2haしかなく特高には狭すぎる</p><div class="chips"><span class="chip">送電線 275kV・約13m</span><span class="chip">山林 1,983㎡</span><span class="chip">総合リスク 高</span></div><div class="gb"><div class="g"><h4>良い点</h4><ul><li>275kV送電線（2回線）まで約13m</li></ul></div><div class="b"><h4>懸念</h4><ul><li>土地が1,983㎡（約0.2ha）で、275kVの受電設備を置くには狭い</li><li>上位の常磐(275kV)は混雑度114%、近くの66kVも空容量0</li><li>尾根上で道路も遠い（幅3m以上まで約1.2km）</li></ul></div></div></div></div></div>
 </section>
 
 <section>
@@ -178,6 +198,7 @@ tbody tr:last-child>*{border-bottom:0}
     <li>浸水・土砂・液状化・区域区分・用途地域・自然公園・大規模盛土は、国交省「不動産情報ライブラリ」のデータで座標の地点を判定しました。周辺の区域までの距離は、地点を含む約2km四方の範囲で測っています。</li>
     <li>道路は国土地理院の道路中心線（1/25,000）の幅員区分から、地点からの直線距離で集計しました。実際の通行ルートの長さ・橋の重量制限・カーブは現地確認が必要です。</li>
     <li>標高と高低差は国土地理院の標高API（地点と半径100mの8方向）から算出しました。</li>
+    <li>送電線の位置と電圧は OpenStreetMap（OpenInfraMap）のデータです。電圧が未登録の線や、地図に載っていない線があり得ます。送電線ごとの空容量は電力会社の空容量マップで確認が必要です。</li>
     <li>変電所は社内の変電所データ（66kV以上）の空容量・スコアを使っています。接続の可否は接続検討の回答で確定します。</li>
     <li>農地・森林・鳥獣保護区・埋蔵文化財・景観・騒音・積雪量は自動で判定できないため、各チェックシートで「要確認」としています。</li>
   </ul>
