@@ -738,6 +738,57 @@
       "last_verified": "2026-08-22",
       "added": "2026-08-23",
       "resolved": "対象外"
+    },
+    {
+      "id": "pl-009",
+      "level": "市区町村",
+      "pref": "埼玉県",
+      "muni": "熊谷市",
+      "body": "熊谷市",
+      "title": "系統用蓄電池の開発許可制度上の取扱いフロー（事業者向け）",
+      "stage": "検討情報あり",
+      "deadline": null,
+      "url": "https://www.city.kumagaya.lg.jp/about/soshiki/toshi/kaihatsushido/oshirase/tikudenchi-workflow.files/tikudenchi-workflow.pdf",
+      "summary": "市公式サイト上に「令和8年7月現在」の取扱いフローPDF（作成2026-07-30・更新2026-08-04）が存在。検索要約では、危険物数量（指定数量）で第一種特定工作物該当を判定し、市街化調整区域には一律の審査基準が無い旨。PDF本文はWebFetchで文字抽出できず本文未確認。",
+      "why_watch": "公式PDFの存在は確認。本文確認できれば開発許可運用型として台帳収録対象（権者・施行時特例市）。",
+      "source_grade": "二次情報",
+      "last_verified": "2026-10-12",
+      "added": "2026-10-12",
+      "resolved": null
+    },
+    {
+      "id": "pl-010",
+      "level": "都道府県",
+      "pref": "福岡県",
+      "muni": null,
+      "body": "福岡県",
+      "title": "系統用蓄電池の開発許可の取扱い資料（電気事業区分・区域別面積基準）",
+      "stage": "検討情報あり",
+      "deadline": null,
+      "url": "https://www.pref.fukuoka.lg.jp/uploaded/attachment/297143.pdf",
+      "summary": "県サイトのPDF（作成2026-08-12・更新2026-09-04）。検索要約では電気事業法上の事業区分と区域区分ごとの許可要面積が整理されている。PDF本文はWebFetchで抽出できず未確認。8/21調査時は「公表確認できず」だった。",
+      "why_watch": "確認できれば福岡県の開発許可運用として台帳収録対象。",
+      "source_grade": "二次情報",
+      "last_verified": "2026-10-12",
+      "added": "2026-10-12",
+      "resolved": null
+    },
+    {
+      "id": "pl-011",
+      "level": "市区町村",
+      "pref": "栃木県",
+      "muni": "日光市",
+      "body": "日光市",
+      "title": "系統用蓄電池の取扱いフロー（都市計画区域内1,000㎡以上等）",
+      "stage": "検討情報あり",
+      "deadline": null,
+      "url": "https://www.city.nikko.lg.jp/material/files/group/33/03_toriatukaihuro.pdf",
+      "summary": "市サイトのPDF。検索要約では都市計画区域内1,000㎡以上（市条例）・区域外10,000㎡以上が許可対象。PDF本文はWebFetchで抽出できず未確認。栃木県の事務処理市か独自公表か要確認。",
+      "why_watch": "権者外の公表例。確認できれば台帳収録対象。",
+      "source_grade": "二次情報",
+      "last_verified": "2026-10-12",
+      "added": "2026-10-12",
+      "resolved": null
     }
   ]
 }
