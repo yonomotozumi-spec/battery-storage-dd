@@ -122,6 +122,8 @@ select, input[type="text"], input[type="number"] {
 }
 select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(27,85,204,.1); }
 .coord-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ext-row { grid-template-columns:1.4fr 1fr 1fr; }
+.ext-cmp td:first-child { white-space:nowrap; color:var(--txt3); }
 .coord-label { font-size:11px; color:var(--txt3); margin-bottom:3px; }
 .opt-row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; padding-top:5px; }
 .chk { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--txt2); cursor:pointer; }
@@ -400,6 +402,54 @@ details.foldable[open] > summary::before { content:'▾ '; }
   <ul class="plain-list" id="analysislist"></ul>
 </details>
 
+<!-- ── 外部の参考DB（蓄電所ネット bess-net.jp）── -->
+<details class="card foldable" id="ext-card">
+  <summary>外部の参考DB：蓄電所ネット「系統連系診断」「系統空き容量データベース」（bess-net.jp）</summary>
+  <div class="msg" style="padding-bottom:6px">
+    一般社団法人エネルギー情報センター（EIC）が運営する無料・登録不要の外部ツールです。10送配電事業者（東京電力PG含む）の公表データ
+    <b>8,346変電所</b>を収録し、都道府県・出力(MW)・容量(MWh)を入れると連系候補Top5を100点満点で表示します
+    （最終更新 2026-10-12、座標あり1,082件・主に中部）。本ツールの結果を<b>突き合わせるための参照用</b>です。
+    条件を入れて下のリンクを開いてください（候補変電所の内訳にも各変電所を蓄電所ネットで引くリンクがあります）。
+  </div>
+  <div class="frow">
+    <div class="flabel">診断条件<div class="fnote">都道府県は、座標で検索すると最寄り変電所の県に自動で切り替わります</div></div>
+    <div class="fcontrol">
+      <div class="coord-row ext-row">
+        <div><div class="coord-label">都道府県</div><select id="ext-pref"></select></div>
+        <div><div class="coord-label">出力 (MW)</div><input type="number" id="ext-mw" value="12.5" step="0.1" min="0"></div>
+        <div><div class="coord-label">容量 (MWh)</div><input type="number" id="ext-mwh" value="50" step="1" min="0"></div>
+      </div>
+      <div class="detail-links" style="margin-top:8px">
+        <a class="chip" id="ext-link" href="https://bess-net.jp/tools/grid-connection-check" target="_blank" rel="noopener">⚡ この条件で系統連系診断を開く</a>
+        <a class="chip" href="https://bess-net.jp/grid" target="_blank" rel="noopener">🗂 系統空き容量データベース（8,346件）</a>
+        <a class="chip" href="https://bess-net.jp/grid/search" target="_blank" rel="noopener">🔧 詳細検索（エリア・電圧・空容量・N-1）</a>
+        <a class="chip" href="https://bess-net.jp/grid/prefecture" target="_blank" rel="noopener">📍 都道府県別の変電所一覧</a>
+      </div>
+      <span class="fnote" id="ext-url"></span>
+    </div>
+  </div>
+  <div class="tbl-scroll">
+    <table class="def-tbl ext-cmp">
+      <thead><tr><th>項目</th><th>本ツール（変電所スコア検索）</th><th>蓄電所ネット 系統連系診断</th></tr></thead>
+      <tbody>
+        <tr><td>収録</td><td>6,071変電所（66kV以上・10社）</td><td>8,346変電所（10社・東京電力PGは2026年6月から収録）</td></tr>
+        <tr><td>座標</td><td>5,329件（87.8%）。候補地からの直線距離で検索</td><td>1,082件（主に中部）。座標が無い変電所は同じ都道府県内をまとめて検索</td></tr>
+        <tr><td>空容量の見方</td><td>「上位系考慮」を優先。≦0かつN-1電制不可は<b>ゲート除外</b></td><td>「当該設備」の空容量÷出力の比率で加点（1.5倍+30／1.0倍+20／0.5倍+10）。上位系の制約・ゲートは無い</td></tr>
+        <tr><td>距離</td><td>S7 近接（20点）: 500m以下20〜5km以下4</td><td>5km未満+25／10km未満+15／20km未満+5（座標がある変電所のみ）。距離不明は同県+5</td></tr>
+        <tr><td>N-1電制／出力制御／電圧</td><td>可+10／「なし」+5／二次≦7kV+10</td><td>可+15／リスク低+10／一次・二次とも明示+10</td></tr>
+        <tr><td>前提規模</td><td>高圧2MW（配点は接続検討回答12件で校正）</td><td>入力した出力・容量（例: 12.5MW／50MWh）</td></tr>
+        <tr><td>判定</td><td>総合ランク S／A／B／C、ゲート除外</td><td>≧70 連系可能性高／≧50 あり／≧30 困難／&lt;30 個別協議必須</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul class="plain-list">
+    <li><b>読み方</b>: 蓄電所ネットは当該設備の空容量だけで点数を付けるため、上位系の空きが0の変電所（例: 北海道の旭川中央は当該設備20MW・上位系考慮0MW・N-1不可）でも「連系可能性あり」と出ます。本ツールではゲート除外です。蓄電所ネットの点数は必ず本ツールの「空容量(上位系考慮)」と併せて見てください。</li>
+    <li><b>秋田県・12.5MW／50MWhの例</b>（2026-10-13時点）: 蓄電所ネットのTop5は 横手・花輪・角館・牛島・御所野（いずれも45点「連系困難」、出力制御あり）。本ツールでは 花輪・角館・牛島＝A（系統48点）、横手＝B（43点）、御所野は154kVの行しかなく空容量未公表です。本ツールの秋田県上位は 南通・大川反（A・58点）で、蓄電所ネットが空容量≧出力×1.5（12.5MW×1.5＝18.75MW）の変電所を優先するため順位が入れ替わります。</li>
+    <li><b>データ時点</b>: 蓄電所ネットの各変電所ページに「公表○年○月○日時点（当サイト取込○月○日）」が出ます（例: 東北は公表2026/07/03時点・取込2026/08/16）。本ツールの元データと公表時点が違えば空容量の値もずれるので、差があるときは送配電事業者の最新の公表値で確認してください。</li>
+    <li>蓄電所ネットの診断結果も公表データに基づく参考情報で、連系可否・空容量は接続検討の申込で確定します。</li>
+  </ul>
+</details>
+
 <p class="disclaimer" id="disclaimer"></p>
 
 </div><!-- /wrap -->
@@ -442,6 +492,41 @@ const rkClass = r => ({ S: 'rk-S', A: 'rk-A', B: 'rk-B', C: 'rk-C' }[r] || (r ==
 const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
 const fmtNum = v => v == null ? '—' : String(v);
 const gmaps = (la, lo) => `https://www.google.com/maps?q=${la},${lo}`;
+
+// ── 外部の参考DB（蓄電所ネット bess-net.jp）へのリンク ──
+// 系統連系診断は ?pref=都道府県&mw=出力&mwh=容量 で条件付きのURLを受け付ける
+// （例: https://bess-net.jp/tools/grid-connection-check?pref=秋田県&mw=12.5&mwh=50）。
+const BESS_TOOL = 'https://bess-net.jp/tools/grid-connection-check';
+const BESS_SEARCH = 'https://bess-net.jp/grid/search';
+function extMw() { const v = parseFloat($('ext-mw').value); return isFinite(v) && v > 0 ? v : 12.5; }
+function extMwh() { const v = parseFloat($('ext-mwh').value); return isFinite(v) && v > 0 ? v : 50; }
+function bessToolUrl(pref) {
+  const q = new URLSearchParams();
+  if (pref) q.set('pref', pref);
+  q.set('mw', extMw()); q.set('mwh', extMwh());
+  return `${BESS_TOOL}?${q.toString()}`;
+}
+// 蓄電所ネットの名称検索は部分一致。東北などは「横手」のように施設種別を付けずに登録されて
+// いるため、末尾の「変電所」「開閉所」などを落として検索する。
+function bessSearchUrl(name) {
+  const short = String(name || '').replace(/[（(].*?[）)]/g, '').replace(/(変電所|開閉所|変換所|送電所)$/, '').trim();
+  return `${BESS_SEARCH}?q=${encodeURIComponent(short || name || '')}`;
+}
+function bessShortName(name) {
+  return String(name || '').replace(/[（(].*?[）)]/g, '').replace(/(変電所|開閉所|変換所|送電所)$/, '').trim() || String(name || '');
+}
+function updateExtLink() {
+  const pref = $('ext-pref').value;
+  const url = bessToolUrl(pref);
+  $('ext-link').href = url;
+  $('ext-link').textContent = `⚡ ${pref || '都道府県未指定'}・${extMw()}MW／${extMwh()}MWh で系統連系診断を開く`;
+  $('ext-url').textContent = url;
+}
+function setExtPref(pref) {
+  if (!pref) return;
+  const sel = $('ext-pref');
+  if ([...sel.options].some(o => o.value === pref)) { sel.value = pref; updateExtLink(); }
+}
 
 // ── 座標のパース（「35.1, 139.4」/ GoogleマップURL）──
 function parseCoords(text) {
@@ -589,6 +674,8 @@ function render(hits, ctx) {
   $('tbl-empty').textContent = '該当する変電所がありません。検索範囲を広げるか、フィルタを外してください。';
 
   renderNoCoord(near ? area(near.row) : null, near ? val(near.row, 'pref') : null);
+  // 外部参照（蓄電所ネット）の診断条件を最寄り変電所の都道府県に合わせる
+  if (near) setExtPref(val(near.row, 'pref'));
 }
 
 function detailHtml(h) {
@@ -663,6 +750,8 @@ function detailHtml(h) {
         <a class="chip" href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">📍 変電所をGoogleマップで見る</a>
         <a class="chip" href="https://maps.gsi.go.jp/#15/${val(row, 'lat')}/${val(row, 'lon')}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>
         <a class="chip" href="https://www.google.com/maps/dir/?api=1&origin=${$('lat').value},${$('lon').value}&destination=${val(row, 'lat')},${val(row, 'lon')}" target="_blank" rel="noopener">🚗 候補地からのルート</a>
+        <a class="chip" href="${bessSearchUrl(val(row, 'name'))}" target="_blank" rel="noopener">🔎 蓄電所ネットで「${esc(bessShortName(val(row, 'name')))}」を検索</a>
+        ${val(row, 'pref') ? `<a class="chip" href="${bessToolUrl(val(row, 'pref'))}" target="_blank" rel="noopener">⚡ 蓄電所ネット 系統連系診断（${esc(val(row, 'pref'))}・${extMw()}MW／${extMwh()}MWh）</a>` : ''}
       </div>
     </div>`;
 }
@@ -712,7 +801,17 @@ function renderStatic() {
     `元データ: ${esc(D.meta.source)}（生成 ${esc(D.meta.generated)}）。スコア定義は substation_scoring.py と共通で、xlsx版と同じ配点です。<br>` +
     `<b>制約</b>: 座標が未取得の${noCoord.toLocaleString()}件は距離判定の対象外です（送配電事業者の公表データには載っているが座標が取れていない変電所）。` +
     `高スコアの変電所はこちらに多く含まれるため、上の「同エリアの高スコア変電所」も必ず確認してください。<br>` +
-    `本ツールは事前スクリーニング用の簡易評価です。空容量は特高側の公表値であり、高圧連系の可否・負担金・工期の確定は接続検討の申込によってのみ行えます。`;
+    `本ツールは事前スクリーニング用の簡易評価です。空容量は特高側の公表値であり、高圧連系の可否・負担金・工期の確定は接続検討の申込によってのみ行えます。<br>` +
+    `<b>外部の参考DB</b>: 蓄電所ネット（bess-net.jp）の<a href="${BESS_TOOL}" target="_blank" rel="noopener">系統連系診断</a>・` +
+    `<a href="https://bess-net.jp/grid" target="_blank" rel="noopener">系統空き容量データベース</a>（10社8,346変電所、2026-10-12更新）で同じ変電所を引けます（上の「外部の参考DB」参照）。`;
+
+  // 外部参照（蓄電所ネット）の都道府県プルダウン: 本DBにある都道府県を件数順に並べる
+  const prefCount = {};
+  D.rows.forEach(r => { const p = val(r, 'pref'); if (p) prefCount[p] = (prefCount[p] || 0) + 1; });
+  const prefs = Object.keys(prefCount).sort((a, b) => prefCount[b] - prefCount[a] || a.localeCompare(b, 'ja'));
+  $('ext-pref').innerHTML = prefs.map(p => `<option value="${esc(p)}">${esc(p)}（${prefCount[p]}件）</option>`).join('');
+  setExtPref(prefs.includes('秋田県') ? '秋田県' : prefs[0]);
+  updateExtLink();
 }
 
 // ── 初期化 ──
@@ -743,6 +842,7 @@ function init() {
   ['radius', 'sortby', 'f-gate', 'f-nodata'].forEach(id => $(id).addEventListener('change', () => {
     if ($('result').classList.contains('show')) run();
   }));
+  ['ext-pref', 'ext-mw', 'ext-mwh'].forEach(id => $(id).addEventListener('input', updateExtLink));
 
   // URLパラメータ（index.html からの引き継ぎ）
   const q = new URLSearchParams(location.search);
