@@ -44,15 +44,27 @@
 APIキーの秘匿とCORSの都合上、API取得はスクリプト側（`reinfolib_judge.py`）で行い、Web画面はその結果JSONを読み込む方式です。
 
 1. Webツールに**緯度経度を入力**する
-2. 取得URLを生成し、GeoJSONを取得してから判定JSON（values.json）を出力する
+2. APIキーを環境変数に入れて `run` を実行する（GeoJSONの取得と判定を一度に行い、values.json を出力）
 
 ```bash
-# ① 取得URLを一覧化（reinfolibのAPIキーが必要）
+export REINFOLIB_API_KEY=...        # キーはリポジトリに置かない（保管場所はNotionのナレッジページ）
+python scripts/reinfolib_judge.py run --lat 42.9270 --lon 141.2698 --out values.json
+```
+
+取得と判定を分けたい場合（取得済みGeoJSONを再利用する・ネットワークの無い環境で判定だけ行う）:
+
+```bash
+# ① 取得URLを一覧化（ブラウザで開いて保存する場合）
 python scripts/reinfolib_judge.py urls --lat 42.9270 --lon 141.2698 --key <APIKEY>
-# ② 各URLのGeoJSONを <reinfolibdir>/<コード>.geojson として保存後、点内判定
+# ①' またはAPIから直接取得して <reinfolibdir>/<コード>.geojson に保存
+python scripts/reinfolib_judge.py fetch --lat 42.9270 --lon 141.2698 --dir <reinfolibdir>
+# ② 点内判定（ネットワーク不要）
 python scripts/reinfolib_judge.py judge --lat 42.9270 --lon 141.2698 \
   --dir <reinfolibdir> --out values.json
 ```
+
+APIキーが無効なときは `HTTP 401/403` で止まります（キーそのものは出力しません）。取得に失敗した
+レイヤは values.json の `missing` に入り、該当項目は手入力のままになります。
 
 3. Web画面の **B. 許認可事前確認 → 「📥 自動判定JSONを読込」** で `values.json` を選択すると、
    対象7項目のプルダウンが座標判定に応じて自動セットされ、検出値がインラインで表示されます
