@@ -404,7 +404,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <span class="card-note">候補地の座標が無くても使えます</span>
   </div>
   <div class="frow">
-    <div class="flabel">地域<div class="fnote">市区町村は変電所の座標から国土地理院の住所変換で求めています（座標が無い変電所は空欄）</div></div>
+    <div class="flabel">地域<div class="fnote">都道府県・市区町村は変電所の座標から国土地理院の住所変換で求めた所在地です（座標が無い変電所は元リストの都道府県のみ）</div></div>
     <div class="fcontrol">
       <div class="coord-row list-row">
         <div><div class="coord-label">エリア</div><select id="l-area"></select></div>
@@ -645,8 +645,10 @@ const memoOf = row => MEMO[area(row) + String(val(row, 'name')).trim()] || null;
 // 上位系の空容量が公表されているか。未公表の変電所は当該設備の空容量で代用して採点しているため、
 // 上位系の増強リスクを見ていない（中部・四国・東北・北陸・沖縄に多い）
 const upChecked = row => val(row, 'availUp') != null;
-// 元リストの都道府県が空の行は、座標から引いた都道府県で補う
-const prefOf = row => val(row, 'pref') || val(row, 'gpref') || '';
+// 所在地の都道府県。座標から引いた都道府県を優先する。元リストの都道府県は管轄の区分らしく、
+// 実際の所在地と違う行がある（例: 上野変電所が「埼玉県」、気仙沼市の鹿折変電所が「岩手県」）。
+// 座標が無い行は元リストの値を使う
+const prefOf = row => val(row, 'gpref') || val(row, 'pref') || '';
 const muniOf = row => val(row, 'muni') || '';
 const hasData = row => val(row, 'availUp') != null || val(row, 'availCur') != null;
 const effCap = row => val(row, 'availUp') != null ? val(row, 'availUp') : val(row, 'availCur');
@@ -898,7 +900,8 @@ function renderNoCoord(areaName, pref) {
 // ── CSV出力 ──
 const CSV_COLS = [
   ['No.', r => val(r, 'no')], ['エリア', r => area(r)], ['変電所名', r => val(r, 'name')],
-  ['都道府県', r => prefOf(r)], ['市区町村', r => muniOf(r)], ['最大電圧kV', r => val(r, 'vmax')], ['二次電圧kV', r => val(r, 'vsec')],
+  ['都道府県', r => prefOf(r)], ['市区町村', r => muniOf(r)],
+  ['元リストの都道府県', r => val(r, 'pref')], ['最大電圧kV', r => val(r, 'vmax')], ['二次電圧kV', r => val(r, 'vsec')],
   ['系統スコア(80)', r => val(r, 'grid')], ['系統ランク', r => rank(r)],
   ['上位系の確認', r => !hasData(r) ? '空容量データ無し' : upChecked(r) ? '確認済み' : '未確認(当該設備で代用)'],
   ['空容量_上位系MW', r => val(r, 'availUp')], ['空容量_当該MW', r => val(r, 'availCur')],

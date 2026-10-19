@@ -42,8 +42,9 @@ def load(path):
         rec = {k: g(k) for k in d["fields"]}
         for k in ("area", "acc", "n1", "curtail", "rank"):
             rec[k] = d["dict"][k][row[f[k]]]
-        # 元リストの都道府県が空なら、座標から引いた都道府県で補う
-        rec["prefAny"] = rec.get("pref") or rec.get("gpref") or ""
+        # 所在地の都道府県は座標から引いたものを優先する。元リストの都道府県は管轄の区分らしく、
+        # 実際の所在地と違う行がある（例: 上野変電所が「埼玉県」）。座標が無い行は元リストの値
+        rec["prefAny"] = rec.get("gpref") or rec.get("pref") or ""
         rec["memo"] = " / ".join(memo.get(rec["area"] + str(rec["name"]).strip(), []))
         out.append(rec)
     return d["meta"], out
@@ -71,6 +72,7 @@ def blank(v):
 COLUMNS = [
     ("No.", lambda r: r["no"]), ("エリア", lambda r: r["area"]), ("変電所名", lambda r: r["name"]),
     ("都道府県", lambda r: r["prefAny"]), ("市区町村", lambda r: r.get("muni")),
+    ("元リストの都道府県", lambda r: r.get("pref")),
     ("最大電圧kV", lambda r: r["vmax"]), ("二次電圧kV", lambda r: r["vsec"]),
     ("系統スコア(80)", lambda r: r["grid"]), ("系統ランク", lambda r: r["rank"]),
     ("上位系の確認", up_label),
