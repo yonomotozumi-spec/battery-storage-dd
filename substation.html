@@ -189,6 +189,29 @@ select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(2
 .btn-sub:hover { background:var(--surf2); }
 .btn-sub:disabled { border-color:var(--bdr); color:var(--txt3); cursor:not-allowed; }
 .list-row { grid-template-columns:repeat(3,1fr); }
+.mode-tabs { display:flex; gap:8px; margin:0 0 14px; flex-wrap:wrap; }
+.mode-tab {
+  flex:1 1 220px; padding:12px 14px; border:1px solid var(--bdr); border-radius:var(--r); background:var(--surf);
+  color:var(--txt2); font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; text-align:left;
+}
+.mode-tab small { display:block; font-size:11px; font-weight:400; color:var(--txt3); margin-top:2px; }
+.mode-tab[aria-selected="true"] { border-color:var(--acc); color:var(--acc); box-shadow:0 0 0 2px rgba(27,85,204,.15); }
+.pref-tools { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; }
+.pref-grid { display:grid; gap:6px; }
+.pref-area { display:grid; grid-template-columns:110px 1fr; gap:6px 10px; align-items:start;
+  padding:6px 0; border-top:1px dashed var(--bdr); }
+.pref-area:first-child { border-top:none; }
+.pref-area-name { font-size:12px; font-weight:700; color:var(--txt2); padding-top:3px; }
+.pref-area-name label { cursor:pointer; display:flex; gap:5px; align-items:center; }
+.pref-list { display:flex; flex-wrap:wrap; gap:4px 12px; }
+.pref-list .chk { font-size:12px; }
+.pref-list .cnt { color:var(--txt3); font-size:10.5px; }
+.pref-summary { font-size:12px; color:var(--txt2); margin-top:8px; line-height:1.5; }
+.btn-main {
+  padding:9px 18px; border:none; border-radius:var(--r); background:var(--acc); color:#fff;
+  font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+}
+.btn-main:hover { background:var(--acc-h); }
 .tbl-links a { color:var(--link); text-decoration:none; font-size:11px; white-space:nowrap; }
 .tbl-links a:hover { text-decoration:underline; }
 
@@ -236,6 +259,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
   .frow{grid-template-columns:1fr;gap:5px;} .flabel{padding-top:0;}
   .coord-row{grid-template-columns:1fr;}
   .list-row{grid-template-columns:1fr;}
+  .pref-area{grid-template-columns:1fr;}
   .sum-grid{grid-template-columns:1fr;}
   .detail-in{grid-template-columns:1fr;}
 }
@@ -256,8 +280,16 @@ details.foldable[open] > summary::before { content:'▾ '; }
   <a class="head-link" id="dd-link" href="index.html">DDチェックシートへ →</a>
 </header>
 
+<!-- ── 使い方の切り替え ── -->
+<div class="mode-tabs" role="tablist">
+  <button class="mode-tab" role="tab" id="tab-loc" aria-selected="true">📍 場所から検索
+    <small>候補地の緯度経度から、近くの変電所を総合スコア順に</small></button>
+  <button class="mode-tab" role="tab" id="tab-pref" aria-selected="false">🗾 都道府県から一覧・CSV
+    <small>都道府県を選んで（複数可）、S/Aなど良い変電所や全変電所をCSVに</small></button>
+</div>
+
 <!-- ── 入力 ── -->
-<div class="card">
+<div class="card" id="loc-card">
   <div class="card-head">
     <span class="sec-tag">Input</span>
     <span class="card-title">候補地の座標</span>
@@ -400,27 +432,38 @@ details.foldable[open] > summary::before { content:'▾ '; }
 <div class="card" id="list-card">
   <div class="card-head">
     <span class="sec-tag">List</span>
-    <span class="card-title">良質な変電所を条件で一覧・CSV出力</span>
+    <span class="card-title">都道府県から変電所を一覧・CSV出力</span>
     <span class="card-note">候補地の座標が無くても使えます</span>
   </div>
   <div class="frow">
-    <div class="flabel">地域<div class="fnote">都道府県・市区町村は変電所の座標から国土地理院の住所変換で求めた所在地です（座標が無い変電所は元リストの都道府県のみ）</div></div>
+    <div class="flabel">① 都道府県<div class="fnote">複数選べます。何も選ばなければ全国が対象です。<br>都道府県は変電所の座標から求めた所在地です（座標が無い変電所は元リストの都道府県）</div></div>
     <div class="fcontrol">
-      <div class="coord-row list-row">
-        <div><div class="coord-label">エリア</div><select id="l-area"></select></div>
-        <div><div class="coord-label">都道府県</div><select id="l-pref"></select></div>
-        <div><div class="coord-label">市区町村</div><select id="l-muni"></select></div>
+      <div class="pref-tools">
+        <button class="btn-sub" type="button" id="l-pref-all">全国すべて選ぶ</button>
+        <button class="btn-sub" type="button" id="l-pref-none">選択をすべて外す</button>
       </div>
-      <div style="margin-top:8px">
-        <div class="coord-label">地域・名前で検索（部分一致。カンマ区切りで複数可）</div>
-        <input type="text" id="l-word" placeholder="例: 横手市, 大仙市 ／ 横手 ／ 十勝">
-      </div>
+      <div class="pref-grid" id="l-prefs"></div>
+      <div class="pref-summary" id="l-pref-summary"></div>
     </div>
   </div>
   <div class="frow">
-    <div class="flabel">系統ランク</div>
+    <div class="flabel">② 変電所の種類</div>
     <div class="fcontrol">
+      <div class="pref-tools">
+        <button class="btn-sub" type="button" id="l-preset-sa">良い変電所（S・A）だけ</button>
+        <button class="btn-sub" type="button" id="l-preset-all">全変電所</button>
+      </div>
       <div class="opt-row" id="l-ranks"></div>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">市区町村・名前<div class="fnote">任意。市区町村は都道府県を1つだけ選んだときに選べます</div></div>
+    <div class="fcontrol">
+      <div class="coord-row">
+        <div><div class="coord-label">市区町村</div><select id="l-muni"></select></div>
+        <div><div class="coord-label">地域・名前で検索（部分一致。カンマ区切りで複数可）</div>
+          <input type="text" id="l-word" placeholder="例: 横手市, 大仙市 ／ 十勝"></div>
+      </div>
     </div>
   </div>
   <div class="frow">
@@ -453,13 +496,13 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
   </div>
   <div class="res-tools">
-    <button class="btn-sub" id="btn-list">一覧を表示</button>
-    <button class="btn-sub" id="btn-csv-list">CSVで保存</button>
+    <button class="btn-main" id="btn-list">一覧を表示</button>
+    <button class="btn-main" id="btn-csv-list">CSVで保存</button>
     <span class="fnote" id="l-count"></span>
   </div>
   <div class="res-tools" style="border-top:none;padding-top:0">
     <span class="fnote">システムが毎月自動で作る都道府県別CSV（全ランク・系統スコア順）:</span>
-    <a class="chip" id="l-prefcsv" href="exports/全国_SA.csv">📥 全国のS/A</a>
+    <span id="l-prefcsv"><a class="chip" href="exports/全国_SA.csv">📥 全国のS/A</a></span>
     <a class="chip" href="https://github.com/yonomotozumi-spec/battery-storage-dd/tree/main/exports" target="_blank" rel="noopener">🗂 都道府県別CSVの一覧</a>
   </div>
   <div class="tbl-scroll" id="l-wrap" style="display:none">
@@ -665,6 +708,7 @@ function run() {
     alert('緯度・経度を入力してください（10進法）。');
     return;
   }
+  setMode('loc');
   const radius = parseInt($('radius').value, 10);
   const showGate = $('f-gate').checked;
   const showNoData = $('f-nodata').checked;
@@ -943,15 +987,24 @@ function csvNear() {
   downloadCsv(`substations_near_${lat}_${lon}_${today()}.csv`, header, lines);
 }
 
+// 都道府県（JISコード順）。エリアごとのまとまりは、各県の変電所が最も多いエリアで決める
+const PREF_ORDER = ['北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県', '茨城県', '栃木県', '群馬県',
+  '埼玉県', '千葉県', '東京都', '神奈川県', '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+  '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県', '鳥取県', '島根県',
+  '岡山県', '広島県', '山口県', '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県', '熊本県',
+  '大分県', '宮崎県', '鹿児島県', '沖縄県'];
+const NO_PREF = '都道府県不明';
+const prefKey = row => prefOf(row) || NO_PREF;
+const selectedPrefs = () => [...document.querySelectorAll('#l-prefs input[data-pref]:checked')].map(i => i.dataset.pref);
+
 // 条件で絞り込み（座標不要）
 function listFilter() {
-  const ar = $('l-area').value, pf = $('l-pref').value, mu = $('l-muni').value, up = $('l-up').value;
+  const pset = new Set(selectedPrefs()), mu = $('l-muni').value, up = $('l-up').value;
   const words = $('l-word').value.split(/[,、，\s]+/).map(w => w.trim()).filter(Boolean);
   const ranks = [...document.querySelectorAll('#l-ranks input:checked')].map(i => i.value);
   const minCap = parseFloat($('l-mincap').value);
   const out = D.rows.filter(r => {
-    if (ar && area(r) !== ar) return false;
-    if (pf && prefOf(r) !== pf) return false;
+    if (pset.size && !pset.has(prefKey(r))) return false;
     if (mu && muniOf(r) !== mu) return false;
     if (words.length && !words.some(w => [area(r), prefOf(r), muniOf(r), val(r, 'name'), val(r, 'addr') || '']
       .some(h => String(h).includes(w)))) return false;
@@ -1004,44 +1057,91 @@ function csvList() {
   $('l-count').textContent = listCountText(list) + '　→ CSVに保存しました';
   const ranks = [...document.querySelectorAll('#l-ranks input:checked')].map(i => i.value)
     .map(r => ({ 'データ無': 'nodata', '除外': 'gated' }[r] || r)).join('');
-  const label = [ranks, { all: '', ok: 'upOK', ng: 'upNG' }[$('l-up').value]].filter(Boolean).join('_');
+  const np = selectedPrefs().length;
+  const label = [np ? `${np}pref` : 'all', ranks, { all: '', ok: 'upOK', ng: 'upNG' }[$('l-up').value]]
+    .filter(Boolean).join('_');
   downloadCsv(`substations_${label}_${today()}.csv`, CSV_COLS.map(c => c[0]),
     list.map(r => CSV_COLS.map(c => c[1](r))));
 }
 
 function initList() {
-  $('l-area').innerHTML = '<option value="">すべて</option>' +
-    D.dict.area.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
-  const fillMunis = () => {
-    const ar = $('l-area').value, pf = $('l-pref').value, cnt = {};
-    D.rows.forEach(r => {
-      const m = muniOf(r);
-      if (m && (!ar || area(r) === ar) && (!pf || prefOf(r) === pf)) cnt[m] = (cnt[m] || 0) + 1;
+  // 都道府県のチェックボックスを、エリアごとにまとめて並べる
+  const cnt = {}, areaVotes = {};
+  D.rows.forEach(r => {
+    const p = prefKey(r);
+    cnt[p] = (cnt[p] || 0) + 1;
+    const v = (areaVotes[p] ||= {});
+    v[area(r)] = (v[area(r)] || 0) + 1;
+  });
+  const mainArea = p => Object.entries(areaVotes[p] || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || 'その他';
+  const prefs = [...PREF_ORDER.filter(p => cnt[p]), ...Object.keys(cnt).filter(p => !PREF_ORDER.includes(p) && p !== NO_PREF)];
+  const groups = [];
+  D.dict.area.forEach(a => {
+    const ps = prefs.filter(p => mainArea(p) === a);
+    if (ps.length) groups.push([a, ps]);
+  });
+  if (cnt[NO_PREF]) groups.push(['その他', [NO_PREF]]);
+  $('l-prefs').innerHTML = groups.map(([a, ps]) => `
+    <div class="pref-area">
+      <div class="pref-area-name"><label><input type="checkbox" data-area="${esc(a)}"> ${esc(a === 'その他' || a === 'J-POWER' ? a : a + 'エリア')}</label></div>
+      <div class="pref-list">${ps.map(p => `<label class="chk"><input type="checkbox" data-pref="${esc(p)}" data-group="${esc(a)}">
+        ${esc(p === NO_PREF ? '都道府県不明（座標なし・元リスト空欄）' : p)}<span class="cnt">${cnt[p]}</span></label>`).join('')}</div>
+    </div>`).join('');
+
+  const syncAreaBoxes = () => {
+    document.querySelectorAll('#l-prefs input[data-area]').forEach(box => {
+      const items = [...document.querySelectorAll(`#l-prefs input[data-group="${box.dataset.area}"]`)];
+      const on = items.filter(i => i.checked).length;
+      box.checked = on === items.length;
+      box.indeterminate = on > 0 && on < items.length;
     });
-    // 都道府県を選ぶまでは件数が多すぎるので、件数順の上位だけでなく全件を五十音順で出す
-    const munis = Object.keys(cnt).sort((a, b) => a.localeCompare(b, 'ja'));
-    $('l-muni').innerHTML = `<option value="">すべて${pf ? '' : '（都道府県を選ぶと絞れます）'}</option>` +
-      munis.map(m => `<option value="${esc(m)}">${esc(m)}（${cnt[m]}件）</option>`).join('');
-    // 選んだ都道府県の、システム生成CSVへのリンク
-    $('l-prefcsv').href = pf ? `exports/${encodeURIComponent(pf)}.csv` : 'exports/全国_SA.csv';
-    $('l-prefcsv').textContent = pf ? `📥 ${pf}の全変電所` : '📥 全国のS/A';
   };
-  const fillPrefs = () => {
-    const ar = $('l-area').value, cnt = {};
-    D.rows.forEach(r => { const p = prefOf(r); if (p && (!ar || area(r) === ar)) cnt[p] = (cnt[p] || 0) + 1; });
-    const prefs = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || a.localeCompare(b, 'ja'));
-    $('l-pref').innerHTML = '<option value="">すべて</option>' +
-      prefs.map(p => `<option value="${esc(p)}">${esc(p)}（${cnt[p]}件）</option>`).join('');
-    fillMunis();
+  const fillMunis = () => {
+    const sel = selectedPrefs(), one = sel.length === 1 ? sel[0] : null, mc = {};
+    if (one) D.rows.forEach(r => { const m = muniOf(r); if (m && prefKey(r) === one) mc[m] = (mc[m] || 0) + 1; });
+    const munis = Object.keys(mc).sort((a, b) => a.localeCompare(b, 'ja'));
+    $('l-muni').disabled = !one;
+    $('l-muni').innerHTML = `<option value="">${one ? 'すべて' : '（都道府県を1つだけ選ぶと選べます）'}</option>` +
+      munis.map(m => `<option value="${esc(m)}">${esc(m)}（${mc[m]}件）</option>`).join('');
+    // 選択中の都道府県の、システム生成CSVへのリンク（多すぎると邪魔なので5県まで）
+    const real = sel.filter(p => p !== NO_PREF);
+    $('l-prefcsv').innerHTML = real.length && real.length <= 5
+      ? real.map(p => `<a class="chip" href="exports/${encodeURIComponent(p)}.csv">📥 ${esc(p)}の全変電所</a>`).join(' ')
+      : '<a class="chip" href="exports/全国_SA.csv">📥 全国のS/A</a>';
+    $('l-pref-summary').textContent = sel.length
+      ? `選択中: ${sel.length}件（${sel.slice(0, 8).join('、')}${sel.length > 8 ? ' ほか' : ''}）`
+      : '選択なし ＝ 全国が対象';
   };
-  fillPrefs();
-  $('l-area').addEventListener('change', fillPrefs);
-  $('l-pref').addEventListener('change', fillMunis);
+  const onChange = () => { syncAreaBoxes(); fillMunis(); };
+  $('l-prefs').addEventListener('change', e => {
+    const a = e.target.dataset.area;
+    if (a != null) document.querySelectorAll(`#l-prefs input[data-group="${a}"]`).forEach(i => { i.checked = e.target.checked; });
+    onChange();
+  });
+  const setAll = on => { document.querySelectorAll('#l-prefs input[data-pref]').forEach(i => { i.checked = on; }); onChange(); };
+  $('l-pref-all').addEventListener('click', () => setAll(true));
+  $('l-pref-none').addEventListener('click', () => setAll(false));
+  onChange();
+
   $('l-word').addEventListener('keydown', e => { if (e.key === 'Enter') showList(); });
   $('l-ranks').innerHTML = ['S', 'A', 'B', 'C', 'データ無', '除外'].map(r =>
     `<label class="chk"><input type="checkbox" value="${r}" ${r === 'S' || r === 'A' ? 'checked' : ''}> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
+  const setRanks = keep => document.querySelectorAll('#l-ranks input').forEach(i => { i.checked = keep.includes(i.value); });
+  $('l-preset-sa').addEventListener('click', () => setRanks(['S', 'A']));
+  $('l-preset-all').addEventListener('click', () => setRanks(['S', 'A', 'B', 'C', 'データ無', '除外']));
   $('btn-list').addEventListener('click', showList);
   $('btn-csv-list').addEventListener('click', csvList);
+}
+
+// ── 使い方の切り替え（場所から検索 / 都道府県から一覧）──
+function setMode(mode) {
+  const pref = mode === 'pref';
+  $('tab-loc').setAttribute('aria-selected', String(!pref));
+  $('tab-pref').setAttribute('aria-selected', String(pref));
+  $('loc-card').style.display = pref ? 'none' : '';
+  $('result').style.display = pref ? 'none' : '';
+  $('list-card').style.display = pref ? '' : 'none';
+  try { history.replaceState(null, '', pref ? '#pref' : location.pathname + location.search); } catch (e) { /* file:// 等 */ }
 }
 
 // ── 定義・実績DBの描画 ──
@@ -1089,6 +1189,9 @@ function init() {
   }
   renderStatic();
   initList();
+  $('tab-loc').addEventListener('click', () => setMode('loc'));
+  $('tab-pref').addEventListener('click', () => setMode('pref'));
+  setMode(location.hash === '#pref' ? 'pref' : 'loc');
   $('btn-csv-near').addEventListener('click', csvNear);
 
   $('btn-run').addEventListener('click', run);
