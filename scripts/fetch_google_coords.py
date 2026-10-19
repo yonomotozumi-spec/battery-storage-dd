@@ -51,6 +51,8 @@ import json
 import math
 import os
 import statistics
+import time
+import urllib.error
 import urllib.request
 
 from openpyxl import load_workbook
@@ -65,7 +67,8 @@ GSI_REV = ("https://mreversegeocoder.gsi.go.jp/reverse-geocoder/"
 FIELDS = "places.displayName,places.location,places.formattedAddress"
 SOURCE_LABEL = "Google Places(名称一致)"
 FILLED_FILL = PatternFill("solid", fgColor="FFF2CC")
-WORKERS = 8
+WORKERS = 4          # 8並列では Google の回数制限（HTTP 429）に当たった（742件中69件）
+RETRY_429 = 5        # 429 のときの再試行回数（待ち時間は2秒から倍々）
 
 
 def search(name, pref, key):
@@ -75,10 +78,17 @@ def search(name, pref, key):
     req = urllib.request.Request(URL, data=body, headers={
         "Content-Type": "application/json", "X-Goog-Api-Key": key,
         "X-Goog-FieldMask": FIELDS})
-    try:
-        res = json.load(urllib.request.urlopen(req, timeout=30))
-    except Exception as e:
-        return None, f"照会に失敗: {str(e)[:60]}"
+    for attempt in range(RETRY_429 + 1):
+        try:
+            res = json.load(urllib.request.urlopen(req, timeout=30))
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < RETRY_429:
+                time.sleep(2 * 2 ** attempt)
+                continue
+            return None, f"照会に失敗: {str(e)[:60]}"
+        except Exception as e:
+            return None, f"照会に失敗: {str(e)[:60]}"
     places = res.get("places") or []
     if not places:
         return None, "該当なし"
@@ -176,6 +186,15 @@ def fill(args):
     code2pref = muni_code_to_pref(rows)
     pts = pref_points(rows)
 
+    # 前回の照会で失敗した行（回数制限など）だけをやり直す。名称不一致などの結果は変わらないので
+    # 全件を検索し直すより安く済む
+    retry_nos = None
+    if args.retry_from:
+        with open(args.retry_from, encoding="utf-8-sig") as f:
+            retry_nos = {int(r["No."]) for r in csv.DictReader(f)
+                         if r["Google名称/理由"].startswith("照会に失敗") and r["No."]}
+        print(f"前回の照会失敗 {len(retry_nos)}件だけを検索します（{args.retry_from}）")
+
     wb = load_workbook(args.list)
     report, filled, skipped = [], 0, 0
 
@@ -200,6 +219,8 @@ def fill(args):
             if args.area and ws.cell(r, hdr["エリア"]).value != args.area:
                 continue
             if ws.cell(r, hdr["緯度"]).value is not None and not args.overwrite:
+                continue
+            if retry_nos is not None and ws.cell(r, hdr["No."]).value not in retry_nos:
                 continue
             targets.append((r, name,
                             ws.cell(r, hdr["都道府県"]).value if "都道府県" in hdr else "",
@@ -285,6 +306,7 @@ def main():
     f.add_argument("--area", help="このエリアだけに限定する")
     f.add_argument("--report")
     f.add_argument("--overwrite", action="store_true")
+    f.add_argument("--retry-from", help="前回の --report のCSV。照会に失敗した行だけを検索し直す")
 
     args = ap.parse_args()
     validate(args) if args.cmd == "validate" else fill(args)
