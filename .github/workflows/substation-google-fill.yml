@@ -7,6 +7,12 @@ name: substation-google-fill
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'failed=前回の照会失敗（回数制限など）だけ検索し直す / all=座標が無い全件を検索する'
+        type: choice
+        options: ['failed', 'all']
+        default: 'failed'
 
 jobs:
   fill:
@@ -43,8 +49,13 @@ jobs:
 
       - name: Google Places で検索（名称一致＋所在地の確認）
         run: |
+          RETRY=()
+          if [ "${{ inputs.mode }}" = "failed" ] && [ -f google_fill_report.csv ]; then
+            RETRY=(--retry-from google_fill_report.csv)
+          fi
           python3 scripts/fetch_google_coords.py fill --in "$LIST" --list missing.xlsx \
-            --sheets 優先S_A --report google_fill_report.csv
+            --sheets 優先S_A --report google_fill_report.new.csv "${RETRY[@]}"
+          mv google_fill_report.new.csv google_fill_report.csv
 
       - name: 本体リストへ反映
         run: |
