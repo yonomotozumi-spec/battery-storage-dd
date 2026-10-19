@@ -1,0 +1,110 @@
+# 座標が未取得の変電所を Google Places で探し直す（手動実行）
+# 事前準備: リポジトリの Settings → Secrets and variables → Actions → New repository secret で
+#   Name: GOOGLE_MAPS_API_KEY / Secret: Google Cloud で作ったAPIキー（Places API (New) を有効化）
+# 実行: Actions タブ → substation-google-fill → Run workflow
+# 結果はプルリクエストとして届く（mainへ直接は書き込まない）。Google は検索1回ごとに課金対象になる。
+name: substation-google-fill
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      LIST: data/全国変電所リスト_66kV以上_座標追加.xlsx
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 依存パッケージ
+        run: pip install openpyxl
+
+      - name: APIキーの確認
+        run: |
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "::error::Secret GOOGLE_MAPS_API_KEY が登録されていません（Settings → Secrets and variables → Actions）"
+            exit 1
+          fi
+
+      - name: 未取得の変電所リストを作成
+        run: |
+          python3 scripts/list_missing_coords.py --in "$LIST" --out missing.xlsx \
+            --ranks "S,A,B,C,除外,データ無" --include-gated
+
+      - name: Google Places で検索（名称一致＋所在地の確認）
+        run: |
+          python3 scripts/fetch_google_coords.py fill --in "$LIST" --list missing.xlsx \
+            --sheets 優先S_A --report google_fill_report.csv
+
+      - name: 本体リストへ反映
+        run: |
+          python3 scripts/merge_coords.py --in "$LIST" --filled missing.xlsx --out "$LIST" \
+            --filled-sheets 優先S_A --acc "Google Places(名称一致)" --allow-outside-area \
+            --report google_merge_report.csv | tee merge_result.txt
+
+      - name: スコア・Web用データ・市区町村・地域別CSV・精度レポートを再生成
+        run: |
+          python3 scripts/score_substations.py --in "$LIST" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
+          python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
+          python3 scripts/build_priority_munis.py --all
+          python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
+          python3 scripts/export_substations.py --by-pref exports
+          python3 scripts/coord_quality_report.py --in "$LIST" --cache-dir osm_cache \
+            --out "docs/変電所座標_精度レポート.md" --history data/coord_quality_history.csv
+
+      - name: 結果の集計
+        id: tally
+        run: |
+          python3 - <<'PY' | tee tally.md
+          import csv, collections
+          rows = list(csv.reader(open("google_fill_report.csv", encoding="utf-8-sig")))[1:]
+          c = collections.Counter()
+          for r in rows:
+              why = r[7] if len(r) > 7 else ""
+              c["採用(隣県)" if "隣県" in why else ("採用" if why.startswith("採用") else "不採用")] += 1
+          print(f"- 検索した変電所: {len(rows)}件")
+          print(f"- 座標を付与: **{c['採用'] + c['採用(隣県)']}件**（うち所在地が隣県だったもの {c['採用(隣県)']}件）")
+          print(f"- 見送り: {c['不採用']}件（名称不一致・該当なし・所在地不一致など。理由は google_fill_report.csv）")
+          PY
+          cat tally.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: プルリクエストを作成
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- "$LIST"; then
+            echo "座標の変更なし。プルリクエストは作りません。"
+            exit 0
+          fi
+          BRANCH="auto/substation-google-$(date +%Y%m%d-%H%M)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add "$LIST" data/substations.js "docs/変電所スコアリング_全国66kV以上_v1.xlsx" \
+            "docs/変電所座標_精度レポート.md" data/coord_quality_history.csv \
+            geo_cache data/priority_munis.json exports google_fill_report.csv google_merge_report.csv
+          git commit -m "Google Placesで変電所座標を補完 ($(date +%F))"
+          git push -u origin "$BRANCH"
+          {
+            echo "座標が未取得の変電所を Google Places で探し直した結果です。"
+            echo ""
+            cat tally.md
+            echo ""
+            echo "行ごとの結果は \`google_fill_report.csv\`（検索結果）と \`google_merge_report.csv\`（反映結果）。"
+            echo "「隣県」で採用した行は、元リストの都道府県が管轄区分で所在地とずれていたものです。地図で数件確認してからマージしてください。"
+          } > pr_body.md
+          gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
+            --title "Google Placesで変電所座標を補完 ($(date +%F))" --body-file pr_body.md \
+          || gh issue create --title "Google Places補完の結果 ($(date +%F))" \
+               --body "プルリクエストを自動作成できなかったため、ブランチ \`$BRANCH\` から手動で作成してください。"
