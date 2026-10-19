@@ -5,7 +5,7 @@
   "S",
   "A"
  ],
- "substations_total": 1209,
+ "substations_total": 1210,
  "unresolved": 0,
  "munis": [
   {
@@ -3205,6 +3205,15 @@
    "A": 1,
    "substations": [
     "長滝変電所(A)"
+   ]
+  },
+  {
+   "pref": "大阪府",
+   "muni": "河内長野市",
+   "S": 0,
+   "A": 1,
+   "substations": [
+    "長野変電所(A)"
    ]
   },
   {
