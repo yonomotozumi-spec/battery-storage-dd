@@ -1,0 +1,89 @@
+# 変電所座標の定期精度向上（月1回）
+# OSM（OpenStreetMap）は日々更新されるため、毎月取り直して
+#   ・座標が未取得の変電所に新しく登録された座標を付与
+#   ・市町村レベルの「推定」座標をOSM実測に格上げ
+# し、座標が変わったときだけプルリクエストを作る（mainへ直接は書き込まない）。
+# 精度の内訳と推移は docs/変電所座標_精度レポート.md に出る。
+name: substation-coords-refresh
+
+on:
+  schedule:
+    - cron: '0 1 1 * *'  # 毎月1日 10:00 JST
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      LIST: data/全国変電所リスト_66kV以上_座標追加.xlsx
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 依存パッケージ
+        run: pip install openpyxl
+
+      - name: OSMから取得（25日より古いキャッシュだけ取り直す）
+        run: |
+          python3 scripts/fetch_substation_coords.py fetch \
+            --in "$LIST" --cache-dir osm_cache \
+            --upgrade-acc 推定 --max-age-days 25 \
+            --retries 6 --retry-sleep 10 --sleep 5
+
+      - name: 座標を反映（未取得の付与＋推定の格上げ）
+        run: |
+          python3 scripts/fetch_substation_coords.py apply \
+            --in "$LIST" --cache-dir osm_cache --out "$LIST" \
+            --upgrade-acc 推定 --report coord_report.csv --summary-json apply_summary.json
+          cat apply_summary.json
+
+      - name: スコア・Web用データ・精度レポートを再生成
+        run: |
+          python3 scripts/score_substations.py --in "$LIST" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
+          python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
+          python3 scripts/coord_quality_report.py --in "$LIST" --cache-dir osm_cache \
+            --out "docs/変電所座標_精度レポート.md" --history data/coord_quality_history.csv
+          cat "docs/変電所座標_精度レポート.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 座標が変わったらプルリクエストを作成
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read FILLED UPGRADED < <(python3 -c "import json;s=json.load(open('apply_summary.json'));print(s['filled'],s['upgraded'])")
+          if [ "$FILLED" = "0" ] && [ "$UPGRADED" = "0" ]; then
+            echo "座標の変更なし。プルリクエストは作りません。"
+            exit 0
+          fi
+          BRANCH="auto/substation-coords-$(date +%Y%m%d-%H%M)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add "$LIST" osm_cache coord_report.csv data/substations.js \
+            "docs/変電所スコアリング_全国66kV以上_v1.xlsx" \
+            "docs/変電所座標_精度レポート.md" data/coord_quality_history.csv
+          git commit -m "変電所座標の定期更新: 新規${FILLED}件・推定→実測${UPGRADED}件 ($(date +%F))"
+          git push -u origin "$BRANCH"
+          {
+            echo "毎月の変電所座標の定期更新です（OSMの最新データで再照合）。"
+            echo ""
+            echo "- 座標を新しく付与: **${FILLED}件**"
+            echo "- 推定座標をOSM実測に格上げ: **${UPGRADED}件**"
+            echo ""
+            echo "行ごとの結果は \`coord_report.csv\`（「移動距離(km)」が大きい行は地図で確認を推奨）。"
+            echo "問題なければマージすると、変電所MAP（substation.html）に反映されます。"
+            echo ""
+            cat "docs/変電所座標_精度レポート.md"
+          } > pr_body.md
+          gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
+            --title "変電所座標の定期更新 ($(date +%F))" --body-file pr_body.md \
+          || gh issue create --title "変電所座標の定期更新 ($(date +%F))" \
+               --body "プルリクエストを自動作成できなかったため、ブランチ \`$BRANCH\` から手動で作成してください（Settings → Actions → General の「Allow GitHub Actions to create and approve pull requests」を有効にすると次回から自動で作成されます）。"

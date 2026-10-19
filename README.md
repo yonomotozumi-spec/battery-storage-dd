@@ -471,6 +471,49 @@ python scripts/fetch_kyushu_pref.py report \
 なお、この対応表からも**座標は得られません**。系統図は模式図で実際の位置を示さないため、
 緯度・経度は引き続き手作業の調査が必要です。
 
+### 変電所座標の定期精度向上（月1回の自動更新）
+
+`.github/workflows/substation-coords-refresh.yml` が**毎月1日 10:00（JST）**に自動で動き、
+OSMの最新データで座標を取り直します。OSMは日々登録が増えるため、前回見つからなかった変電所が
+後から拾えるようになります。手動で今すぐ動かす場合は GitHub の Actions タブ →
+`substation-coords-refresh` → **Run workflow** を押します。
+
+1. 座標が未取得の行、または精度が「推定」（北海道の176件・市町村レベル）の行がある都道府県について、
+   25日より古いOSMキャッシュだけを取り直す（取得に失敗した県は前回のキャッシュのまま続行）
+2. 未取得の行に座標を付与し、「推定」の行はOSM実測で置き換える。照合ルールは上記の
+   `fetch_substation_coords.py` と同じ。推定座標から**30km以上**動く場合は同名の別施設を疑い、置き換えない
+3. スコアリングxlsx・`data/substations.js`・精度レポートを再生成
+4. **座標が1件でも変わったときだけプルリクエストを作成**（mainへ直接は書き込まない）。内容を見てマージすると
+   変電所MAP（`substation.html`）に反映されます。変化が無い月は何も起きません
+
+精度の内訳と推移は [`docs/変電所座標_精度レポート.md`](docs/変電所座標_精度レポート.md)
+（推移の元データは `data/coord_quality_history.csv`）に出ます。座標精度を4段階にまとめています。
+
+| 区分 | 座標精度の値 | 2026-10-19 時点 |
+|---|---|---|
+| 高 | OSM実測 / 公表資料(手動) | 3,215件（53.0%） |
+| 中 | Google Places(名称一致) / OSM実測(名称一致) | 1,938件（31.9%） |
+| 低 | 推定 | 176件（2.9%） |
+| 無 | 未取得 | 742件（12.2%） |
+
+レポートの「要確認」は、精度が中・低の行のうち、OSMに同名の変電所が一意に見つかり位置が1km以上
+食い違うものです（データは書き換えません。地図で確かめて正しい方を `merge_coords.py --force` で反映）。
+エリア別の「S/Aで低・無」は、系統ランクS/Aなのに座標が推定か未取得の件数で、手作業で調べる効果が最も大きい行です。
+
+```bash
+# 手元で同じことをする場合
+python scripts/fetch_substation_coords.py fetch --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" \
+  --cache-dir osm_cache --upgrade-acc 推定 --max-age-days 25
+python scripts/fetch_substation_coords.py apply --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" \
+  --cache-dir osm_cache --out "data/全国変電所リスト_66kV以上_座標追加.xlsx" --upgrade-acc 推定 --report coord_report.csv
+python scripts/coord_quality_report.py --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --cache-dir osm_cache \
+  --out "docs/変電所座標_精度レポート.md" --history data/coord_quality_history.csv
+```
+
+> プルリクエストの自動作成には、リポジトリの Settings → Actions → General →
+> 「Allow GitHub Actions to create and approve pull requests」を有効にする必要があります。
+> 無効のままだと、代わりに「ブランチから手動で作成してください」というIssueが起票されます。
+
 ### データの再生成
 
 `data/substations.js` は自動生成ファイルです（`window.SUBSTATION_DATA` に代入するだけの素のJSなので、

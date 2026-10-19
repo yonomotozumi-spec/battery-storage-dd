@@ -28,10 +28,21 @@
   python scripts/fetch_substation_coords.py apply \
     --in 全国変電所リスト_66kV以上.xlsx --cache-dir osm_cache \
     --out 全国変電所リスト_66kV以上_座標追加.xlsx --report coord_report.csv
+
+  # 定期更新（.github/workflows/substation-coords-refresh.yml が月1回実行）
+  #   古いキャッシュだけ取り直し、未取得行に加えて「推定」座標の行もOSM実測に格上げする
+  python scripts/fetch_substation_coords.py fetch \
+    --in 全国変電所リスト_66kV以上_座標追加.xlsx --cache-dir osm_cache \
+    --upgrade-acc 推定 --max-age-days 25
+  python scripts/fetch_substation_coords.py apply \
+    --in 全国変電所リスト_66kV以上_座標追加.xlsx --cache-dir osm_cache \
+    --out 全国変電所リスト_66kV以上_座標追加.xlsx --upgrade-acc 推定
 """
 import argparse
 import csv
+import datetime
 import json
+import math
 import os
 import re
 import sys
@@ -287,6 +298,39 @@ def read_rows(path, sheet_name):
     return rows, cols, hdr
 
 
+def needs_coords(r, upgrade_acc=()):
+    """座標を探す対象か。未取得の行と、精度の低い座標（--upgrade-acc で指定）の行。"""
+    return not isinstance(r["lat"], (int, float)) or (r["acc"] or "") in upgrade_acc
+
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = p2 - p1, math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 6371.0 * 2 * math.asin(math.sqrt(a))
+
+
+def cache_age_days(path):
+    """キャッシュのOSMデータ時点（osm3s.timestamp_osm_base）から何日経ったか。
+    git checkout でファイルの更新日時はリセットされるため、中身の時点で判定する。
+    時点が読めないものは古い扱い（取り直す）にする。"""
+    try:
+        with open(path, encoding="utf-8") as f:
+            ts = (json.load(f).get("osm3s") or {}).get("timestamp_osm_base")
+        t = datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")
+    except (OSError, ValueError, TypeError, AttributeError):
+        return float("inf")
+    return (datetime.datetime.utcnow() - t).total_seconds() / 86400
+
+
+def is_fresh(path, args):
+    if not os.path.exists(path) or args.force:
+        return False
+    if args.max_age_days is None:
+        return True
+    return cache_age_days(path) <= args.max_age_days
+
+
 def cache_path(cache_dir, key):
     safe = re.sub(r"[^\w\-]", "_", key)
     return os.path.join(cache_dir, f"{safe}.json")
@@ -294,18 +338,26 @@ def cache_path(cache_dir, key):
 
 def cmd_fetch(args):
     rows, _, _ = read_rows(args.src, args.list_sheet)
-    missing = [r for r in rows if not isinstance(r["lat"], (int, float))]
+    missing = [r for r in rows if needs_coords(r, args.upgrade_acc)]
     prefs = sorted({r["pref"] for r in missing if r["pref"]})
-    print(f"座標未取得 {len(missing)}件 / 対象都道府県 {len(prefs)}件")
+    print(f"座標の取得対象 {len(missing)}件 / 対象都道府県 {len(prefs)}件")
     os.makedirs(args.cache_dir, exist_ok=True)
 
+    # 1県の失敗で全体を止めない（Overpassは共有IPを一時遮断することがある）。
+    # 失敗した県は前回のキャッシュのまま apply に使われる。
+    failed = []
     for i, pref in enumerate(prefs, 1):
         path = cache_path(args.cache_dir, pref)
-        if os.path.exists(path) and not args.force:
-            print(f"[{i}/{len(prefs)}] {pref}: キャッシュ済みのためスキップ")
+        if is_fresh(path, args):
+            print(f"[{i}/{len(prefs)}] {pref}: キャッシュが新しいためスキップ")
             continue
         print(f"[{i}/{len(prefs)}] {pref}: 取得中…")
-        payload = overpass_fetch(overpass_query_pref(pref), args.retries, args.retry_sleep)
+        try:
+            payload = overpass_fetch(overpass_query_pref(pref), args.retries, args.retry_sleep)
+        except Exception as e:  # noqa: BLE001 - 理由を出して次の県へ
+            print(f"    取得失敗: {e}", file=sys.stderr)
+            failed.append(pref)
+            continue
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False)
         print(f"    {len(payload.get('elements', []))} 件取得")
@@ -315,19 +367,28 @@ def cmd_fetch(args):
     nameless = sorted({r["name"] for r in missing if not r["pref"]})
     if nameless:
         path = cache_path(args.cache_dir, "_japan_by_name")
-        if os.path.exists(path) and not args.force:
-            print("全国名称検索: キャッシュ済みのためスキップ")
+        if is_fresh(path, args):
+            print("全国名称検索: キャッシュが新しいためスキップ")
         else:
             print(f"全国名称検索: {len(nameless)}件の名称を{args.chunk}件ずつ照会")
             merged = {"elements": []}
-            for i in range(0, len(nameless), args.chunk):
-                chunk = nameless[i:i + args.chunk]
-                payload = overpass_fetch(overpass_query_japan_names(chunk), args.retries, args.retry_sleep)
-                merged["elements"].extend(payload.get("elements", []))
-                print(f"    {i + len(chunk)}/{len(nameless)} 照会済み（累計{len(merged['elements'])}件）")
-                time.sleep(args.sleep)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(merged, f, ensure_ascii=False)
+            try:
+                for i in range(0, len(nameless), args.chunk):
+                    chunk = nameless[i:i + args.chunk]
+                    payload = overpass_fetch(overpass_query_japan_names(chunk), args.retries, args.retry_sleep)
+                    merged["elements"].extend(payload.get("elements", []))
+                    merged["osm3s"] = payload.get("osm3s")   # 鮮度判定用にデータ時点を残す
+                    print(f"    {i + len(chunk)}/{len(nameless)} 照会済み（累計{len(merged['elements'])}件）")
+                    time.sleep(args.sleep)
+            except Exception as e:  # noqa: BLE001
+                # 一部だけの結果で上書きすると前回取れていた名称が消えるので、保存しない
+                print(f"    取得失敗のため前回のキャッシュを維持: {e}", file=sys.stderr)
+                failed.append("全国名称検索")
+            else:
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(merged, f, ensure_ascii=False)
+    if failed:
+        print(f"取得失敗（前回キャッシュを使用）: {', '.join(failed)}")
     print(f"完了: {args.cache_dir}")
 
 
@@ -349,6 +410,36 @@ def load_cache(cache_dir):
     return by_pref, japan
 
 
+def match_row(r, by_pref, japan, box):
+    """1行をOSMキャッシュと照合する。(候補 or None, 結果の説明, 照合範囲) を返す。
+
+    apply と精度レポート（coord_quality_report.py）の両方が同じ判定を使う。
+    """
+    if r["pref"] and r["pref"] in by_pref:
+        strict, loose = by_pref[r["pref"]]
+        scope = r["pref"]
+    elif not r["pref"]:
+        strict, loose = japan
+        scope = "全国"
+    else:
+        strict, loose = {}, {}
+        scope = r["pref"]
+
+    # ① 施設種別まで一致するキーで照合 → ② 見つからなければ種別を外した緩いキー
+    best, how = resolve(strict.get(normalize_name(r["name"]), []), r["vmax"])
+    if best is None:
+        l_cands = loose.get(loose_name(r["name"]), [])
+        if len(l_cands) == 1:
+            best, how = l_cands[0], "一致(種別ゆれ)"
+        elif l_cands:
+            how = f"候補{len(l_cands)}件で特定不可"
+
+    # 全国検索は同名の別変電所を掴みうるので、エリアの実測分布から外れたら捨てる
+    if best is not None and scope == "全国" and not in_area(box, r["area"], best["lat"], best["lon"]):
+        return None, f"{how}(全国)だが{r['area']}エリア外のため不採用", scope, best
+    return best, how, scope, None
+
+
 def cmd_apply(args):
     rows, cols, _ = read_rows(args.src, args.list_sheet)
     by_pref, japan = load_cache(args.cache_dir)
@@ -357,36 +448,17 @@ def cmd_apply(args):
     ws = wb[args.list_sheet]
 
     box = area_ranges(rows)
-    filled, ambiguous, unmatched, off_area = 0, 0, 0, 0
+    filled, upgraded, ambiguous, unmatched, off_area, too_far = 0, 0, 0, 0, 0, 0
     report = []
     for r in rows:
-        if isinstance(r["lat"], (int, float)):
+        if not needs_coords(r, args.upgrade_acc):
             continue
-        if r["pref"] and r["pref"] in by_pref:
-            strict, loose = by_pref[r["pref"]]
-            scope = r["pref"]
-        elif not r["pref"]:
-            strict, loose = japan
-            scope = "全国"
-        else:
-            strict, loose = {}, {}
-            scope = r["pref"]
+        had = isinstance(r["lat"], (int, float)) and isinstance(r["lon"], (int, float))
+        best, how, scope, rejected = match_row(r, by_pref, japan, box)
 
-        # ① 施設種別まで一致するキーで照合 → ② 見つからなければ種別を外した緩いキー
-        best, how = resolve(strict.get(normalize_name(r["name"]), []), r["vmax"])
-        if best is None:
-            l_cands = loose.get(loose_name(r["name"]), [])
-            if len(l_cands) == 1:
-                best, how = l_cands[0], "一致(種別ゆれ)"
-            elif l_cands:
-                how = f"候補{len(l_cands)}件で特定不可"
-
-        # 全国検索は同名の別変電所を掴みうるので、エリアの実測分布から外れたら捨てる
-        if best is not None and scope == "全国" and not in_area(box, r["area"], best["lat"], best["lon"]):
+        if rejected is not None:
             off_area += 1
-            report.append([r["row"], r["name"], r["pref"],
-                           f"{how}(全国)だが{r['area']}エリア外のため不採用",
-                           "", "", best["name"]])
+            report.append([r["row"], r["name"], r["pref"], how, "", "", rejected["name"], r["acc"], ""])
             continue
 
         if best is None:
@@ -394,29 +466,49 @@ def cmd_apply(args):
                 ambiguous += 1
             else:
                 unmatched += 1
-            report.append([r["row"], r["name"], r["pref"], how, "", "", ""])
+            report.append([r["row"], r["name"], r["pref"], how, "", "", "", r["acc"], ""])
             continue
+
+        moved = ""
+        if had:
+            # 推定座標からの格上げ。推定は市町村レベルなので多少は動くが、
+            # 大きく離れるなら同名の別施設を掴んだ疑いがあるため置き換えない
+            moved = round(haversine_km(r["lat"], r["lon"], best["lat"], best["lon"]), 2)
+            if moved > args.max_move_km:
+                too_far += 1
+                report.append([r["row"], r["name"], r["pref"],
+                               f"{how}({scope})だが既存座標から{moved}km離れるため置換せず",
+                               best["lat"], best["lon"], best["name"], r["acc"], moved])
+                continue
 
         ws.cell(r["row"], cols["lat"]).value = best["lat"]
         ws.cell(r["row"], cols["lon"]).value = best["lon"]
         ws.cell(r["row"], cols["acc"]).value = ACC_OSM_NAME
         for c in (cols["lat"], cols["lon"], cols["acc"]):
             ws.cell(r["row"], c).fill = OSM_FILL
-        filled += 1
+        if had:
+            upgraded += 1
+        else:
+            filled += 1
         report.append([r["row"], r["name"], r["pref"], f"{how}({scope})",
-                       best["lat"], best["lon"], best["name"]])
+                       best["lat"], best["lon"], best["name"], r["acc"], moved])
 
     wb.save(args.out)
-    print(f"付与: {filled}件 / 候補複数で特定不可: {ambiguous}件 / "
-          f"エリア外で不採用: {off_area}件 / 一致なし: {unmatched}件")
+    print(f"新規付与: {filled}件 / 格上げ: {upgraded}件 / 候補複数で特定不可: {ambiguous}件 / "
+          f"エリア外で不採用: {off_area}件 / 距離が離れすぎで置換せず: {too_far}件 / 一致なし: {unmatched}件")
     print(f"出力: {args.out}")
     if args.report:
         with open(args.report, "w", encoding="utf-8-sig", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["行","変電所名","都道府県","結果","緯度","経度","OSM側の名称"])
+            w.writerow(["行","変電所名","都道府県","結果","緯度","経度","OSM側の名称","元の座標精度","移動距離(km)"])
             w.writerows(report)
         print(f"照合レポート: {args.report}")
-    print("※ 一致しなかった行は空欄のままです（推定値では埋めません）。")
+    if args.summary_json:
+        with open(args.summary_json, "w", encoding="utf-8") as f:
+            json.dump({"filled": filled, "upgraded": upgraded, "ambiguous": ambiguous,
+                       "off_area": off_area, "too_far": too_far, "unmatched": unmatched},
+                      f, ensure_ascii=False)
+    print("※ 一致しなかった行は元のまま（空欄・推定値）です。新たな推定値では埋めません。")
 
 
 def main():
@@ -430,6 +522,10 @@ def main():
     f.add_argument("--sleep", type=float, default=3.0, help="リクエスト間隔(秒)")
     f.add_argument("--chunk", type=int, default=50, help="名称検索の1リクエストあたり件数")
     f.add_argument("--force", action="store_true", help="キャッシュがあっても取り直す")
+    f.add_argument("--max-age-days", type=float,
+                   help="OSMデータ時点がこの日数より古いキャッシュは取り直す（定期更新用）")
+    f.add_argument("--upgrade-acc", action="append", default=[],
+                   help="この座標精度の行も取得対象にする（例: 推定）。複数指定可")
     f.add_argument("--retries", type=int, default=3,
                    help="1リクエストあたりの再試行回数。Overpassに遮断されがちな環境では増やす")
     f.add_argument("--retry-sleep", type=float, default=5.0,
@@ -442,6 +538,11 @@ def main():
     a.add_argument("--out", required=True)
     a.add_argument("--list-sheet", default="全国変電所リスト")
     a.add_argument("--report", help="照合結果のCSV出力先")
+    a.add_argument("--upgrade-acc", action="append", default=[],
+                   help="この座標精度の行もOSM実測で置き換える（例: 推定）。複数指定可")
+    a.add_argument("--max-move-km", type=float, default=30.0,
+                   help="格上げで既存座標からこれ以上動く場合は置換しない（既定30km）")
+    a.add_argument("--summary-json", help="件数の要約をJSONで出力（ワークフロー用）")
     a.set_defaults(func=cmd_apply)
 
     args = ap.parse_args()
