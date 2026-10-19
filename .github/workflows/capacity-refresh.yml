@@ -1,0 +1,118 @@
+# スコアの元データ（空容量・運用容量・予想潮流・N-1電制・出力制御）の定期更新（月1回）
+# 東北・北陸・関西・中国・四国・九州の公表CSVを取得して本体リストを書き換え、スコア・Web用データ・
+# 地域別CSVを作り直す。照合率やランクの変化が普段どおりならそのまま main に反映し、
+# おかしければ別ブランチに置いて確認を求める Issue を起票する。
+# 東京・中部・北海道・沖縄は自動取得できないため、レポートに手作業の確認先を出す。
+name: capacity-refresh
+
+on:
+  schedule:
+    - cron: '0 1 5 * *'  # 毎月5日 10:00 JST（座標の定期更新の4日後）
+  workflow_dispatch:
+
+concurrency:
+  group: substation-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+    env:
+      LIST: data/全国変電所リスト_66kV以上_座標追加.xlsx
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 依存パッケージ
+        run: pip install openpyxl
+
+      - name: 各社の公表CSVを取得
+        run: python3 scripts/update_capacity.py fetch --cache-dir capacity_cache
+
+      - name: 本体リストへ反映
+        run: |
+          cp "$LIST" before.xlsx
+          python3 scripts/update_capacity.py apply --in "$LIST" --cache-dir capacity_cache --out "$LIST" \
+            --report capacity_report.csv --summary-json capacity_summary.json \
+            --report-md "docs/スコア元データ_更新レポート.md"
+
+      - name: スコア・Web用データ・地域別CSVを再生成
+        run: |
+          python3 scripts/score_substations.py --in "$LIST" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
+          python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
+          python3 scripts/build_priority_munis.py
+          python3 scripts/export_substations.py --by-pref exports
+
+      - name: 結果の確認（照合率・ランクの変化）
+        id: check
+        run: |
+          python3 - <<'PY' | tee check.md
+          import json, os, sys
+          sys.path.insert(0, "scripts")
+          from score_substations import read_substations
+          import substation_scoring as S
+
+          def ranks(p):
+              return {r[0]: S.score_row(r[1], r[5], r[10], r[11], r[12], r[13], r[14], r[15])["rank"]
+                      for r in read_substations(p, "全国変電所リスト")}
+          a, b = ranks("before.xlsx"), ranks(os.environ["LIST"])
+          moved = [k for k in a if a[k] != b.get(k)]
+          sa = lambda d: sum(1 for v in d.values() if v in ("S", "A"))
+          s = json.load(open("capacity_summary.json", encoding="utf-8"))
+          problems = []
+          for area, v in s["areas"].items():
+              if v["listed_with_data"] and v["matched"] < 0.7 * v["listed_with_data"]:
+                  problems.append(f"{area}: 照合 {v['matched']}件 / 容量データのある行 {v['listed_with_data']}件（70%未満）")
+          for area, e in s.get("fetch_errors", {}).items():
+              problems.append(f"{area}: {e}")
+          if len(moved) > 0.1 * len(a):
+              problems.append(f"ランクが変わった行が {len(moved)}件（全体の10%超）")
+          changed = sum(v["changed"] for v in s["areas"].values())
+          print(f"- 値が変わった行: **{changed}件**")
+          print(f"- ランクが変わった行: **{len(moved)}件**（S/A {sa(a):,}件 → {sa(b):,}件）")
+          if problems:
+              print("- ⚠ 確認が必要:")
+              for p in problems:
+                  print(f"  - {p}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"changed={changed}\nok={'0' if problems else '1'}\n")
+          PY
+          cat check.md "docs/スコア元データ_更新レポート.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 反映（問題なければ main、問題があれば別ブランチ＋Issue）
+        if: steps.check.outputs.changed != '0'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          FILES=("$LIST" data/substations.js "docs/変電所スコアリング_全国66kV以上_v1.xlsx" \
+                 "docs/スコア元データ_更新レポート.md" capacity_report.csv data/priority_munis.json exports)
+          MSG="スコア元データの定期更新: ${{ steps.check.outputs.changed }}件 ($(date +%F))"
+          gh label create capacity-refresh --color 0E8A16 --description "スコア元データの定期更新" 2>/dev/null || true
+          if [ "${{ steps.check.outputs.ok }}" = "1" ]; then
+            git add "${FILES[@]}"
+            git commit -m "$MSG"
+            git pull --rebase origin "${{ github.event.repository.default_branch }}"
+            git push
+            TITLE="スコア元データを更新しました ($(date +%F))"
+            HEAD="変電所MAP（substation.html）に反映済みです。行ごとの変更は \`capacity_report.csv\` を参照。"
+          else
+            BRANCH="auto/capacity-$(date +%Y%m%d-%H%M)"
+            git checkout -b "$BRANCH"
+            git add "${FILES[@]}"
+            git commit -m "$MSG"
+            git push -u origin "$BRANCH"
+            TITLE="スコア元データの更新に確認が必要です ($(date +%F))"
+            HEAD="普段と違う結果のため、main には反映していません。ブランチ \`$BRANCH\` の内容を確認してから取り込んでください。"
+          fi
+          { echo "$HEAD"; echo ""; cat check.md; echo ""; cat "docs/スコア元データ_更新レポート.md"; } > issue_body.md
+          gh issue create --title "$TITLE" --label capacity-refresh --body-file issue_body.md

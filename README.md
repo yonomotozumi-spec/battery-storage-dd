@@ -536,6 +536,45 @@ python scripts/fetch_kyushu_pref.py report \
 なお、この対応表からも**座標は得られません**。系統図は模式図で実際の位置を示さないため、
 緯度・経度は引き続き手作業の調査が必要です。
 
+### スコア元データの定期更新（月1回の自動更新）
+
+空容量・運用容量・予想潮流・N-1電制・出力制御（S1〜S4の材料）は、各送配電事業者が数か月ごとに更新する公表資料が元です。
+`.github/workflows/capacity-refresh.yml` が**毎月5日 10:00（JST）**に、全国共通形式の変電所CSVを公開している6社の最新版を取得して
+本体リストを書き換え、スコア・Web用データ・地域別CSVを作り直します（Actions タブ → `capacity-refresh` → Run workflow で今すぐ実行も可）。
+
+| エリア | 自動更新 | 取得元 |
+|---|---|---|
+| 東北・北陸・四国 | ○ | 各社ページの `sys_capa_*_tr_YYYYMM_*.csv` |
+| 関西 | ○ | `interchange/takusou/pdf/154kv_(more\|less)_trans.csv` |
+| 中国 | ○ | `zip/csv_*.zip` 内の `*_tr_*.csv` |
+| 九州 | ○ | 開示ページの `td_*.zip` 内「変圧器CSV」 |
+| 東京・中部・沖縄 | × | 自動取得を403で拒否。手作業で確認 |
+| 北海道 | × | PDFのみ |
+
+照合と書き換えのルール（`scripts/update_capacity.py`）:
+
+- エリア内で、種別（変電所／開閉所など）を外した名前が一致する行だけを書き換える。同名のバンクが複数あれば二次電圧→一次電圧→
+  **設備容量が既存値と一致するもの**の順に絞り、決められなければ書き換えない（「特定不可」としてレポート）
+- 公表値が「－」の項目は既存値を残す（既存の予想潮流には逆算値なども入っているため、空欄で消さない）
+- N-1電制の「不可 ♯3」と「不可 #3」のような表記ゆれは変更として扱わない
+- 公表CSVにあって本体に無い変電所は追加しない（件数だけレポート）
+
+照合できた行が容量データのある行の70%未満のエリアがある、取得に失敗した、またはランクが変わった行が全体の10%を超えた場合は、
+main に反映せず別ブランチに置いて確認を求める Issue を起票します。普段どおりなら main に反映し、結果を Issue で知らせます。
+結果は [`docs/スコア元データ_更新レポート.md`](docs/スコア元データ_更新レポート.md)、行ごとの変更は `capacity_report.csv`。
+
+初回（2026-10-19）は、手作業で取り込んでいた6〜7月時点のデータを9〜10月時点に更新し、581行の値が変わり、57行のランクが変わりました
+（S/A 1,351件 → 1,354件。主に10月15日に更新された関西）。
+
+```bash
+python scripts/update_capacity.py fetch --cache-dir capacity_cache
+python scripts/update_capacity.py apply --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --cache-dir capacity_cache \
+  --out "data/全国変電所リスト_66kV以上_座標追加.xlsx" --report capacity_report.csv --report-md "docs/スコア元データ_更新レポート.md"
+```
+
+> 毎月1日の座標の定期更新（下記）も、変更件数が普段どおり（新規＋格上げが300件以下）なら main に直接反映し、結果を Issue で知らせます。
+> 2つのワークフローは同時に動かないよう `concurrency: substation-data` で順番待ちにしています。
+
 ### 変電所座標の定期精度向上（月1回の自動更新）
 
 `.github/workflows/substation-coords-refresh.yml` が**毎月1日 10:00（JST）**に自動で動き、
@@ -548,8 +587,7 @@ OSMの最新データで座標を取り直します。OSMは日々登録が増�
 2. 未取得の行に座標を付与し、「推定」の行はOSM実測で置き換える。照合ルールは上記の
    `fetch_substation_coords.py` と同じ。推定座標から**30km以上**動く場合は同名の別施設を疑い、置き換えない
 3. スコアリングxlsx・`data/substations.js`・精度レポートを再生成
-4. **座標が1件でも変わったときだけプルリクエストを作成**（mainへ直接は書き込まない）。内容を見てマージすると
-   変電所MAP（`substation.html`）に反映されます。変化が無い月は何も起きません
+4. 座標が変わったら、件数が普段どおりなら main に直接反映し、多すぎれば別ブランチに置いて確認を求める。どちらも結果を Issue で知らせる。変化が無い月は何も起きません
 
 精度の内訳と推移は [`docs/変電所座標_精度レポート.md`](docs/変電所座標_精度レポート.md)
 （推移の元データは `data/coord_quality_history.csv`）に出ます。座標精度を4段階にまとめています。
@@ -575,9 +613,7 @@ python scripts/coord_quality_report.py --in "data/全国変電所リスト_66kV�
   --out "docs/変電所座標_精度レポート.md" --history data/coord_quality_history.csv
 ```
 
-> プルリクエストの自動作成には、リポジトリの Settings → Actions → General →
-> 「Allow GitHub Actions to create and approve pull requests」を有効にする必要があります。
-> 無効のままだと、代わりに「ブランチから手動で作成してください」というIssueが起票されます。
+> main への直接反映は GitHub Actions の標準権限（contents: write）で動くため、追加の設定は要りません。
 
 ### データの再生成
 

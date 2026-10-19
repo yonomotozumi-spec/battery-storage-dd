@@ -2,7 +2,8 @@
 # OSM（OpenStreetMap）は日々更新されるため、毎月取り直して
 #   ・座標が未取得の変電所に新しく登録された座標を付与
 #   ・市町村レベルの「推定」座標をOSM実測に格上げ
-# し、座標が変わったときだけプルリクエストを作る（mainへ直接は書き込まない）。
+# する。変更が普段どおりの件数なら main に直接反映し、多すぎるときは別ブランチに置いて確認を求める
+# （どちらの場合も結果を Issue で知らせる）。
 # 精度の内訳と推移は docs/変電所座標_精度レポート.md に出る。
 name: substation-coords-refresh
 
@@ -11,13 +12,16 @@ on:
     - cron: '0 1 1 * *'  # 毎月1日 10:00 JST
   workflow_dispatch:
 
+concurrency:
+  group: substation-data
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: write
-      pull-requests: write
       issues: write
     env:
       LIST: data/全国変電所リスト_66kV以上_座標追加.xlsx
@@ -58,38 +62,48 @@ jobs:
             --out "docs/変電所座標_精度レポート.md" --history data/coord_quality_history.csv
           cat "docs/変電所座標_精度レポート.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 座標が変わったらプルリクエストを作成
+      - name: 反映（普段どおりなら main、件数が多すぎれば別ブランチ＋Issue）
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           read FILLED UPGRADED < <(python3 -c "import json;s=json.load(open('apply_summary.json'));print(s['filled'],s['upgraded'])")
           if [ "$FILLED" = "0" ] && [ "$UPGRADED" = "0" ]; then
-            echo "座標の変更なし。プルリクエストは作りません。"
+            echo "座標の変更なし。"
             exit 0
           fi
-          BRANCH="auto/substation-coords-$(date +%Y%m%d-%H%M)"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add "$LIST" osm_cache coord_report.csv data/substations.js \
-            "docs/変電所スコアリング_全国66kV以上_v1.xlsx" \
-            "docs/変電所座標_精度レポート.md" data/coord_quality_history.csv \
-            geo_cache data/priority_munis.json exports
-          git commit -m "変電所座標の定期更新: 新規${FILLED}件・推定→実測${UPGRADED}件 ($(date +%F))"
-          git push -u origin "$BRANCH"
+          gh label create coords-refresh --color 1D76DB --description "変電所座標の定期更新" 2>/dev/null || true
+          FILES=("$LIST" osm_cache coord_report.csv data/substations.js \
+                 "docs/変電所スコアリング_全国66kV以上_v1.xlsx" "docs/変電所座標_精度レポート.md" \
+                 data/coord_quality_history.csv geo_cache data/priority_munis.json exports)
+          MSG="変電所座標の定期更新: 新規${FILLED}件・推定→実測${UPGRADED}件 ($(date +%F))"
+          # 初回の実行で新規14件・格上げ58件。桁違いに多いときは照合の不具合を疑って止める
+          if [ $((FILLED + UPGRADED)) -le 300 ]; then
+            git add "${FILES[@]}"
+            git commit -m "$MSG"
+            git pull --rebase origin "${{ github.event.repository.default_branch }}"
+            git push
+            TITLE="変電所座標を更新しました ($(date +%F))"
+            HEAD="変電所MAP（substation.html）に反映済みです。"
+          else
+            BRANCH="auto/substation-coords-$(date +%Y%m%d-%H%M)"
+            git checkout -b "$BRANCH"
+            git add "${FILES[@]}"
+            git commit -m "$MSG"
+            git push -u origin "$BRANCH"
+            TITLE="変電所座標の更新に確認が必要です ($(date +%F))"
+            HEAD="変更が${FILLED}+${UPGRADED}件と普段より多いため、main には反映していません。ブランチ \`$BRANCH\` を確認してから取り込んでください。"
+          fi
           {
-            echo "毎月の変電所座標の定期更新です（OSMの最新データで再照合）。"
+            echo "$HEAD"
             echo ""
             echo "- 座標を新しく付与: **${FILLED}件**"
             echo "- 推定座標をOSM実測に格上げ: **${UPGRADED}件**"
             echo ""
             echo "行ごとの結果は \`coord_report.csv\`（「移動距離(km)」が大きい行は地図で確認を推奨）。"
-            echo "問題なければマージすると、変電所MAP（substation.html）に反映されます。"
             echo ""
             cat "docs/変電所座標_精度レポート.md"
-          } > pr_body.md
-          gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
-            --title "変電所座標の定期更新 ($(date +%F))" --body-file pr_body.md \
-          || gh issue create --title "変電所座標の定期更新 ($(date +%F))" \
-               --body "プルリクエストを自動作成できなかったため、ブランチ \`$BRANCH\` から手動で作成してください（Settings → Actions → General の「Allow GitHub Actions to create and approve pull requests」を有効にすると次回から自動で作成されます）。"
+          } > issue_body.md
+          gh issue create --title "$TITLE" --label coords-refresh --body-file issue_body.md
