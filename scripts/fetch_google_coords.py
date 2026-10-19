@@ -56,7 +56,8 @@ import urllib.request
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-from fetch_substation_coords import normalize_name, read_rows
+from fetch_substation_coords import (NEIGHBOR_MAX_KM, NEIGHBOR_PREFS, haversine_km, normalize_name,
+                                     pref_points, read_rows)
 
 URL = "https://places.googleapis.com/v1/places:searchText"
 GSI_REV = ("https://mreversegeocoder.gsi.go.jp/reverse-geocoder/"
@@ -173,6 +174,7 @@ def fill(args):
     rows, _, _ = read_rows(args.src, args.list_sheet)
     p2a = pref_to_area(rows)
     code2pref = muni_code_to_pref(rows)
+    pts = pref_points(rows)
 
     wb = load_workbook(args.list)
     report, filled, skipped = [], 0, 0
@@ -214,8 +216,17 @@ def fill(args):
             if got is None:
                 return r, name, pref, area, None, "所在地を確認できなかった"
             if pref:
+                # 元リストの都道府県は管轄の区分らしく、所在地と隣県でずれる行がある（OSM実測で6.3%）。
+                # 隣県で、かつ同じエリアの県なら採用する（遠方の同名変電所はここで落ちる）
+                # 隣県で、同じエリアの県で、リストの県の既存座標から近い（県境付近）ときだけ採用する。
+                # 遠方や隣県の同名変電所（広島県の西条→愛媛県の西条など）はここで落ちる
                 if got != pref:
-                    return r, name, pref, area, None, f"所在地が{got}で都道府県と一致しない"
+                    near = min((haversine_km(hit[0], hit[1], a, b) for a, b in pts.get(pref, [])),
+                               default=float("inf"))
+                    if not (got in NEIGHBOR_PREFS.get(pref, []) and p2a.get(got) == area
+                            and near <= NEIGHBOR_MAX_KM):
+                        return r, name, pref, area, None, f"所在地が{got}で都道府県と一致しない"
+                    return r, name, pref, area, hit, f"採用(所在地は隣県の{got}・{pref}の既存座標から{near:.1f}km)"
             elif p2a.get(got) != area:
                 return (r, name, pref, area, None,
                         f"所在地が{got}（{p2a.get(got)}エリア）で行のエリアと一致しない")
@@ -238,7 +249,7 @@ def fill(args):
                         ws.cell(r, hdr[k]).fill = FILLED_FILL
                 filled += 1
                 report.append([sheet, r, no, name, pref, round(lat, 6), round(lon, 6),
-                               "採用", gname, addr])
+                               why, gname, addr])
 
     wb.save(args.out or args.list)
     print(f"記入 {filled}件 / 見送り {skipped}件")

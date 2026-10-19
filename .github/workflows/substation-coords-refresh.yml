@@ -35,7 +35,7 @@ jobs:
         run: |
           python3 scripts/fetch_substation_coords.py fetch \
             --in "$LIST" --cache-dir osm_cache \
-            --upgrade-acc 推定 --max-age-days 25 \
+            --upgrade-acc 推定 --max-age-days 25 --with-neighbors \
             --retries 6 --retry-sleep 10 --sleep 5
 
       - name: 座標を反映（未取得の付与＋推定の格上げ）

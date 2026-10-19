@@ -76,6 +76,57 @@ OPERATOR_PREFIXES = [
 ]
 SUFFIXES = ["変電所", "開閉所", "変換所", "電力所", "S/S", "SS"]
 
+# 隣接する都道府県（陸続き＋橋・近接海峡）。元リストの「都道府県」は所在地ではなく管轄の区分らしく、
+# 座標から引いた所在地と食い違う行が隣県で170件（OSM実測の6.3%）ある（例: 上野変電所が「埼玉県」、
+# 気仙沼市の鹿折変電所が「岩手県」）。リストの県で見つからないときは隣県まで探す。
+NEIGHBOR_PREFS = {
+    "北海道": ["青森県"], "青森県": ["北海道", "岩手県", "秋田県"], "岩手県": ["青森県", "秋田県", "宮城県"],
+    "宮城県": ["岩手県", "秋田県", "山形県", "福島県"], "秋田県": ["青森県", "岩手県", "宮城県", "山形県"],
+    "山形県": ["秋田県", "宮城県", "福島県", "新潟県"],
+    "福島県": ["宮城県", "山形県", "新潟県", "群馬県", "栃木県", "茨城県"],
+    "茨城県": ["福島県", "栃木県", "埼玉県", "千葉県"], "栃木県": ["福島県", "茨城県", "群馬県", "埼玉県"],
+    "群馬県": ["福島県", "栃木県", "埼玉県", "長野県", "新潟県"],
+    "埼玉県": ["茨城県", "栃木県", "群馬県", "長野県", "山梨県", "東京都", "千葉県"],
+    "千葉県": ["茨城県", "埼玉県", "東京都", "神奈川県"], "東京都": ["埼玉県", "千葉県", "神奈川県", "山梨県"],
+    "神奈川県": ["東京都", "山梨県", "静岡県", "千葉県"], "新潟県": ["山形県", "福島県", "群馬県", "長野県", "富山県"],
+    "富山県": ["新潟県", "長野県", "岐阜県", "石川県"], "石川県": ["富山県", "岐阜県", "福井県"],
+    "福井県": ["石川県", "岐阜県", "滋賀県", "京都府"], "山梨県": ["埼玉県", "東京都", "神奈川県", "静岡県", "長野県"],
+    "長野県": ["新潟県", "群馬県", "埼玉県", "山梨県", "静岡県", "愛知県", "岐阜県", "富山県"],
+    "岐阜県": ["富山県", "石川県", "福井県", "長野県", "愛知県", "三重県", "滋賀県"],
+    "静岡県": ["神奈川県", "山梨県", "長野県", "愛知県"], "愛知県": ["静岡県", "長野県", "岐阜県", "三重県"],
+    "三重県": ["愛知県", "岐阜県", "滋賀県", "京都府", "奈良県", "和歌山県"],
+    "滋賀県": ["福井県", "岐阜県", "三重県", "京都府"],
+    "京都府": ["福井県", "滋賀県", "三重県", "奈良県", "大阪府", "兵庫県"],
+    "大阪府": ["京都府", "奈良県", "和歌山県", "兵庫県"], "兵庫県": ["京都府", "大阪府", "岡山県", "鳥取県", "徳島県"],
+    "奈良県": ["三重県", "京都府", "大阪府", "和歌山県"], "和歌山県": ["三重県", "奈良県", "大阪府"],
+    "鳥取県": ["兵庫県", "岡山県", "島根県", "広島県"], "島根県": ["鳥取県", "広島県", "山口県"],
+    "岡山県": ["兵庫県", "鳥取県", "広島県", "香川県"], "広島県": ["岡山県", "鳥取県", "島根県", "山口県", "愛媛県"],
+    "山口県": ["島根県", "広島県", "福岡県"], "徳島県": ["香川県", "愛媛県", "高知県", "兵庫県"],
+    "香川県": ["徳島県", "愛媛県", "岡山県"], "愛媛県": ["香川県", "徳島県", "高知県", "広島県"],
+    "高知県": ["徳島県", "愛媛県"], "福岡県": ["佐賀県", "熊本県", "大分県", "山口県"],
+    "佐賀県": ["福岡県", "長崎県"], "長崎県": ["佐賀県"], "熊本県": ["福岡県", "大分県", "宮崎県", "鹿児島県"],
+    "大分県": ["福岡県", "熊本県", "宮崎県"], "宮崎県": ["熊本県", "大分県", "鹿児島県"],
+    "鹿児島県": ["熊本県", "宮崎県"], "沖縄県": [],
+}
+
+# 隣県で見つけた候補は、リストの県の既存の座標（どれか）からこの距離以内のときだけ採用する。
+# 所在地がずれている170件は県境近くにあり、リストの県の最寄りの既存座標までの距離は中央値5.7km。
+# 隣県の同名の別施設（広島県の西条→愛媛県の西条 43km、埼玉県の行田→千葉県の行田 14km）はここで落ちる
+NEIGHBOR_MAX_KM = 10.0
+
+# エリアごとの一般送配電事業者名（OSM側の名称に他社名が入っていたら別施設とみなす）
+AREA_OPERATOR = {
+    "北海道": "北海道電力", "東北": "東北電力", "東京": "東京電力", "中部": "中部電力", "北陸": "北陸電力",
+    "関西": "関西電力", "中国": "中国電力", "四国": "四国電力", "九州": "九州電力", "沖縄": "沖縄電力",
+}
+
+
+def foreign_operator(osm_name, area):
+    """OSM側の名称に、行のエリアとは別の電力会社名が入っているか（例: 東京エリアの行に
+    「中部電力株式会社 日吉変電所」）。入っていれば同名の別施設なので採用しない。"""
+    s = unicodedata.normalize("NFKC", str(osm_name or ""))
+    return any(op in s for a, op in AREA_OPERATOR.items() if a != area)
+
 
 def normalize_name(name):
     """変電所名の照合キー（strict）。事業者名・法人格・連番・空白は落とすが、
@@ -339,7 +390,11 @@ def cache_path(cache_dir, key):
 def cmd_fetch(args):
     rows, _, _ = read_rows(args.src, args.list_sheet)
     missing = [r for r in rows if needs_coords(r, args.upgrade_acc)]
-    prefs = sorted({r["pref"] for r in missing if r["pref"]})
+    prefs = {r["pref"] for r in missing if r["pref"]}
+    if args.with_neighbors:
+        # apply が隣県まで探せるよう、隣県のキャッシュも用意する
+        prefs |= {nb for p in list(prefs) for nb in NEIGHBOR_PREFS.get(p, [])}
+    prefs = sorted(prefs)
     print(f"座標の取得対象 {len(missing)}件 / 対象都道府県 {len(prefs)}件")
     os.makedirs(args.cache_dir, exist_ok=True)
 
@@ -410,10 +465,20 @@ def load_cache(cache_dir):
     return by_pref, japan
 
 
-def match_row(r, by_pref, japan, box):
-    """1行をOSMキャッシュと照合する。(候補 or None, 結果の説明, 照合範囲) を返す。
+def pref_points(rows):
+    """リストの都道府県ごとの既存座標。隣県で見つけた候補が県境近くかを判定するのに使う。"""
+    pts = {}
+    for r in rows:
+        if r["pref"] and isinstance(r["lat"], (int, float)) and isinstance(r["lon"], (int, float)):
+            pts.setdefault(r["pref"], []).append((r["lat"], r["lon"]))
+    return pts
+
+
+def match_row(r, by_pref, japan, box, pts=None):
+    """1行をOSMキャッシュと照合する。(候補 or None, 結果の説明, 照合範囲, 不採用にした候補) を返す。
 
     apply と精度レポート（coord_quality_report.py）の両方が同じ判定を使う。
+    pts（pref_points の結果）を渡したときだけ隣県まで探す。
     """
     if r["pref"] and r["pref"] in by_pref:
         strict, loose = by_pref[r["pref"]]
@@ -434,9 +499,35 @@ def match_row(r, by_pref, japan, box):
         elif l_cands:
             how = f"候補{len(l_cands)}件で特定不可"
 
+    # リストの県に候補がまったく無ければ隣県を探す（元リストの都道府県は所在地とずれることがあるため）。
+    # 隣県では同名の別施設を掴みやすいので、一意・エリア分布内・他社名なしをすべて満たすときだけ採用
+    if best is None and how == "一致なし" and scope != "全国" and pts is not None:
+        cands = {}
+        for nb in NEIGHBOR_PREFS.get(scope, []):
+            if nb in by_pref:
+                for c in by_pref[nb][0].get(normalize_name(r["name"]), []):
+                    cands[(round(c["lat"], 4), round(c["lon"], 4))] = (nb, c)
+        if cands:
+            nb_best, nb_how = resolve([c for _, c in cands.values()], r["vmax"])
+            if nb_best is None:
+                return None, f"隣県で{nb_how}", scope, None
+            nb_pref = next(p for p, c in cands.values() if c is nb_best)
+            if foreign_operator(nb_best["name"], r["area"]):
+                return None, f"隣県({nb_pref})で一致したが他社の変電所のため不採用", scope, nb_best
+            if not in_area(box, r["area"], nb_best["lat"], nb_best["lon"]):
+                return None, f"隣県({nb_pref})で一致したが{r['area']}エリア外のため不採用", scope, nb_best
+            near = min((haversine_km(nb_best["lat"], nb_best["lon"], a, b) for a, b in pts.get(scope, [])),
+                       default=float("inf"))
+            if near > NEIGHBOR_MAX_KM:
+                return (None, f"隣県({nb_pref})で一致したが{scope}の既存座標から{near:.0f}km離れているため不採用",
+                        scope, nb_best)
+            return nb_best, f"{nb_how}(隣県{nb_pref})", scope, None
+
     # 全国検索は同名の別変電所を掴みうるので、エリアの実測分布から外れたら捨てる
     if best is not None and scope == "全国" and not in_area(box, r["area"], best["lat"], best["lon"]):
         return None, f"{how}(全国)だが{r['area']}エリア外のため不採用", scope, best
+    if best is not None and scope == "全国" and foreign_operator(best["name"], r["area"]):
+        return None, f"{how}(全国)だが他社の変電所のため不採用", scope, best
     return best, how, scope, None
 
 
@@ -448,13 +539,14 @@ def cmd_apply(args):
     ws = wb[args.list_sheet]
 
     box = area_ranges(rows)
+    pts = pref_points(rows)
     filled, upgraded, ambiguous, unmatched, off_area, too_far = 0, 0, 0, 0, 0, 0
     report = []
     for r in rows:
         if not needs_coords(r, args.upgrade_acc):
             continue
         had = isinstance(r["lat"], (int, float)) and isinstance(r["lon"], (int, float))
-        best, how, scope, rejected = match_row(r, by_pref, japan, box)
+        best, how, scope, rejected = match_row(r, by_pref, japan, box, pts)
 
         if rejected is not None:
             off_area += 1
@@ -526,6 +618,8 @@ def main():
                    help="OSMデータ時点がこの日数より古いキャッシュは取り直す（定期更新用）")
     f.add_argument("--upgrade-acc", action="append", default=[],
                    help="この座標精度の行も取得対象にする（例: 推定）。複数指定可")
+    f.add_argument("--with-neighbors", action="store_true",
+                   help="対象都道府県の隣県も取得する（元リストの都道府県が所在地とずれる行を隣県で拾うため）")
     f.add_argument("--retries", type=int, default=3,
                    help="1リクエストあたりの再試行回数。Overpassに遮断されがちな環境では増やす")
     f.add_argument("--retry-sleep", type=float, default=5.0,
