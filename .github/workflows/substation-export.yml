@@ -1,0 +1,66 @@
+# 変電所を地域・条件で絞り込んでCSVを払い出す（手動実行）
+# GitHub の Actions タブ → substation-export → Run workflow で地域名などを入れて実行すると、
+# 実行結果のページ下部「Artifacts」からCSV（zip）をダウンロードできる。
+# 上位30件は実行結果のページ（Summary）にも表で出る。
+name: substation-export
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: '地域（都道府県・市区町村・エリア・変電所名の部分一致。カンマ区切りで複数可。空欄なら全国）例: 秋田県 / 横手市,大仙市 / 中部'
+        required: false
+        default: ''
+      ranks:
+        description: '系統ランク'
+        type: choice
+        options: ['S,A', 'S', 'S,A,B', 'S,A,B,C', 'S,A,B,C,データ無,除外']
+        default: 'S,A'
+      up:
+        description: '上位系の確認（all=すべて / ok=上位系で判定したものだけ / ng=当該設備で代用したものだけ）'
+        type: choice
+        options: ['all', 'ok', 'ng']
+        default: 'all'
+      min_cap:
+        description: '空容量の下限MW（空欄なら指定なし）'
+        required: false
+        default: ''
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CSVを作成
+        env:
+          REGION: ${{ inputs.region }}
+          RANKS: ${{ inputs.ranks }}
+          UP: ${{ inputs.up }}
+          MIN_CAP: ${{ inputs.min_cap }}
+        run: |
+          ARGS=(--region "$REGION" --ranks "$RANKS" --up "$UP" --out out/substations.csv)
+          if [ -n "$MIN_CAP" ]; then ARGS+=(--min-cap "$MIN_CAP"); fi
+          python3 scripts/export_substations.py "${ARGS[@]}" | tee result.txt
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import csv, os
+          rows = list(csv.reader(open("out/substations.csv", encoding="utf-8-sig")))
+          print(f"## 変電所の払い出し: {os.environ['REGION'] or '全国'}（ランク {os.environ['RANKS']}・上位系 {os.environ['UP']}）")
+          print()
+          print(open("result.txt", encoding="utf-8").read())
+          print("CSVはこのページ下部の **Artifacts** からダウンロードできます。上位30件:")
+          print()
+          h = rows[0]
+          cols = [h.index(c) for c in ["変電所名", "都道府県", "市区町村", "系統スコア(80)", "系統ランク", "上位系の確認", "空容量_上位系MW", "空容量_当該MW", "N-1電制"]]
+          print("| " + " | ".join(h[i] for i in cols) + " |")
+          print("|" + "---|" * len(cols))
+          for r in rows[1:31]:
+              print("| " + " | ".join(r[i] for i in cols) + " |")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: substations-csv
+          path: out/substations.csv

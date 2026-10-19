@@ -28,7 +28,35 @@ import substation_scoring as S
 # rows の並び。substation.html の F.* と対応する
 FIELDS = ["no", "area", "name", "pref", "lat", "lon", "acc", "vmax", "vsec",
           "opcap", "flow", "availCur", "availUp", "n1", "curtail", "addr",
-          "s1", "s2", "s3", "s4", "s5", "s6", "grid", "rank"]
+          "s1", "s2", "s3", "s4", "s5", "s6", "grid", "rank", "muni", "gpref"]
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REVGEO_CACHE = os.path.join(ROOT, "geo_cache", "revgeo.json")
+MUNI_CACHE = os.path.join(ROOT, "geo_cache", "muni_codes.json")
+
+
+def load_geo():
+    """座標→(都道府県, 市区町村) を引く関数を返す。
+
+    逆ジオコードの結果は build_priority_munis.py --all が geo_cache/ に貯めたものを使い、
+    ここではネットワークに出ない。キャッシュに無い座標は空欄になる。
+    """
+    try:
+        with open(REVGEO_CACHE, encoding="utf-8") as f:
+            cache = json.load(f)
+        with open(MUNI_CACHE, encoding="utf-8") as f:
+            table = json.load(f)
+    except OSError:
+        return lambda la, lo: ("", "")
+
+    def lookup(la, lo):
+        if la is None or lo is None:
+            return "", ""
+        code = cache.get(f"{la:.4f},{lo:.4f}")
+        code = code.lstrip("0") if code else None
+        pm = table.get(code) if code else None
+        return (pm[0], pm[1]) if pm else ("", "")
+    return lookup
 
 
 class Dict_:
@@ -68,18 +96,25 @@ def main():
     d_area, d_acc, d_n1, d_curtail, d_rank = Dict_(), Dict_(), Dict_(), Dict_(), Dict_()
     rows = []
     with_coords = 0
+    geo = load_geo()
+    with_muni = 0
     for (no, area, name, pref, vmax, vsec, lat, lon, acc, cap, opcap, flow,
          avail, avail_up, n1, curtail, addr) in src_rows:
         sc = S.score_row(area, vsec, opcap, flow, avail, avail_up, n1, curtail)
         la, lo = num(lat, 5), num(lon, 5)
         if la is not None and lo is not None:
             with_coords += 1
+        gpref, muni = geo(la, lo)
+        if muni:
+            with_muni += 1
         rows.append([
             num(no), d_area.idx(area), name or "", pref or "", la, lo, d_acc.idx(acc),
             num(vmax), num(vsec), num(opcap), num(flow), num(avail), num(avail_up),
             d_n1.idx(n1), d_curtail.idx(curtail), addr or "",
             sc["s1"], sc["s2"], sc["s3"], sc["s4"], sc["s5"], sc["s6"],
             sc["grid_score"], d_rank.idx(sc["rank"]),
+            # 市区町村と、座標から引いた都道府県（元リストの都道府県が空の行の補完用）
+            muni, gpref,
         ])
 
     payload = {
@@ -88,6 +123,7 @@ def main():
             "source": args.source_label,
             "total": len(rows),
             "withCoords": with_coords,
+            "withMuni": with_muni,
             "gridMax": S.GRID_MAX,
             "s7Max": S.S7_MAX,
             "totalMax": S.TOTAL_MAX,
@@ -120,7 +156,7 @@ def main():
         f.write(header + "window.SUBSTATION_DATA=" + body + ";\n")
 
     size_kb = os.path.getsize(args.out) / 1024
-    print(f"出力: {args.out}  {len(rows)}件（座標あり {with_coords}件） {size_kb:.0f}KB")
+    print(f"出力: {args.out}  {len(rows)}件（座標あり {with_coords}件・市区町村あり {with_muni}件） {size_kb:.0f}KB")
 
 
 if __name__ == "__main__":

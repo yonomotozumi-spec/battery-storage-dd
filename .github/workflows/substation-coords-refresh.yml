@@ -49,6 +49,11 @@ jobs:
         run: |
           python3 scripts/score_substations.py --in "$LIST" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
           python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
+          # 新しく座標が付いた変電所の市区町村を引き（国土地理院）、市区町村入りで作り直す
+          python3 scripts/build_priority_munis.py --all
+          python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
+          # 都道府県別CSV（システムからの払い出し用）
+          python3 scripts/export_substations.py --by-pref exports
           python3 scripts/coord_quality_report.py --in "$LIST" --cache-dir osm_cache \
             --out "docs/変電所座標_精度レポート.md" --history data/coord_quality_history.csv
           cat "docs/変電所座標_精度レポート.md" >> "$GITHUB_STEP_SUMMARY"
@@ -69,7 +74,8 @@ jobs:
           git checkout -b "$BRANCH"
           git add "$LIST" osm_cache coord_report.csv data/substations.js \
             "docs/変電所スコアリング_全国66kV以上_v1.xlsx" \
-            "docs/変電所座標_精度レポート.md" data/coord_quality_history.csv
+            "docs/変電所座標_精度レポート.md" data/coord_quality_history.csv \
+            geo_cache data/priority_munis.json exports
           git commit -m "変電所座標の定期更新: 新規${FILLED}件・推定→実測${UPGRADED}件 ($(date +%F))"
           git push -u origin "$BRANCH"
           {

@@ -8,6 +8,7 @@ data/substations.js のランクS/A変電所（座標あり）を国土地理院
 
   python scripts/build_priority_munis.py            # 生成（逆ジオコードはgeo_cacheに蓄積）
   python scripts/build_priority_munis.py --limit 50 # 動作確認用に件数を絞る
+  python scripts/build_priority_munis.py --all      # 全ランクの変電所を逆ジオコード（市区町村検索・CSV払い出し用）
 
 逆ジオコーダ: https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress
 市区町村コード表: https://maps.gsi.go.jp/js/muni.js
@@ -71,6 +72,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--limit", type=int, help="処理する変電所数の上限（動作確認用）")
     ap.add_argument("--sleep", type=float, default=0.15, help="逆ジオコーダへのリクエスト間隔秒")
+    ap.add_argument("--all", action="store_true",
+                    help="S/A以外も含む座標ありの全変電所を逆ジオコードしてキャッシュに貯める"
+                         "（Web版の市区町村表示・地域別CSVに使う。priority_munis.json の集計はS/Aのまま）")
     args = ap.parse_args()
 
     raw = SUBS_JS.read_text(encoding="utf-8")
@@ -84,13 +88,16 @@ def main():
     ]
     if args.limit:
         targets = targets[: args.limit]
+    geo_targets = targets
+    if args.all:
+        geo_targets = [r for r in data["rows"] if r[f["lat"]] is not None and r[f["lon"]] is not None]
 
     CACHE_DIR.mkdir(exist_ok=True)
     cache = json.loads(REVGEO_CACHE.read_text(encoding="utf-8")) if REVGEO_CACHE.exists() else {}
     muni_table = load_muni_table()
 
     fetched = failed = 0
-    for i, r in enumerate(targets):
+    for i, r in enumerate(geo_targets):
         key = f"{r[f['lat']]:.4f},{r[f['lon']]:.4f}"
         if key in cache:
             continue
@@ -103,7 +110,7 @@ def main():
             failed += 1
         if fetched % 100 == 0 and fetched:
             REVGEO_CACHE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
-            print(f"  {i+1}/{len(targets)} 逆ジオコード済み…")
+            print(f"  {i+1}/{len(geo_targets)} 逆ジオコード済み…", flush=True)
         time.sleep(args.sleep)
     REVGEO_CACHE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 

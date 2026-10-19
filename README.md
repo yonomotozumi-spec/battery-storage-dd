@@ -165,7 +165,30 @@ S1（空容量）とゲートは「空容量(上位系考慮)」で判定しま�
 - 「一覧を表示」で上位100件を表示、「CSVで保存」で該当全件を保存（Excelでそのまま開けるBOM付きUTF-8）
 - 座標検索の結果も、表の下の「この検索結果をCSVで保存」で距離・S7・総合スコア付きで全件保存できます
 
-CSVの列：No.、エリア、変電所名、都道府県、電圧、系統スコア・ランク、上位系の確認、空容量（上位系・当該）、N-1電制、出力制御、
+地域は「エリア → 都道府県 → 市区町村」のプルダウンか、「地域・名前で検索」欄（例: `横手市, 大仙市`、部分一致）で絞れます。
+市区町村は変電所の座標から国土地理院の逆ジオコーダで求めたもので（`build_priority_munis.py --all` が `geo_cache/` に蓄積）、
+元リストで都道府県が空欄の行も座標から都道府県を補っています。座標が無い変電所は市区町村が空欄です。
+
+### 地域別CSVの払い出し（システム側）
+
+画面を使わずに、システムがCSVを作って渡す方法が3つあります。
+
+1. **都道府県別CSV（毎月自動生成）**：`exports/<都道府県>.csv`（全ランク・系統スコア順）と `exports/全国_SA.csv`。
+   毎月の座標更新（substation-coords-refresh）のたびに作り直されます。一覧は [`exports/README.md`](exports/README.md)。
+   GitHub Pagesで公開していれば `…/exports/秋田県.csv` のURLで直接ダウンロードでき、画面の一覧カードにもリンクがあります
+2. **条件を指定して実行（GitHubの画面から）**：Actions タブ → `substation-export` → **Run workflow** で、
+   地域（都道府県・市区町村・エリア・変電所名。カンマ区切り可）・系統ランク・上位系の確認・空容量の下限を入れて実行。
+   終わった実行のページ下部 **Artifacts** からCSVをダウンロードでき、上位30件はページ上にも表で出ます
+3. **コマンド**：
+
+```bash
+python scripts/export_substations.py --region 秋田県 --out 秋田県_SA.csv
+python scripts/export_substations.py --region "横手市,大仙市" --ranks S,A,B --out 横手周辺.csv
+python scripts/export_substations.py --region 中部 --up ok --min-cap 6 --out 中部_上位系確認済.csv
+python scripts/export_substations.py --by-pref exports        # 都道府県別CSVを一括生成
+```
+
+CSVの列：No.、エリア、変電所名、都道府県、市区町村、電圧、系統スコア・ランク、上位系の確認、空容量（上位系・当該）、N-1電制、出力制御、
 運用容量、予想潮流、S1〜S6、緯度経度、座標精度、所在地、接続検討の実績、Googleマップのリンク。
 
 ### 近接スコア S7（20点）
