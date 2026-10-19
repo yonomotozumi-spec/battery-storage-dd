@@ -342,6 +342,25 @@ def write_transport(ws, items, address, pxno):
         for c in range(1,7): ws.cell(r,c).border=BORDER
         ws.row_dimensions[r].height=30; r+=1
 
+def apply_chiban(items, ch):
+    """moj_chiban.py の結果を DD項目1（住所）と11（農地該当）に反映する"""
+    labels=ch.get("chiban") or []
+    em=ch.get("emaff") or {}
+    tag="" if ch.get("status")=="地番を特定" and ch.get("confidence")=="高" else "（推定）"
+    out=[]
+    for (no,name,val,url,how,comment) in items:
+        if no=="1" and labels:
+            head="・".join(labels[:4])+("ほか" if len(labels)>4 else "")
+            val=f"{val}（地番{tag}: {head}）"
+            comment=(comment+" / " if comment else "")+f"地番は登記所備付地図から{ch.get('method','')}（{ch.get('status','')}）。登記簿・公図で確認"
+        if no=="11" and em:
+            url=em.get("url") or url
+            if not val:
+                val=f"eMAFF農地ナビで『{em.get('search_text','')}』を検索して確認"
+            comment=(comment+" / " if comment else "")+em.get("memo","")
+        out.append((no,name,val,url,how,comment))
+    return out
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--address",required=True); ap.add_argument("--lat",type=float,required=True); ap.add_argument("--lon",type=float,required=True)
@@ -349,6 +368,7 @@ def main():
     ap.add_argument("--values",default=""); ap.add_argument("--out",required=True)
     ap.add_argument("--tso",default="",help="送配電エリア（北海道/東北/東京/中部/北陸/関西/中国/四国/九州）。空き容量マップのリンク生成に使用")
     ap.add_argument("--grid",default="",help="系統接続確認の回答JSON（任意）")
+    ap.add_argument("--chiban",default="",help="moj_chiban.py の出力JSON（任意）。地番候補とeMAFF農地ナビの検索リンク・メモを反映")
     args=ap.parse_args()
     items=dd_items(args.lat,args.lon,args.address,args.muni,args.pref)
     permit_ov={}
@@ -364,6 +384,8 @@ def main():
                 if nc: comment=(comment+" / "+nc) if comment else nc
             merged.append((no,name,val,url,how,comment))
         items=merged
+    if args.chiban and os.path.exists(args.chiban):
+        items=apply_chiban(items,json.load(open(args.chiban,encoding="utf-8")))
     wb=Workbook(); ws1=wb.active
     safe=args.address
     for ch in '[]:*?/\\': safe=safe.replace(ch,"")
