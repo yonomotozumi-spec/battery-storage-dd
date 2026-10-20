@@ -563,7 +563,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <span class="card-note" id="map-count"></span>
   </div>
   <div class="frow">
-    <div class="flabel">表示する変電所<div class="fnote">丸の色＝系統ランク、大きい丸＝154kV以上（上位系側）、橙の縁＝上位系の空容量が未確認。座標がある変電所だけ地図に出ます</div></div>
+    <div class="flabel">表示する変電所<div class="fnote">既定は座標のある全変電所。大きい丸＝154kV以上（上位系側）、橙の縁＝上位系の空容量が未確認。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
     <div class="fcontrol">
       <div class="opt-row" id="m-ranks"></div>
       <div class="coord-row list-row">
@@ -1654,7 +1654,9 @@ function renderMarkers() {
   });
   const sa = list.filter(r => ['S', 'A'].includes(rank(r))).length;
   const nBad = list.filter(r => upperStatus(r).cls === 'bad').length, nUnk = list.filter(r => ['unk', 'none'].includes(upperStatus(r).cls)).length;
-  $('map-count').textContent = `表示 ${list.length.toLocaleString()}件（S/A ${sa.toLocaleString()}・上位系ダメ ${nBad.toLocaleString()}・不明 ${nUnk.toLocaleString()}）`;
+  const noCoord = D.meta.total - D.meta.withCoords;
+  $('map-count').innerHTML = `表示 ${list.length.toLocaleString()}件／座標あり ${D.meta.withCoords.toLocaleString()}件（S/A ${sa.toLocaleString()}・上位系ダメ ${nBad.toLocaleString()}・不明 ${nUnk.toLocaleString()}）` +
+    `<br>座標が未取得の ${noCoord.toLocaleString()}件は地図に出ません`;
 }
 
 function renderLegend() {
@@ -1844,8 +1846,14 @@ function toggleChuden() {
 }
 
 function initMapControls() {
-  $('m-ranks').innerHTML = ['S', 'A', 'B', 'C', 'データ無', '除外'].map(r =>
-    `<label class="chk"><input type="checkbox" value="${r}" ${r === 'S' || r === 'A' ? 'checked' : ''}> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
+  // 既定は全変電所（上位系統の状態で色分けするため）。S/Aだけに絞るボタンを用意する
+  $('m-ranks').innerHTML = `<button class="btn-sub" type="button" id="m-preset-all">全変電所</button>
+    <button class="btn-sub" type="button" id="m-preset-sa">良い変電所（S・A）だけ</button>` +
+    ['S', 'A', 'B', 'C', 'データ無', '除外'].map(r =>
+    `<label class="chk"><input type="checkbox" value="${r}" checked> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
+  const setMapRanks = keep => { document.querySelectorAll('#m-ranks input').forEach(i => { i.checked = keep.includes(i.value); }); renderMarkers(); };
+  $('m-preset-all').addEventListener('click', () => setMapRanks(['S', 'A', 'B', 'C', 'データ無', '除外']));
+  $('m-preset-sa').addEventListener('click', () => setMapRanks(['S', 'A']));
   ['m-ranks', 'm-up', 'm-mincap', 'm-kv', 'm-n1', 'm-curtail', 'm-topo'].forEach(id =>
     $(id).addEventListener('change', () => { renderMarkers(); }));
   $('m-mincap').addEventListener('input', () => { renderMarkers(); });
