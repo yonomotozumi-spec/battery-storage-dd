@@ -8,7 +8,7 @@ OSM（Overpass）からの取得は fetch_substation_coords.py で掘り尽く�
 どこから手を付けるかを決めるための作業リストを出す。
 
 優先度は「接続検討を申し込む価値」＝系統スコアのランクに合わせる。
-ランクS/A（系統スコア48点以上）かつゲート除外でない行だけが対象。
+ランクS/A（系統スコア48点以上）かつ上位系0の警告が無い行だけが対象。
 S/A以外は座標が付いても申し込み対象になりにくいので載せない。
 
   優先S/A     : 販売対象エリアのS/A。系統スコアの降順。
@@ -79,7 +79,7 @@ def maps_query(row):
 
 
 def load_targets(src, sheet, ranks=("S", "A"), include_gated=False):
-    """指定ランクの、座標未取得の行を返す（既定はS/Aかつゲート除外でない行）。"""
+    """指定ランクの、座標未取得の行を返す（既定はS/Aかつ上位系0の警告が無い行）。"""
     rows = [dict(zip(FIELDS, r)) for r in read_substations(src, sheet)]
     targets = []
     for r in rows:
@@ -87,7 +87,7 @@ def load_targets(src, sheet, ranks=("S", "A"), include_gated=False):
             continue
         sc = S.score_row(r["area"], r["vsec"], r["opcap"], r["flow"],
                          r["avail"], r["avail_up"], r["n1"], r["curtail"])
-        if (sc["gate"] == "除外" and not include_gated) or sc["rank"] not in ranks:
+        if (sc["gate"] and not include_gated) or sc["rank"] not in ranks:
             continue
         r["rank"] = sc["rank"]
         r["grid"] = sc["grid_score"]
@@ -167,7 +167,7 @@ def main():
                     help="対象ランク（カンマ区切り）。既定 S,A。"
                          "例: --ranks B は候補地の除外判定用に座標だけ揃える用途")
     ap.add_argument("--include-gated", action="store_true",
-                    help="ゲート除外の行も含める（座標だけ揃えたい場合）")
+                    help="上位系0の警告がある行も含める（座標だけ揃えたい場合）")
     ap.add_argument("--defer", action="append", default=[],
                     help="劣後させるエリア名。複数指定可（例: --defer 四国 --defer 北陸）")
     args = ap.parse_args()
@@ -190,7 +190,7 @@ def main():
     wb.save(args.out)
 
     missing = sum(1 for r in all_rows if not isinstance(r["lat"], (int, float)))
-    print(f"座標未取得 {missing}件 / うちS/A(ゲート除外を除く) {len(targets)}件")
+    print(f"座標未取得 {missing}件 / うちS/A(上位系0の警告を除く) {len(targets)}件")
     print(f"  優先 {len(priority)}件 / 劣後 {len(deferred)}件")
     print(f"出力: {args.out}")
 

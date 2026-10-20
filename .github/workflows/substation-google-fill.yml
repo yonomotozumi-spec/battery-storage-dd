@@ -45,7 +45,7 @@ jobs:
       - name: 未取得の変電所リストを作成
         run: |
           python3 scripts/list_missing_coords.py --in "$LIST" --out missing.xlsx \
-            --ranks "S,A,B,C,除外,データ無" --include-gated
+            --ranks "S,A,B,C,データ無" --include-gated
 
       - name: Google Places で検索（名称一致＋所在地の確認）
         run: |

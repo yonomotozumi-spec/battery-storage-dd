@@ -25,7 +25,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_JS = os.path.join(ROOT, "data", "substations.js")
-ALL_RANKS = ["S", "A", "B", "C", "データ無", "除外"]
+ALL_RANKS = ["S", "A", "B", "C", "データ無"]
 
 
 def load(path):
@@ -75,6 +75,7 @@ COLUMNS = [
     ("元リストの都道府県", lambda r: r.get("pref")),
     ("最大電圧kV", lambda r: r["vmax"]), ("二次電圧kV", lambda r: r["vsec"]),
     ("系統スコア(80)", lambda r: r["grid"]), ("系統ランク", lambda r: r["rank"]),
+    ("上位系0の警告", lambda r: "警告" if r.get("gate") else ""),
     ("上位系の確認", up_label),
     ("空容量_上位系MW", lambda r: r["availUp"]), ("空容量_当該MW", lambda r: r["availCur"]),
     ("N-1電制", lambda r: r["n1"]), ("出力制御", lambda r: r["curtail"]),
