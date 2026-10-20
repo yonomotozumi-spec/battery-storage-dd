@@ -285,7 +285,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
 .ust-check { background:#8E24AA; }
 .memo-pin { width:15px; height:15px; border-radius:50%; border:1.5px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.35);
   color:#fff; font-size:9px; font-weight:700; line-height:12px; text-align:center; cursor:pointer; }
-.memo-none { background:#0B9966; } .memo-bank { background:#E3A600; } .memo-yes { background:#CC2A20; } .memo-unk { background:#607D8B; }
+.memo-std { background:#16213D; } .memo-none { background:#0B9966; } .memo-bank { background:#E3A600; } .memo-yes { background:#CC2A20; } .memo-unk { background:#607D8B; }
 .memo-est { border-style:dashed; opacity:.8; }
 .lg-pin { display:inline-block; width:13px; height:13px; border-radius:50%; color:#fff; font-size:8px; font-weight:700; line-height:13px; text-align:center; vertical-align:middle; margin-right:3px; }
 .cap-bad { color:var(--fail); font-weight:700; }
@@ -569,17 +569,20 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <span class="card-note" id="map-count"></span>
   </div>
   <div class="frow">
-    <div class="flabel">表示する変電所<div class="fnote">既定は座標のある全変電所。大きい丸＝154kV以上（上位系側）、橙の縁＝上位系の空容量が未確認。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
+    <div class="flabel">表示する変電所<div class="fnote">既定は座標のある全変電所。丸の色＝変電所単体の空き×上位系の空き（5色）、大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
     <div class="fcontrol">
       <div class="opt-row" id="m-ranks"></div>
       <div class="coord-row list-row">
         <div><div class="coord-label">上位系の確認</div>
           <select id="m-up">
             <option value="all">すべて</option>
-            <option value="ok">上位系を確認できたものだけ</option>
-            <option value="ng">上位系が未確認（当該設備で代用）のものだけ</option>
-            <option value="bad">上位系がダメ（上位系の空き0以下・上位側送電線の空き0）のものだけ</option>
-            <option value="check">要接続検討（ゲート除外だが当該設備に空き／実績で上位系対策なし）のものだけ</option>
+            <option value="ownok">変電所単体で空きあり（緑＋黄＋紫）</option>
+            <option value="both">緑：変電所も上位系も空きあり</option>
+            <option value="upbad">紫：変電所は空きあり・上位系は空き無し（要接続検討）</option>
+            <option value="upunk">黄：変電所は空きあり・上位系は不明</option>
+            <option value="ownbad">赤：変電所単体で空き無し</option>
+            <option value="ok">上位系の値を公表している変電所だけ</option>
+            <option value="ng">上位系の値が未公表（当該設備で代用）の変電所だけ</option>
           </select></div>
         <div><div class="coord-label">空容量の下限 (MW)</div><input type="number" id="m-mincap" placeholder="例: 6" step="0.1" min="0"></div>
         <div><div class="coord-label">電圧階級</div>
@@ -592,7 +595,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <div class="coord-row list-row">
         <div><div class="coord-label">丸の色</div>
           <select id="m-color">
-            <option value="status">上位系統の状態（空きあり／ダメ／不明）</option>
+            <option value="status">変電所単体の空き × 上位系の空き（5色）</option>
             <option value="rank">系統ランク（S〜C・除外）</option>
           </select></div>
       </div>
@@ -1081,10 +1084,12 @@ const CSV_COLS = [
   ['接続検討の実績', r => (memoOf(r) || []).map(m => m[8]).join(' / ')],
   ['Googleマップ', r => val(r, 'lat') != null ? gmaps(val(r, 'lat'), val(r, 'lon')) : ''],
   // ── 地図モードと同じ判定（scripts/grid_status.py と同じ列。システム側のCSVと揃える）──
-  ['上位系統の状態', r => TOPO ? upperStatus(r).label : ''],
+  ['判定（変電所単体×上位系）', r => TOPO ? gridStatus(r).label : ''],
+  ['変電所単体の空き', r => TOPO ? { ok: '空きあり', bad: '空き無し', unk: '非公表' }[gridStatus(r).own.st] : ''],
+  ['上位系の空き', r => TOPO ? { ok: '空きあり', bad: '空き無し', unk: '不明' }[gridStatus(r).up] : ''],
   ['上位系統の判定理由', r => TOPO ? upperStatus(r).reason : ''],
-  ['要接続検討', r => TOPO && upperStatus(r).cls === 'check' ? '○' : ''],
-  ['要接続検討の理由', r => TOPO ? (needCheck(r) || []).join('、') : ''],
+  ['要接続検討', r => TOPO && gridStatus(r).cls === 'upbad' ? '○' : ''],
+  ['要接続検討の理由', r => TOPO && gridStatus(r).cls === 'upbad' ? ('変電所は空きあり・上位系は空き無し' + ((needCheck(r) || []).length ? '。' + needCheck(r).join('、') : '')) : ''],
   ['実績の分類', r => TOPO ? memoText(r) : ''],
   ['実績_対策なし', r => TOPO ? memoSummary(r).none || '' : ''],
   ['実績_バンク等の対策待ち', r => TOPO ? memoSummary(r).bank || '' : ''],
@@ -1491,10 +1496,6 @@ function upperStatus(row) {
   else if (ok.length) r = { cls: 'part', reason: `上位側に空きあり: ${ok.map(desc).join('、')}。この変電所の「空容量(上位系考慮)」は未公表` };
   else if (hasData(row)) r = { cls: 'unk', reason: '「空容量(上位系考慮)」が未公表' + (upLines.length ? '。上位側の変電所・送電線の空容量も非公表' : (ni != null ? '。上位側の送電線がつながりデータに無い' : '。つながりデータなし')) };
   else r = { cls: 'none', reason: upLines.length ? '送配電事業者の空容量が未取得。上位側の空容量も非公表' : '送配電事業者の空容量が未取得' };
-  if (r.cls === 'bad') {
-    const nc = needCheck(row);
-    if (nc) r = { cls: 'check', reason: r.reason + '。ただし ' + nc.join('、') + ' → 接続検討を申し込む価値あり（実績: 王子・由仁・曽根・引野は上位系0でも上位系対策なし）' };
-  }
   r.label = STATUS_LABEL[r.cls];
   UPPER_CACHE.set(row, r);
   return r;
@@ -1522,13 +1523,12 @@ function memoSummary(row) {
   ms.forEach(m => { const u = memoUpper(m); c[u.cls]++; if (u.est) c.est++; else if (u.cls === 'none') c.noneSure++; });
   return c;
 }
-const memoPinClass = c => (c.none ? 'memo-none' : c.bank ? 'memo-bank' : c.yes ? 'memo-yes' : 'memo-unk') + (c.est === c.n ? ' memo-est' : '');
+const memoPinClass = c => 'memo-std' + (c.est === c.n ? ' memo-est' : '');
 const MEMO_LABEL = { none: '上位系・バンク等の対策なし', bank: '上位系の対策なし（別途バンク逆潮流対策・変電設備工事待ち）', yes: '上位系対策あり', unk: '記載なし' };
 // 「要接続検討」: ゲート除外（上位系0かつN-1不可）だが、当該設備の空きがS1の第2段階（≧6MW）以上、または実績で上位系対策なしの回答がある。
 // 実績では上位系0でも当該設備に空きがあれば上位系対策なしで通った例（王子・由仁・曽根・引野）があるため、一律に隠さず別表示する
 const NEED_CHECK_MW = (D && D.params.s1Steps && D.params.s1Steps[1]) ? D.params.s1Steps[1][0] : 6;
 function needCheck(row) {
-  if (rank(row) !== '除外') return null;
   const why = [];
   const cur = val(row, 'availCur');
   if (cur != null && cur >= NEED_CHECK_MW) why.push(`当該設備の空容量 ${cur}MW（≧${NEED_CHECK_MW}MW）`);
@@ -1536,7 +1536,43 @@ function needCheck(row) {
   if (c.noneSure) why.push(`接続検討の実績で上位系・バンク等の対策なしの回答 ${c.noneSure}件`);
   return why.length ? why : null;
 }
-const ustBadge = row => { const u = upperStatus(row); return `<span class="ust ust-${u.cls}" title="${esc(u.reason)}">${esc(u.label)}</span>`; };
+// ── 整理した判定：変電所単体（当該設備＝配電用バンク）の空き × 上位系の空き → 5区分 ──
+//  both   緑  変電所も上位系も空きあり
+//  upunk  黄  変電所は空きあり・上位系は不明（東北・北陸・四国・中部・沖縄に多い）
+//  upbad  紫  変電所は空きあり・上位系は空き無し → 要接続検討（実績: 王子・由仁・曽根・引野は上位系0でも通った）
+//  ownbad 赤  変電所単体で空き無し（上位系がどうでも配電用バンクに空きが無い）
+//  none   灰  空容量データ無し
+const GS_COLOR = { both: '#0B9966', upunk: '#E3A600', upbad: '#8E24AA', ownbad: '#CC2A20', none: '#C9CFDC' };
+const GS_LABEL = { both: '変電所も上位系も空きあり', upunk: '変電所は空きあり・上位系は不明', upbad: '変電所は空きあり・上位系は空き無し（要接続検討）',
+  ownbad: '変電所単体で空き無し', none: '空容量データ無し' };
+const GS_UST = { both: 'ust-ok', upunk: 'ust-unk', upbad: 'ust-check', ownbad: 'ust-bad', none: 'ust-none' };
+// 変電所単体の空き：当該設備の空容量。非公表でも上位系考慮が>0なら当該にも空きがある
+function ownStatus(row) {
+  const c = val(row, 'availCur'), u = val(row, 'availUp');
+  if (c != null) return { st: c > 0 ? 'ok' : 'bad', cap: c };
+  if (u != null && u > 0) return { st: 'ok', cap: u };
+  return { st: 'unk', cap: null };
+}
+const GS_CACHE = new WeakMap();
+function gridStatus(row) {
+  if (GS_CACHE.has(row)) return GS_CACHE.get(row);
+  const o = ownStatus(row), u = upperStatus(row);
+  const up = ['ok', 'part'].includes(u.cls) ? 'ok' : u.cls === 'bad' ? 'bad' : 'unk';
+  let cls;
+  if (o.st === 'bad') cls = 'ownbad';
+  else if (o.st === 'ok') cls = up === 'ok' ? 'both' : up === 'bad' ? 'upbad' : 'upunk';
+  else cls = up === 'bad' ? 'ownbad' : 'none';   // 当該が非公表で上位系考慮が0以下 → 空き無し扱い
+  const ownText = o.st === 'ok' ? `空きあり ${o.cap}MW` : o.st === 'bad' ? `空き無し ${o.cap}MW` : '非公表';
+  const upText = up === 'ok' ? '空きあり' : up === 'bad' ? '空き無し' : '不明';
+  const nc = cls === 'upbad' ? needCheck(row) : null;
+  const r = { cls, own: o, up, upInfo: u, label: GS_LABEL[cls],
+    reason: `変電所単体（当該設備）: ${ownText}／上位系: ${upText}（${u.reason}）` +
+      (cls === 'upbad' ? (nc ? `。${nc.join('、')} → 実績で上位系0でも通った例（王子・由仁・曽根・引野）と同じ条件` : '。接続検討で上位系の扱いを確認する価値あり') : '') };
+  GS_CACHE.set(row, r);
+  return r;
+}
+const gsBadge = row => { const g = gridStatus(row); return `<span class="ust ${GS_UST[g.cls]}" title="${esc(g.reason)}">${esc(g.label)}</span>`; };
+const ustBadge = gsBadge;
 const capCell = v => v == null ? '—' : v <= 0 ? `<span class="cap-bad">${v}</span>` : `<span class="cap-ok">${v}</span>`;
 
 // 上位系設備の参照（["L", 送電線添字] / ["N", ノード添字] / ["T", 文字]）を表示用の文字にする。空き0以下のものは赤
@@ -1601,10 +1637,10 @@ function topologyHtml(row) {
   const a = area(row), ni = nodeOf(row);
   const head = '<div class="dt-title">上位系統・つながり（送配電事業者の公表CSVから）</div>';
   if (!TOPO.meta.areas.includes(a)) {
-    return `<div class="topo-box">${head}<div style="margin:2px 0 6px">${ustBadge(row)} <span class="ust-reason">${esc(upperStatus(row).reason)}</span></div>${memoHtmlSummary(row)}<div class="topo-note">${esc(a)}エリアは公表CSVを自動取得できないため、つながりの情報はありません。${esc(TOPO_MANUAL[a] || '')}</div></div>`;
+    return `<div class="topo-box">${head}<div style="margin:2px 0 6px">${gsBadge(row)} <span class="ust-reason">${esc(gridStatus(row).reason)}</span></div>${memoHtmlSummary(row)}<div class="topo-note">${esc(a)}エリアは公表CSVを自動取得できないため、つながりの情報はありません。${esc(TOPO_MANUAL[a] || '')}</div></div>`;
   }
   if (ni == null) {
-    return `<div class="topo-box">${head}<div style="margin:2px 0 6px">${ustBadge(row)} <span class="ust-reason">${esc(upperStatus(row).reason)}</span></div>${memoHtmlSummary(row)}<div class="topo-note">${esc(a)}の公表CSV（${esc(topoDates(a))}）に同じ名前の変電所が見つからず、つながりを付与できませんでした。名前の表記違いか、公表対象外（配電用変電所の一部など）の可能性があります。</div></div>`;
+    return `<div class="topo-box">${head}<div style="margin:2px 0 6px">${gsBadge(row)} <span class="ust-reason">${esc(gridStatus(row).reason)}</span></div>${memoHtmlSummary(row)}<div class="topo-note">${esc(a)}の公表CSV（${esc(topoDates(a))}）に同じ名前の変電所が見つからず、つながりを付与できませんでした。名前の表記違いか、公表対象外（配電用変電所の一部など）の可能性があります。</div></div>`;
   }
   const node = TOPO.nodes[ni];
   const banks = node[3];
@@ -1637,9 +1673,9 @@ function topologyHtml(row) {
     </tr>`;
   }).join('');
   const nUp = links.filter(x => v1max != null && lineKv(x.line) != null && lineKv(x.line) >= v1max).length;
-  const u = upperStatus(row);
+  const g = gridStatus(row);
   return `<div class="topo-box">${head}
-    <div style="margin:2px 0 6px">${ustBadge(row)} <span class="ust-reason">${esc(u.reason)}</span></div>
+    <div style="margin:2px 0 6px">${gsBadge(row)} <span class="ust-reason">${esc(g.reason)}</span></div>
     ${memoHtmlSummary(row)}
     <div class="topo-note">${esc(a)}の公表（${esc(topoDates(a))}）。公表物の変電所名「${esc(node[1])}」${node[5].length ? '（No. ' + esc(node[5].join('・')) + '）' : ''}に引き当て。
       ${banks.length ? '' : '変圧器の公表行は無く（開閉所など）、送電線の端点として出てくるものです。'}</div>
@@ -1721,8 +1757,8 @@ function mapFilter() {
     if (!ranks.includes(rank(r))) return false;
     if (up === 'ok' && !upChecked(r)) return false;
     if (up === 'ng' && (upChecked(r) || !hasData(r))) return false;
-    if (up === 'bad' && !['bad', 'check'].includes(upperStatus(r).cls)) return false;
-    if (up === 'check' && upperStatus(r).cls !== 'check') return false;
+    if (up === 'ownok' && !['both', 'upunk', 'upbad'].includes(gridStatus(r).cls)) return false;
+    if (['both', 'upbad', 'upunk', 'ownbad'].includes(up) && gridStatus(r).cls !== up) return false;
     if ($('m-memo').checked && !memoOf(r)) return false;
     if (isFinite(minCap) && !(effCap(r) >= minCap)) return false;
     const vm = val(r, 'vmax');
@@ -1738,12 +1774,12 @@ function mapFilter() {
 function markerStyle(r, selected) {
   const rk = rank(r), big = val(r, 'vmax') >= 154;
   const byStatus = $('m-color').value === 'status';
-  const fill = byStatus ? STATUS_COLOR[upperStatus(r).cls] : (RANK_COLOR[rk] || '#999');
+  const fill = byStatus ? GS_COLOR[gridStatus(r).cls] : (RANK_COLOR[rk] || '#999');
   return {
     radius: (big ? 7 : 4.5) + (selected ? 3 : 0),
-    fillColor: fill, fillOpacity: rk === 'データ無' && !byStatus ? .6 : .9,
-    color: selected ? '#16213D' : (!hasData(r) ? '#8390AC' : upChecked(r) ? '#334155' : '#E08A00'),
-    weight: selected ? 3 : (hasData(r) && !upChecked(r) ? 2.2 : 1),
+    fillColor: fill, fillOpacity: (byStatus ? gridStatus(r).cls === 'none' : rk === 'データ無') ? .6 : .9,
+    color: selected ? '#16213D' : '#334155',
+    weight: selected ? 3 : 1,
     opacity: 1,
   };
 }
@@ -1752,7 +1788,7 @@ function markerTip(r) {
   return `<b>${esc(val(r, 'name'))}</b>（${esc(area(r))}${prefOf(r) ? ' / ' + esc(prefOf(r)) : ''}）<br>` +
     `系統ランク ${esc(rank(r))}・${val(r, 'grid')}点　${val(r, 'vmax') != null ? val(r, 'vmax') + 'kV' : ''}${val(r, 'vsec') != null ? '→' + val(r, 'vsec') + 'kV' : ''}<br>` +
     `空容量 上位系 ${fmtNum(val(r, 'availUp'))}／当該 ${fmtNum(val(r, 'availCur'))} MW　N-1 ${esc(n1(r))}<br>` +
-    `上位系統: <b style="color:${STATUS_COLOR[upperStatus(r).cls]}">${esc(upperStatus(r).label)}</b>` +
+    `判定: <b style="color:${GS_COLOR[gridStatus(r).cls]}">${esc(gridStatus(r).label)}</b>` +
     (nodeOf(r) != null ? `　つながる送電線 ${nodeLinks(nodeOf(r)).length}本` : '') +
     (memoOf(r) ? `<br>接続検討の実績 ${memoSummary(r).n}件（対策なし ${memoSummary(r).none}・バンク等の対策待ち ${memoSummary(r).bank}・上位系対策あり ${memoSummary(r).yes}・記載なし ${memoSummary(r).unk}${memoSummary(r).est ? `・うち変電所は推定 ${memoSummary(r).est}` : ''}）` : '');
 }
@@ -1781,10 +1817,10 @@ function renderMarkers() {
     }
   });
   const sa = list.filter(r => ['S', 'A'].includes(rank(r))).length;
-  const nBad = list.filter(r => upperStatus(r).cls === 'bad').length, nUnk = list.filter(r => ['unk', 'none'].includes(upperStatus(r).cls)).length;
-  const nCheck = list.filter(r => upperStatus(r).cls === 'check').length, nMemo = list.filter(r => memoOf(r)).length;
+  const cnt = k => list.filter(r => gridStatus(r).cls === k).length, nMemo = list.filter(r => memoOf(r)).length;
   const noCoord = D.meta.total - D.meta.withCoords;
-  $('map-count').innerHTML = `表示 ${list.length.toLocaleString()}件／座標あり ${D.meta.withCoords.toLocaleString()}件（S/A ${sa.toLocaleString()}・上位系ダメ ${nBad.toLocaleString()}・要接続検討 ${nCheck.toLocaleString()}・不明 ${nUnk.toLocaleString()}・実績あり ${nMemo}）` +
+  $('map-count').innerHTML = `表示 ${list.length.toLocaleString()}件／座標あり ${D.meta.withCoords.toLocaleString()}件（S/A ${sa.toLocaleString()}）` +
+    `<br>緑 ${cnt('both').toLocaleString()}・黄 ${cnt('upunk').toLocaleString()}・紫 ${cnt('upbad').toLocaleString()}・赤 ${cnt('ownbad').toLocaleString()}・灰 ${cnt('none').toLocaleString()}・実績あり ${nMemo}` +
     `<br>座標が未取得の ${noCoord.toLocaleString()}件は地図に出ません`;
 }
 
@@ -1792,12 +1828,11 @@ function renderLegend() {
   const dot = (c, extra = '') => `<span class="lg-dot ${extra}" style="background:${c}"></span>`;
   const byStatus = $('m-color').value === 'status';
   const dots = byStatus
-    ? `<span><b>丸の色＝上位系統：</b></span>` + ['ok', 'part', 'bad', 'check', 'unk', 'none'].map(k => `<span>${dot(STATUS_COLOR[k])}${STATUS_LABEL[k]}</span>`).join('')
+    ? `<span><b>丸の色＝変電所単体の空き × 上位系の空き：</b></span>` + ['both', 'upunk', 'upbad', 'ownbad', 'none'].map(k => `<span>${dot(GS_COLOR[k])}${GS_LABEL[k]}</span>`).join('')
     : `<span><b>丸の色＝系統ランク：</b></span>` + Object.entries(RANK_COLOR).map(([k, c]) => `<span>${dot(c)}${k === 'データ無' ? '空容量データ無し' : k === '除外' ? 'ゲート除外' : k}</span>`).join('');
   $('map-legend').innerHTML = dots +
-    `<span>${dot('#fff', 'big')}154kV以上（上位系側）</span><span>${dot('#fff', 'up-ng')}上位系未確認</span>` +
-    `<span style="margin-left:6px"><b>接続検討の実績：</b></span>` +
-    `<span><span class="lg-pin memo-none">実</span>上位系・バンク等の対策なし</span><span><span class="lg-pin memo-bank">実</span>上位系なし・バンク等の対策待ち</span><span><span class="lg-pin memo-yes">実</span>上位系対策あり</span><span><span class="lg-pin memo-unk">実</span>記載なし</span><span><span class="lg-pin memo-unk memo-est">推</span>変電所は推定</span>` +
+    `<span>${dot('#fff', 'big')}154kV以上（上位系側）</span>` +
+    `<span style="margin-left:6px"><span class="lg-pin memo-std">実</span>接続検討の実績あり（内容は内訳・CSV）</span><span><span class="lg-pin memo-std memo-est">推</span>実績の変電所は推定</span>` +
     `<span style="margin-left:6px"><b>線の色＝空容量：</b></span>` +
     `<span><span class="lg-line" style="border-color:${STATUS_COLOR.ok}"></span>上位側に空きあり</span>` +
     `<span><span class="lg-line" style="border-color:${STATUS_COLOR.bad}"></span>上位側に空き無し（ダメ）</span>` +
@@ -2004,8 +2039,8 @@ function initMapControls() {
     ? `・丸をクリックすると、その変電所の系統データ・スコア内訳と<b>上位系統（つながっている送電線・相手側の変電所・上位系の制約設備）</b>を下に表示し、相手側までの模式線を引きます。相手側の名前をクリックすると、そこへ移ってさらに上位をたどれます。<br>` +
       `・つながりのデータは ${esc(areas)} の${TOPO.meta.areas.length}エリア（各社の公表CSV、北海道は公表PDF。変電所 ${TOPO.meta.linkedRows.toLocaleString()}件に付与、生成 ${esc(TOPO.meta.generated)}）。東京・中部・沖縄は公表物を自動取得できないため、空容量などの系統データのみです。<br>` +
       `・模式線は公表CSVの「潮流方向」の両端を直線で結んだもので、実際の送電線の経路ではありません。中部は「中部電力PG公表の送電線」で実形状を重ねられます。<br>` +
-      `・<b>上位系統の状態</b>：緑＝この変電所の「空容量(上位系考慮)」に空きあり、赤＝ダメ（「空容量(上位系考慮)」が0以下、または未公表で上位側の変電所の該当バンクが全て空き0以下）、黄緑＝この変電所の上位系値は未公表だが上位側の変電所には空きあり（混在を含む）、橙＝不明（上位系も上位側も非公表）、灰＝空容量データ無し、<b>紫＝要接続検討</b>（ゲート除外だが当該設備の空きが${NEED_CHECK_MW}MW以上、または実績で上位系対策なしの回答がある。王子・由仁型の当たりを拾うための区分）。「上位系がダメ」「要接続検討」は「上位系の確認」のプルダウンで絞り込めます。<br>` +
-      `・「実」の印は接続検討の実績がある変電所（緑＝回答書に上位系もバンク等の対策もなし、黄＝上位系の対策はないが別途バンク逆潮流対策・変電設備工事待ち、赤＝上位系対策あり、灰＝記載なし。点線の「推」は回答書に変電所名が無く住所から推定した実績で、その変電所の回答とは限らない）。<b>「上位系統対策なし」の回答は公表の空容量より優先してよい</b>（回答の有効期限内に契約申込まで進めること、出力制御の見込みは別途確認）。`
+      `・<b>丸の色（5色）</b>は「変電所単体（当該設備＝配電用バンク）の空き」と「上位系の空き」の組み合わせです。緑＝両方空きあり、黄＝変電所は空きあり・上位系は不明（上位系の値が未公表のエリア）、<b>紫＝変電所は空きあり・上位系は空き無し＝要接続検討</b>（実績では王子・由仁・曽根・引野が上位系0でも上位系対策なしで通った。当該設備の空きが${NEED_CHECK_MW}MW以上か実績で対策なしなら特に）、赤＝変電所単体で空き無し、灰＝データ無し。上位系の空きは「空容量(上位系考慮)」、未公表なら上位側の変電所の該当バンクで判定し、それも非公表なら「不明」。<br>` +
+      `・「実」の印は接続検討の実績がある変電所。回答の内容（上位系対策なし／バンク等の対策待ち／上位系対策あり）は内訳とCSVに出します。点線の「推」は回答書に変電所名が無く住所から推定した実績で、その変電所の回答とは限りません。<b>「上位系統対策なし」の回答は公表の空容量より優先してよい</b>（回答の有効期限内に契約申込まで進めること、出力制御の見込みは別途確認）。`
     : '・data/grid_topology.js を読み込めなかったため、つながりの表示はできません（空容量などの表示は可能です）。';
 }
 
