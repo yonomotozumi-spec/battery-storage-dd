@@ -91,6 +91,9 @@ COLUMNS = [
     ("元リストの都道府県", lambda r: r.get("pref")),
     ("最大電圧kV", lambda r: r["vmax"]), ("二次電圧kV", lambda r: r["vsec"]),
     ("系統スコア(80)", lambda r: r["grid"]), ("系統ランク", lambda r: r["rank"]),
+    # 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類
+    ("カテゴリ（地図の色）", lambda r: GS.category_text(r["_row"]) if GS else ""),
+    ("接続検討の実績（件数・分類）", lambda r: GS.memo_text(r["_row"]) if GS else ""),
     ("上位系の確認", up_label),
     ("空容量_上位系MW", lambda r: r["availUp"]), ("空容量_当該MW", lambda r: r["availCur"]),
     ("N-1電制", lambda r: r["n1"]), ("出力制御", lambda r: r["curtail"]),
@@ -99,15 +102,14 @@ COLUMNS = [
     ("S4出制", lambda r: r["s4"]), ("S5配変", lambda r: r["s5"]), ("S6エリア", lambda r: r["s6"]),
     ("緯度", lambda r: r["lat"]), ("経度", lambda r: r["lon"]), ("座標精度", lambda r: r["acc"]),
     ("所在地(参考)", lambda r: r["addr"]), ("接続検討の実績", lambda r: r["memo"]),
+    ("接続検討の実績_詳細", lambda r: GS.memo_detail_text(r["_row"]) if GS else ""),
     ("Googleマップ", lambda r: f"https://www.google.com/maps?q={r['lat']},{r['lon']}" if r["lat"] is not None else ""),
     # ── 地図モードと同じ判定（grid_status.py）──
-    ("判定（変電所単体×上位系）", _gs(lambda g, row: g.grid_status(row)["label"])),
     ("変電所単体の空き", _gs(lambda g, row: {"ok": "空きあり", "bad": "空き無し", "unk": "非公表"}[g.grid_status(row)["own"]["st"]])),
     ("上位系の空き", _gs(lambda g, row: {"ok": "空きあり", "bad": "空き無し", "unk": "不明"}[g.grid_status(row)["up"]])),
     ("上位系統の判定理由", _gs(lambda g, row: g.upper_status(row)["reason"])),
     ("要接続検討", _gs(lambda g, row: "○" if g.grid_status(row)["cls"] == "upbad" else "")),
     ("要接続検討の理由", _gs(lambda g, row: ("変電所は空きあり・上位系は空き無し" + ("。" + "、".join(g.need_check(row)) if g.need_check(row) else "")) if g.grid_status(row)["cls"] == "upbad" else "")),
-    ("実績の分類", _gs(lambda g, row: g.memo_text(row))),
     ("実績_対策なし", _gs(lambda g, row: g.memo_summary(row)["none"] or "")),
     ("実績_バンク等の対策待ち", _gs(lambda g, row: g.memo_summary(row)["bank"] or "")),
     ("実績_上位系対策あり", _gs(lambda g, row: g.memo_summary(row)["yes"] or "")),
@@ -188,9 +190,9 @@ def by_pref(rows, meta, outdir):
         "各都道府県の全変電所（全ランク）を系統スコア順に並べたCSVです。Excelでそのまま開けます。"
         "「系統ランク」「上位系の確認」列でフィルタしてください。",
         "",
-        "地図モード（substation.html#map）と同じ判定の列も入っています：「判定（変電所単体×上位系）」（緑＝両方空きあり／黄＝変電所は空きあり・上位系は不明／"
+        "地図モード（substation.html#map）と同じ判定の列も入っています：「カテゴリ（地図の色）」（緑＝両方空きあり／黄＝変電所は空きあり・上位系は不明／"
         "紫＝変電所は空きあり・上位系は空き無し＝要接続検討／赤＝変電所単体で空き無し／灰＝データ無し）と「変電所単体の空き」「上位系の空き」「上位系統の判定理由」、"
-        "「要接続検討」（○＝紫）、「実績の分類」（対策なし／バンク等の対策待ち／"
+        "「要接続検討」（○＝紫）、「接続検討の実績（件数・分類）」（対策なし／バンク等の対策待ち／"
         "上位系対策あり／記載なし、うち変電所は推定）、「上位側の送電線（相手側・上位側の空き）」、「上位系の制約設備（▼＝空き0以下）」。"
         "つながりの元は東北・北陸・関西・中国・四国・九州・北海道の公表物で、東京・中部・沖縄は「対象外エリア」になります。",
         "",

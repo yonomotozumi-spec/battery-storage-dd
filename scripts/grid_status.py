@@ -28,6 +28,7 @@ STATUS_LABEL = {
     "none": "空容量データ無し",
 }
 MEMO_LABEL = {"none": "対策なし", "bank": "バンク等の対策待ち", "yes": "上位系対策あり", "unk": "記載なし"}
+GS_NAME = {"both": "緑", "upunk": "黄", "upbad": "紫", "ownbad": "赤", "none": "灰"}
 GS_LABEL = {
     "both": "変電所も上位系も空きあり",
     "upunk": "変電所は空きあり・上位系は不明",
@@ -56,6 +57,7 @@ class GridStatus:
         s1 = d.get("params", {}).get("s1Steps") or []
         self.need_check_mw = s1[1][0] if len(s1) > 1 else 6
         self.memo = {}
+        self.result_index = {id(r): i for i, r in enumerate(self.results)}
         for r in self.results:
             self.memo.setdefault(r[0] + str(r[1]).strip(), []).append(r)
         self.row_by_no = {str(r[self.F["no"]]): r for r in self.rows}
@@ -318,6 +320,21 @@ class GridStatus:
             return ""
         parts = [f"{MEMO_LABEL[k]}{c[k]}" for k in ("none", "bank", "yes", "unk") if c[k]]
         return f"{c['n']}件（" + "・".join(parts) + (f"・うち変電所は推定{c['est']}" if c["est"] else "") + "）"
+
+    def category_text(self, row):
+        """地図と同じカテゴリ（5色）。例「紫：変電所は空きあり・上位系は空き無し（要接続検討）」"""
+        g = self.grid_status(row)
+        return f"{GS_NAME[g['cls']]}：{g['label']}"
+
+    def memo_detail_text(self, row):
+        """接続検討の実績の全項目（回答ごとに1行。画面の memoDetailText と同じ）"""
+        out = []
+        for m in self.memo_of(row):
+            cls, est = self.memo_upper(m)
+            i = self.result_index.get(id(m), -1)
+            out.append(f"#{i + 1}【{MEMO_LABEL[cls]}{'・変電所は推定' if est else ''}】{m[8]}／案件:{m[2]}／出力:{m[3]}／"
+                       f"負担金:{m[4]}／工期:{m[5]}／対策:{m[6]}／教訓・上位系:{m[7]}")
+        return "\n".join(out)
 
     def topo_available(self, row):
         if not self.topo:
