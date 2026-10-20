@@ -229,6 +229,20 @@ tr.row-detail > td { background:var(--bg); padding:0; }
 .kv dt { color:var(--txt3); white-space:nowrap; }
 .kv dd { color:var(--txt); font-variant-numeric:tabular-nums; }
 .detail-note { grid-column:1/-1; font-size:11px; color:var(--txt2); background:var(--surf); border:1px solid var(--bdr); border-radius:6px; padding:8px 10px; line-height:1.5; }
+.memo-card { grid-column:1/-1; border:1px solid var(--acc); border-radius:6px; background:var(--surf); padding:8px 10px; }
+.memo-card .dt-title { color:var(--acc); }
+.memo-item { border-top:1px dashed var(--bdr); padding:7px 0 4px; font-size:11.5px; }
+.memo-item:first-of-type { border-top:none; }
+.memo-item .kv { margin-top:4px; }
+.memo-item .kv dd { white-space:normal; }
+.memo-cls { display:inline-block; font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:4px; color:#fff; margin-right:4px; white-space:nowrap; }
+#res-details .def-tbl { min-width:1250px; }
+#res-details .def-tbl td:nth-child(8) { white-space:nowrap; }
+#res-details .memo-est-tag { display:block; width:max-content; margin-top:3px; white-space:nowrap; }
+.memo-cls.none { background:#0B9966; } .memo-cls.bank { background:#E3A600; } .memo-cls.yes { background:#CC2A20; } .memo-cls.unk { background:#607D8B; }
+.memo-est-tag { display:inline-block; font-size:10.5px; padding:0 6px; border:1px dashed var(--warn); color:var(--warn); border-radius:4px; }
+#resbody tr.res-hit td { background:rgba(27,85,204,.12); }
+#resbody tr { scroll-margin-top:60px; }
 .detail-links { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:6px; }
 .chip {
   padding:4px 10px; border:1px solid var(--bdr); border-radius:14px;
@@ -651,11 +665,12 @@ details.foldable[open] > summary::before { content:'▾ '; }
   <ul class="plain-list" id="noteslist"></ul>
 </details>
 
-<details class="card foldable">
+<details class="card foldable" id="res-details">
   <summary>接続検討回答の実績DB（<span id="rescount"></span>）</summary>
+  <div class="msg" id="res-filter" style="display:none;border-bottom:1px solid var(--bdr)"></div>
   <div class="tbl-scroll">
     <table class="def-tbl">
-      <thead><tr><th>エリア</th><th>変電所名</th><th>案件</th><th>負担金</th><th>連系工期</th><th>主な対策工事</th><th>教訓・律速</th></tr></thead>
+      <thead><tr><th>#</th><th>エリア</th><th>変電所名</th><th>案件</th><th>出力</th><th>負担金</th><th>連系工期</th><th>上位系の扱い</th><th>主な対策工事</th><th>教訓・律速</th></tr></thead>
       <tbody id="resbody"></tbody>
     </table>
   </div>
@@ -986,9 +1001,7 @@ function detailHtml(h) {
       <dt>所在地(参考)</dt><dd>${esc(val(row, 'addr') || '—')}</dd>
     </dl>`;
 
-  const memoHtml = memo ? memo.map(m => `<div class="detail-note"><b>この変電所の接続検討 実績</b>：
-      ${esc(m[2])}／出力${esc(m[3])}／負担金 ${esc(m[4])}／工期 ${esc(m[5])}／対策 ${esc(m[6])}
-      <br>教訓・律速: ${esc(m[7])}</div>`).join('') : '';
+  const memoHtml = memo ? memoCardHtml(row) : '';
 
   const gateHtml = rank(row) === '除外'
     ? `<div class="detail-note" style="border-color:var(--fail);color:var(--fail)">
@@ -1034,6 +1047,7 @@ function detailHtml(h) {
       ${gateHtml}${upHtml}${noDataHtml}${accHtml}${memoHtml}
       ${topologyHtml(row)}
       <div class="detail-links">
+        ${memo ? `<a class="chip res-jump" href="#" data-res="${memo.map(m => D.results.indexOf(m)).join(',')}">📋 接続検討の実績（${memo.length}件）を実績DBで見る</a>` : ''}
         ${h.noMapChip ? '' : `<a class="chip topo-map" data-no="${val(row, 'no')}" href="#map">🗺 地図で系統のつながりを見る</a>`}
         <a class="chip" href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">📍 変電所をGoogleマップで見る</a>
         <a class="chip" href="https://maps.gsi.go.jp/#15/${val(row, 'lat')}/${val(row, 'lon')}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>
@@ -1335,9 +1349,11 @@ function renderStatic() {
   $('noteslist').innerHTML = D.notes.map(n => `<li>${esc(n)}</li>`).join('') +
     `<li>系統ランクは系統スコア80点での区分（S:${D.params.gridRank.S}以上 / A:${D.params.gridRank.A} / B:${D.params.gridRank.B}）。` +
     `本画面の総合ランクは、これを100点満点に比例換算した本ツール独自の区分（S:${sThr}以上 / A:${aThr} / B:${bThr}）です。</li>`;
-  $('resbody').innerHTML = D.results.map(r =>
-    `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[4])}</td>
-      <td>${esc(r[5])}</td><td>${esc(r[6])}</td><td>${esc(r[7])}</td></tr>`).join('');
+  $('resbody').innerHTML = D.results.map((r, i) => {
+    const u = memoUpper(r);
+    return `<tr id="res-${i}"><td class="num">${i + 1}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td>
+      <td>${esc(r[5])}</td><td><span class="memo-cls ${u.cls}">${esc(MEMO_LABEL_SHORT[u.cls])}</span>${u.est ? '<span class="memo-est-tag">変電所は推定</span>' : ''}</td><td>${esc(r[6])}</td><td>${esc(r[7])}</td></tr>`;
+  }).join('');
   const nImp = D.results.length - D.resultsManual;
   $('rescount').textContent = `${D.results.length}件：手入力${D.resultsManual}件＝スコアの校正元／` +
     `接続検討回答 検証一覧から取込${nImp}件＝AI読取値のため判断前に原本確認`;
@@ -1621,6 +1637,48 @@ function nodeLinks(ni) {
   return out;
 }
 
+// 内訳に出す「接続検討の実績」の詳しいカード（実績DBの全項目）。「実」の印を押すとここに移る
+function memoCardHtml(row) {
+  const ms = memoOf(row) || [];
+  if (!ms.length) return '';
+  const items = ms.map(m => {
+    const i = D.results.indexOf(m), u = memoUpper(m);
+    const manual = i >= 0 && i < D.resultsManual;
+    return `<div class="memo-item">
+      <span class="memo-cls ${u.cls}">${esc(MEMO_LABEL_SHORT[u.cls])}</span>${u.est ? '<span class="memo-est-tag">変電所は推定（回答書に変電所名なし）</span>' : ''}
+      <b>${esc(m[8])}</b>
+      <dl class="kv">
+        <dt>実績DB</dt><dd>#${i + 1}（${manual ? '手入力・スコアの校正元' : '検証一覧から取込・AI読取値のため判断前に原本確認'}）
+          <a href="#" class="res-jump" data-res="${i}">実績DBの表で見る</a></dd>
+        <dt>案件・設置場所</dt><dd>${esc(m[2])}</dd>
+        <dt>出力</dt><dd>${esc(m[3])}</dd>
+        <dt>負担金</dt><dd>${esc(m[4])}</dd>
+        <dt>連系工期</dt><dd>${esc(m[5])}</dd>
+        <dt>主な対策工事</dt><dd>${esc(m[6])}</dd>
+        <dt>教訓・律速／上位系</dt><dd>${esc(m[7])}</dd>
+      </dl></div>`;
+  }).join('');
+  const all = ms.map(m => D.results.indexOf(m)).filter(i => i >= 0).join(',');
+  return `<div class="memo-card" id="memo-card">
+    <div class="dt-title">この変電所の接続検討 実績（${ms.length}件）　<a href="#" class="res-jump" data-res="${all}" style="font-weight:400;text-transform:none;letter-spacing:0">実績DBの表でまとめて見る</a></div>
+    ${items}
+    <div class="topo-note">「上位系統対策なし」の回答は公表の空容量より優先してよい（回答の有効期限内に契約申込まで進めること、出力制御の見込みは別途確認）。検証一覧から取り込んだ実績はAIで回答書PDFを読み取った値なので、判断の前に原本で確認してください。</div>
+  </div>`;
+}
+
+// 実績DBの表を開いて、指定の行（カンマ区切りの番号）を強調してそこへ移る
+function showResults(idxs) {
+  const set = new Set(String(idxs).split(',').filter(x => x !== '').map(Number));
+  document.querySelectorAll('#resbody tr').forEach((tr, i) => tr.classList.toggle('res-hit', set.has(i)));
+  $('res-details').open = true;
+  const n = set.size;
+  $('res-filter').style.display = n ? '' : 'none';
+  $('res-filter').innerHTML = n ? `選んだ変電所の実績 ${n}件を青く表示しています。<a href="#" id="res-clear">強調を消す</a>` : '';
+  const first = [...set].sort((a, b) => a - b)[0];
+  const tr = first != null ? $('res-' + first) : null;
+  (tr || $('res-details')).scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 // 内訳に出す「接続検討の実績」のまとめ（上位系対策の有無）。回答書の記載は公表値より優先してよい
 function memoHtmlSummary(row) {
   const c = memoSummary(row);
@@ -1812,7 +1870,7 @@ function renderMarkers() {
         interactive: true, keyboard: false,
       });
       pin.bindTooltip(markerTip(r), { direction: 'top', offset: [0, -6], opacity: .95 });
-      pin.on('click', () => selectRow(r, { pan: false }));
+      pin.on('click', () => selectRow(r, { pan: false, focusMemo: true }));
       pin.addTo(MAP_LAYERS.markers);
     }
   });
@@ -1979,7 +2037,9 @@ function selectRow(row, opts = {}) {
   if (m) m.bindPopup(`<b>${esc(val(row, 'name'))}</b> <span class="rk ${rkClass(rk)}">${esc(rk)}</span><br>` +
     `空容量 上位系 ${fmtNum(val(row, 'availUp'))}／当該 ${fmtNum(val(row, 'availCur'))} MW<br>` +
     `<span style="color:var(--txt3)">内訳・上位系統は地図の下に表示しています</span>`, { closeButton: false, autoPan: false }).openPopup();
-  $('map-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const mc = opts.focusMemo && $('map-panel').querySelector('#memo-card');
+  if (mc) { mc.scrollIntoView({ behavior: 'smooth', block: 'center' }); mc.animate([{ boxShadow: '0 0 0 4px rgba(27,85,204,.35)' }, { boxShadow: '0 0 0 0 rgba(27,85,204,0)' }], { duration: 1600 }); }
+  else $('map-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function toggleChuden() {
@@ -2066,6 +2126,9 @@ function init() {
   });
   // 内訳の「地図で系統のつながりを見る」／上位系統の表の相手側リンク
   document.addEventListener('click', e => {
+    const rj = e.target.closest('.res-jump');
+    if (rj) { e.preventDefault(); e.stopPropagation(); showResults(rj.dataset.res); return; }
+    if (e.target.id === 'res-clear') { e.preventDefault(); showResults(''); return; }
     const chip = e.target.closest('.topo-map');
     if (chip) {
       e.preventDefault();
