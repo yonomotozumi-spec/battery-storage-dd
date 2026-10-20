@@ -568,7 +568,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <table class="rtbl">
       <thead>
         <tr><th>#</th><th>変電所</th><th class="num">空容量<br>上位系(MW)</th><th class="num">空容量<br>当該(MW)</th>
-          <th>N-1電制</th><th class="num">系統<br>(80)</th><th>ランク</th><th>地図</th></tr>
+          <th>N-1電制</th><th class="num">系統<br>(80)</th><th>ランク</th><th>カテゴリ（地図の色）</th><th>実績</th><th>地図</th></tr>
       </thead>
       <tbody id="ltbody"></tbody>
     </table>
@@ -1087,6 +1087,9 @@ const CSV_COLS = [
   ['都道府県', r => prefOf(r)], ['市区町村', r => muniOf(r)],
   ['元リストの都道府県', r => val(r, 'pref')], ['最大電圧kV', r => val(r, 'vmax')], ['二次電圧kV', r => val(r, 'vsec')],
   ['系統スコア(80)', r => val(r, 'grid')], ['系統ランク', r => rank(r)],
+  // 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類（scripts/grid_status.py と同じ）
+  ['カテゴリ（地図の色）', r => catText(r)],
+  ['接続検討の実績（件数・分類）', r => memoText(r)],
   ['上位系の確認', r => !hasData(r) ? '空容量データ無し' : upChecked(r) ? '確認済み' : '未確認(当該設備で代用)'],
   ['空容量_上位系MW', r => val(r, 'availUp')], ['空容量_当該MW', r => val(r, 'availCur')],
   ['N-1電制', r => n1(r)], ['出力制御', r => curtail(r)],
@@ -1096,15 +1099,14 @@ const CSV_COLS = [
   ['緯度', r => val(r, 'lat')], ['経度', r => val(r, 'lon')], ['座標精度', r => acc(r)],
   ['所在地(参考)', r => val(r, 'addr')],
   ['接続検討の実績', r => (memoOf(r) || []).map(m => m[8]).join(' / ')],
+  ['接続検討の実績_詳細', r => memoDetailText(r)],
   ['Googleマップ', r => val(r, 'lat') != null ? gmaps(val(r, 'lat'), val(r, 'lon')) : ''],
   // ── 地図モードと同じ判定（scripts/grid_status.py と同じ列。システム側のCSVと揃える）──
-  ['判定（変電所単体×上位系）', r => TOPO ? gridStatus(r).label : ''],
   ['変電所単体の空き', r => TOPO ? { ok: '空きあり', bad: '空き無し', unk: '非公表' }[gridStatus(r).own.st] : ''],
   ['上位系の空き', r => TOPO ? { ok: '空きあり', bad: '空き無し', unk: '不明' }[gridStatus(r).up] : ''],
   ['上位系統の判定理由', r => TOPO ? upperStatus(r).reason : ''],
   ['要接続検討', r => TOPO && gridStatus(r).cls === 'upbad' ? '○' : ''],
   ['要接続検討の理由', r => TOPO && gridStatus(r).cls === 'upbad' ? ('変電所は空きあり・上位系は空き無し' + ((needCheck(r) || []).length ? '。' + needCheck(r).join('、') : '')) : ''],
-  ['実績の分類', r => TOPO ? memoText(r) : ''],
   ['実績_対策なし', r => TOPO ? memoSummary(r).none || '' : ''],
   ['実績_バンク等の対策待ち', r => TOPO ? memoSummary(r).bank || '' : ''],
   ['実績_上位系対策あり', r => TOPO ? memoSummary(r).yes || '' : ''],
@@ -1152,6 +1154,16 @@ function memoText(row) {
   return `${c.n}件（${parts.join('・')}${c.est ? `・うち変電所は推定${c.est}` : ''}）`;
 }
 const MEMO_LABEL_SHORT = { none: '対策なし', bank: 'バンク等の対策待ち', yes: '上位系対策あり', unk: '記載なし' };
+const GS_NAME = { both: '緑', upunk: '黄', upbad: '紫', ownbad: '赤', none: '灰' };
+// カテゴリ（地図の5色）。例「紫：変電所は空きあり・上位系は空き無し（要接続検討）」
+const catText = row => { const g = gridStatus(row); return `${GS_NAME[g.cls]}：${g.label}`; };
+// 接続検討の実績の全項目（回答ごとに1行。セル内改行）
+function memoDetailText(row) {
+  return (memoOf(row) || []).map(m => {
+    const i = D.results.indexOf(m), u = memoUpper(m);
+    return `#${i + 1}【${MEMO_LABEL_SHORT[u.cls]}${u.est ? '・変電所は推定' : ''}】${m[8]}／案件:${m[2]}／出力:${m[3]}／負担金:${m[4]}／工期:${m[5]}／対策:${m[6]}／教訓・上位系:${m[7]}`;
+  }).join('\n');
+}
 
 function downloadCsv(filename, header, lines) {
   const cell = v => {
@@ -1239,6 +1251,8 @@ function showList() {
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
       <td><span class="rk ${rkClass(rank(r))}">${esc(rank(r))}</span>${upTag(r)}</td>
+      <td>${gsBadge(r)}</td>
+      <td>${memoOf(r) ? `<a href="#" class="res-jump" data-res="${memoOf(r).map(m => D.results.indexOf(m)).join(',')}">${esc(memoText(r))}</a>` : '—'}</td>
       <td class="tbl-links">${val(r, 'lat') != null
         ? `<a href="${gmaps(val(r, 'lat'), val(r, 'lon'))}" target="_blank" rel="noopener">地図</a>` : '座標なし'}</td>
     </tr>`).join('');
