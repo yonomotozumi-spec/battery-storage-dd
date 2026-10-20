@@ -383,6 +383,10 @@ def cmd_apply(args):
                 # 公表値が「－」でも既存値は消さない。既存の予想潮流には逆算値（空容量−運用容量）や
                 # 旧資料の値が入っており、空欄にすると採点材料が減るだけになるため
                 continue
+            if k == "cap" and best["opcap"] is not None and new < best["opcap"]:
+                # 中部の配電用バンクは設備容量が 0・3・7 など運用容量より小さい値で公表されている（伏せ字扱い）。
+                # 物理的にあり得ない値なので既存値を残す（設備容量は採点に使わない）
+                continue
             if not same(old, new):
                 diffs.append(f"{label}: {old if old is not None else '空'}→{new if new is not None else '空'}")
                 ws.cell(r, C[k]).value = new
