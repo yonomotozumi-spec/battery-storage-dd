@@ -4,13 +4,15 @@
 スコアの元データ（空容量・運用容量・予想潮流・N-1電制・出力制御）を、各送配電事業者の
 最新の公表CSVで更新する。月1回の定期更新（.github/workflows/capacity-refresh.yml）で使う。
 
-対象は、全国共通形式（OCCTOの系統空容量公表フォーマット）の変電所CSVを公開している6社。
-  東北・北陸・関西・中国・四国・九州
-東京（Akamaiが全パスに403）・中部（Azure Front Doorが403）・北海道（PDFのみ）・沖縄（自動取得不可）
+対象は、全国共通形式（OCCTOの系統空容量公表フォーマット）の変電所CSVを公開している6社と、
+同じ項目をPDF（混雑状況マップ・予想潮流等一覧表）で公表している北海道。
+  東北・北陸・関西・中国・四国・九州・北海道（PDFは hokkaido_capacity_pdf.py で読む。要 pdfplumber）
+東京（Akamaiが全パスに403）・中部（Azure Front Doorが403）・沖縄（自動取得不可）
 は対象外で、レポートに「手作業で確認」と出す。
 
   # ① 取得：各社のページから最新の変圧器CSV（ZIP含む）を探してダウンロード（要ネットワーク）
-  python scripts/update_capacity.py fetch --cache-dir capacity_cache
+  python scripts/update_capacity.py fetch --cache-dir capacity_cache          # 全エリア
+  python scripts/update_capacity.py fetch --cache-dir capacity_cache --areas 北海道   # 一部だけ
 
   # ② 反映：本体xlsxの該当行の容量欄を書き換える（ネットワーク不要）
   python scripts/update_capacity.py apply \
@@ -57,11 +59,13 @@ SOURCES = {
     # 九州は送電線ZIPと変圧器ZIPが同じ td_*.zip 名で並ぶ。中身のフォルダ名「変圧器CSV」で選ぶ
     "九州": ("https://www.kyuden.co.jp/td/service/wheeling/disclosure.html",
              r"/var/rev0/[0-9/]+/td_[A-Za-z0-9]+\.zip"),
+    # 北海道はCSVが無く、系統別PDF（01〜24）と187kV以上PDFの「予想潮流等一覧表」を読む
+    "北海道": ("https://www.hepco.co.jp/network/con_service/public_document/bid_info.html",
+              r"pdf/map_forecast_tide_list(?:_\d+)?\.pdf"),
 }
 MANUAL_AREAS = {
     "東京": "www.tepco.co.jp は自動取得を全パスで拒否（403）。県別PDF「予想潮流等一覧表（変電所）」を手作業で確認",
     "中部": "gridmap.powergrid.chuden.co.jp は自動取得を拒否（403）。ブラウザで開き、一覧CSV（KRSIH010〜016）を取得",
-    "北海道": "公表はPDF（map_forecast_tide_list_*.pdf）のみ",
     "沖縄": "www.okiden.co.jp は自動取得を拒否（403）。con_res_map*.csv を手作業で確認",
 }
 
@@ -97,6 +101,8 @@ def cmd_fetch(args):
     os.makedirs(args.cache_dir, exist_ok=True)
     manifest = {"fetched": datetime.date.today().isoformat(), "areas": {}}
     for area, (page, pat) in SOURCES.items():
+        if args.areas and area not in args.areas:
+            continue
         try:
             html = decode(http_get(page))
         except Exception as e:  # noqa: BLE001
@@ -143,7 +149,8 @@ def cmd_fetch(args):
 # ---------- CSV の読み取り ----------
 
 def num(s):
-    s = unicodedata.normalize("NFKC", str(s or "")).replace(",", "").replace("'", "").strip()
+    # 0 を空扱いにしないよう `str(s or "")` は使わない（空容量0が書き込まれなくなる）
+    s = unicodedata.normalize("NFKC", "" if s is None else str(s)).replace(",", "").replace("'", "").strip()
     if s in DASHES or not re.fullmatch(r"-?\d+(\.\d+)?", s):
         return None
     v = float(s)
@@ -151,7 +158,7 @@ def num(s):
 
 
 def text(s):
-    s = unicodedata.normalize("NFKC", str(s or "")).replace("♯", "#").replace("'", "")
+    s = unicodedata.normalize("NFKC", "" if s is None else str(s)).replace("♯", "#").replace("'", "")
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -280,7 +287,12 @@ def cmd_apply(args):
     dates = {}    # area -> 更新日（CSV先頭行の最新）
     for area, info in manifest["areas"].items():
         for fi in info.get("files", []):
-            d, rows = parse_csv(os.path.join(args.cache_dir, fi["file"]))
+            path = os.path.join(args.cache_dir, fi["file"])
+            if path.lower().endswith(".pdf"):
+                from hokkaido_capacity_pdf import parse_pdf
+                d, rows = parse_pdf(path)
+            else:
+                d, rows = parse_csv(path)
             if d:
                 dates.setdefault(area, set()).add(d)
             for r in rows:
@@ -340,7 +352,8 @@ def cmd_apply(args):
                 ws.cell(r, C[k]).value = new
         if diffs:
             s["changed"] += 1
-            ws.cell(r, C["src"]).value = f"{area}公表CSV（{max(dates.get(area, {''}))}）"
+            kind = "公表PDF" if area == "北海道" else "公表CSV"
+            ws.cell(r, C["src"]).value = f"{area}{kind}（{max(dates.get(area, {''}))}）"
             report.append([ws.cell(r, C["no"]).value, area, name, "更新", " / ".join(diffs), best["v1"], best["v2"]])
 
     # データソースシートの日付を更新
@@ -379,7 +392,8 @@ def cmd_apply(args):
 def write_md(path, stat, manifest):
     L = ["# スコア元データ 更新レポート", "",
          f"更新: {datetime.date.today().isoformat()}（`scripts/update_capacity.py`。月1回の定期更新で自動生成）", "",
-         "空容量・運用容量・予想潮流・N-1電制・出力制御を、各送配電事業者の最新の公表CSVで書き換えた結果です。", "",
+         "空容量・運用容量・予想潮流・N-1電制・出力制御を、各送配電事業者の最新の公表CSV"
+         "（北海道は公表PDF「予想潮流等一覧表」）で書き換えた結果です。", "",
          "| エリア | 公表日 | 公表CSVの変電所行 | 本体と照合 | うち値が変わった | 特定不可 | 本体に無い公表行 |",
          "|---|---|---|---|---|---|---|"]
     for a, s in stat.items():
@@ -390,7 +404,8 @@ def write_md(path, stat, manifest):
         L.append(f"| {a} | 取得失敗 | {e} | | | | |")
     L += ["", "- 「特定不可」は同じ名前の変電所が複数あり、電圧・設備容量でも1つに決められなかった行です（書き換えていません）",
           "- 「本体に無い公表行」は公表CSVにあって本体リストに無い変電所です（座標などが無いため自動では追加しません）",
-          "- 公表値が「－」の項目は既存値を残しています", "",
+          "- 公表値が「－」の項目は既存値を残しています",
+          "- 北海道の「公表CSVの変電所行」はPDFから読み取ったバンク行の数です（1変電所に複数バンクがあれば複数行）", "",
           "## 自動では更新できないエリア（手作業で確認）", "",
           "| エリア | 理由・確認方法 |", "|---|---|"]
     for a, why in MANUAL_AREAS.items():
@@ -406,6 +421,7 @@ def main():
     f = sub.add_parser("fetch", help="各社の最新CSVをダウンロード（要ネットワーク）")
     f.add_argument("--cache-dir", required=True)
     f.add_argument("--sleep", type=float, default=1.0)
+    f.add_argument("--areas", nargs="*", help="取得するエリアを限定する（例: --areas 北海道）。省略時は全エリア")
     f.set_defaults(func=cmd_fetch)
     a = sub.add_parser("apply", help="本体xlsxの容量欄を書き換える")
     a.add_argument("--in", dest="src", required=True)
