@@ -14,6 +14,9 @@
   python scripts/update_capacity.py fetch --cache-dir capacity_cache          # 全エリア
   python scripts/update_capacity.py fetch --cache-dir capacity_cache --areas 北海道   # 一部だけ
 
+  # ①' 手作業で落としたCSVを登録（中部など自動取得できない会社。ブラウザで保存したCSV/ZIPを渡す）
+  python scripts/update_capacity.py add --area 中部 --cache-dir capacity_cache 一覧表.csv 一覧.zip ...
+
   # ② 反映：本体xlsxの該当行の容量欄を書き換える（ネットワーク不要）
   python scripts/update_capacity.py apply \
     --in "data/全国変電所リスト_66kV以上_座標追加.xlsx" --cache-dir capacity_cache \
@@ -146,6 +149,38 @@ def cmd_fetch(args):
         json.dump(manifest, f, ensure_ascii=False, indent=1)
 
 
+def cmd_add(args):
+    """手作業で落としたCSV（ZIP可）をキャッシュに登録する。fetch の後に実行すれば apply が一緒に反映する。"""
+    os.makedirs(args.cache_dir, exist_ok=True)
+    mpath = os.path.join(args.cache_dir, "manifest.json")
+    manifest = json.load(open(mpath, encoding="utf-8")) if os.path.exists(mpath) else \
+        {"fetched": datetime.date.today().isoformat(), "areas": {}}
+    files = []
+    for path in args.files:
+        if path.lower().endswith(".zip"):
+            zf = zipfile.ZipFile(path)
+            for info in zf.infolist():
+                try:
+                    name = info.filename.encode("cp437").decode("cp932")   # Windowsで作ったZIPの日本語名
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    name = info.filename
+                if not name.lower().endswith(".csv") or "変電所" not in name:
+                    continue    # 送電線の一覧は使わない
+                fn = re.sub(r"[^\w.\-]", "_", f"{args.area}__manual__{os.path.basename(name)}")
+                with open(os.path.join(args.cache_dir, fn), "wb") as f:
+                    f.write(zf.read(info))
+                files.append({"file": fn, "url": f"manual:{os.path.basename(path)}", "member": name})
+        else:
+            fn = re.sub(r"[^\w.\-]", "_", f"{args.area}__manual__{os.path.basename(path)}")
+            with open(os.path.join(args.cache_dir, fn), "wb") as f:
+                f.write(open(path, "rb").read())
+            files.append({"file": fn, "url": f"manual:{os.path.basename(path)}"})
+    manifest["areas"][args.area] = {"page": "手作業で取得", "files": files, "manual": True}
+    with open(mpath, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=1)
+    print(f"{args.area}: {len(files)}ファイルを登録")
+
+
 # ---------- CSV の読み取り ----------
 
 def num(s):
@@ -199,8 +234,9 @@ def parse_csv(path):
         "cap": find_col(h, "設備容量"),
         "opcap": find_col(h, "運用容量値"),
         "flow": find_col(h, "予想潮流"),
-        "cur": find_col(h, "当該設備", "空") if find_col(h, "当該設備", "空") is not None
-        else find_col(h, "空き容量"),
+        # 当該設備の空容量。上位系を出していない会社は「空き容量」（北陸）や「空容量」（中部）の1列だけ
+        "cur": next((c for c in (find_col(h, "当該設備", "空"), find_col(h, "空き容量"),
+                                 find_col(h, "空容量", avoid=("上位",))) if c is not None), None),
         "up": find_col(h, "上位系", "空"),
         "n1": find_col(h, "N-1電制適用可否"),
         "curtail": find_col(h, "平常時出力制御", avoid=("設備", "系統")),
@@ -352,7 +388,7 @@ def cmd_apply(args):
                 ws.cell(r, C[k]).value = new
         if diffs:
             s["changed"] += 1
-            kind = "公表PDF" if area == "北海道" else "公表CSV"
+            kind = "公表PDF" if area == "北海道" else ("公表CSV・手動取得" if manifest["areas"][area].get("manual") else "公表CSV")
             ws.cell(r, C["src"]).value = f"{area}{kind}（{max(dates.get(area, {''}))}）"
             report.append([ws.cell(r, C["no"]).value, area, name, "更新", " / ".join(diffs), best["v1"], best["v2"]])
 
@@ -423,6 +459,11 @@ def main():
     f.add_argument("--sleep", type=float, default=1.0)
     f.add_argument("--areas", nargs="*", help="取得するエリアを限定する（例: --areas 北海道）。省略時は全エリア")
     f.set_defaults(func=cmd_fetch)
+    m = sub.add_parser("add", help="手作業で落としたCSV/ZIPをキャッシュに登録する（中部など）")
+    m.add_argument("--area", required=True)
+    m.add_argument("--cache-dir", required=True)
+    m.add_argument("files", nargs="+")
+    m.set_defaults(func=cmd_add)
     a = sub.add_parser("apply", help="本体xlsxの容量欄を書き換える")
     a.add_argument("--in", dest="src", required=True)
     a.add_argument("--cache-dir", required=True)
