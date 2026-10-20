@@ -602,7 +602,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <div class="opt-row">
         <label class="chk"><input type="checkbox" id="m-links" checked> 選んだ変電所のつながり（模式線）</label>
         <label class="chk"><input type="checkbox" id="m-hop2"> 2段先まで</label>
-        <label class="chk"><input type="checkbox" id="m-net"> 上位系統の送電線を描く（6エリア・模式線）</label>
+        <label class="chk"><input type="checkbox" id="m-net"> 上位系統の送電線を描く（7エリア・模式線）</label>
         <label class="chk">電圧
           <select id="m-net-kv" style="width:auto;padding:3px 8px">
             <option value="154">154kV以上</option>
@@ -1324,7 +1324,6 @@ const topoDates = a => (TOPO && TOPO.meta.sources[a] ? TOPO.meta.sources[a].date
 const TOPO_MANUAL = {
   '東京': '東京電力PGのサイトが自動取得を拒否（403）するため、県別PDF「予想潮流等一覧表」を手で確認してください',
   '中部': '中部電力PGのマッピングが自動取得を拒否（403）するため一覧CSVは未取得です。地図モードの「中部電力PG公表の送電線」で実形状の送電線を確認できます',
-  '北海道': '北海道電力NWの公表がPDFのみのため未取得です',
   '沖縄': '沖縄電力のサイトが自動取得を拒否（403）するため未取得です',
   'J-POWER': '対象外（送配電事業者の公表物に含まれません）',
 };
@@ -1454,6 +1453,9 @@ function refLabel(ref) {
   return `<span class="topo-txt">${esc(v)}</span>`;
 }
 
+// 参照の一覧を表示用に（同じ送電線の区間が複数あるときは1つにまとめる）
+const refList = refs => { const seen = new Set(); return refs.map(refLabel).filter(t => !seen.has(t) && seen.add(t)).join('、'); };
+
 // 端点（from/to）の表示。相手側の変電所は本体リストにあればクリックで選べる
 function endLabel(e, ni) {
   if (typeof e !== 'number') return `<span class="topo-txt">${esc(e || '—')}</span>`;
@@ -1501,7 +1503,7 @@ function topologyHtml(row) {
       <td class="num">${fmt(b[BF.opcap])}</td><td class="num">${fmt(b[BF.flow])}</td>
       <td class="num">${capCell(b[BF.availCur])}</td><td class="num">${capCell(b[BF.availUp])}</td>
       <td>${esc(b[BF.n1] || '—')}</td><td>${esc(b[BF.curtail] || '—')}</td><td>${esc(b[BF.factor] || '—')}</td>
-      <td>${b[BF.upRefs].length ? b[BF.upRefs].map(refLabel).join('、') : (TOPO.strings[b[BF.upEq]] && !/^[-－ー―]+$/.test(TOPO.strings[b[BF.upEq]]) ? esc(TOPO.strings[b[BF.upEq]]) : '—')}</td>
+      <td>${b[BF.upRefs].length ? refList(b[BF.upRefs]) : (TOPO.strings[b[BF.upEq]] && !/^[-－ー―]+$/.test(TOPO.strings[b[BF.upEq]]) ? esc(TOPO.strings[b[BF.upEq]]) : '—')}</td>
     </tr>`).join('');
   const links = nodeLinks(ni);
   const linkRows = links.map(({ line: l, other, n }) => {
@@ -1518,7 +1520,7 @@ function topologyHtml(row) {
       <td class="num">${fmt(l[LF.opcap])}</td><td class="num">${fmt(l[LF.flow])}</td>
       <td class="num">${capCell(l[LF.availCur])}</td><td class="num">${capCell(l[LF.availUp])}</td>
       <td>${esc(l[LF.n1] || '—')}</td><td>${esc(l[LF.curtail] || '—')}</td>
-      <td>${l[LF.upRefs].length ? l[LF.upRefs].map(refLabel).join('、') : '—'}</td>
+      <td>${l[LF.upRefs].length ? refList(l[LF.upRefs]) : '—'}</td>
     </tr>`;
   }).join('');
   const nUp = links.filter(x => v1max != null && lineKv(x.line) != null && lineKv(x.line) >= v1max).length;
@@ -1861,7 +1863,7 @@ function initMapControls() {
   const areas = TOPO ? TOPO.meta.areas.join('・') : '';
   $('map-msg').innerHTML = TOPO
     ? `・丸をクリックすると、その変電所の系統データ・スコア内訳と<b>上位系統（つながっている送電線・相手側の変電所・上位系の制約設備）</b>を下に表示し、相手側までの模式線を引きます。相手側の名前をクリックすると、そこへ移ってさらに上位をたどれます。<br>` +
-      `・つながりのデータは ${esc(areas)} の6エリア（各社の公表CSV・変電所 ${TOPO.meta.linkedRows.toLocaleString()}件に付与、生成 ${esc(TOPO.meta.generated)}）。東京・中部・北海道・沖縄は公表物を自動取得できないため、空容量などの系統データのみです。<br>` +
+      `・つながりのデータは ${esc(areas)} の${TOPO.meta.areas.length}エリア（各社の公表CSV、北海道は公表PDF。変電所 ${TOPO.meta.linkedRows.toLocaleString()}件に付与、生成 ${esc(TOPO.meta.generated)}）。東京・中部・沖縄は公表物を自動取得できないため、空容量などの系統データのみです。<br>` +
       `・模式線は公表CSVの「潮流方向」の両端を直線で結んだもので、実際の送電線の経路ではありません。中部は「中部電力PG公表の送電線」で実形状を重ねられます。<br>` +
       `・<b>上位系統の状態</b>：緑＝この変電所の「空容量(上位系考慮)」に空きあり、赤＝ダメ（「空容量(上位系考慮)」が0以下、または未公表で上位側の変電所の該当バンクが全て空き0以下）、黄緑＝この変電所の上位系値は未公表だが上位側の変電所には空きあり（混在を含む）、橙＝不明（上位系も上位側も非公表）、灰＝空容量データ無し。「上位系がダメ」の変電所は「上位系の確認」のプルダウンで絞り込めます。`
     : '・data/grid_topology.js を読み込めなかったため、つながりの表示はできません（空容量などの表示は可能です）。';

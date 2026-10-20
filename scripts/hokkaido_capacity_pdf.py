@@ -100,11 +100,30 @@ def _parse_bank(tokens):
         curtail = "なし"
     else:
         curtail = None
+    # 残り: 平常時出力制御が必要となりうる設備（当該設備／上位系設備）と備考。系統トポロジー（build_grid_topology.py）で使う
+    i += 1
+    cur_eq = _nfkc(rest[i]) if i < len(rest) else ""
+    tail = [_nfkc(t) for t in rest[i + 1:]]
+    remark = " ".join(t for t in tail if t.startswith(("※", "◇")))
+    up_eq = _join_equipment(t for t in tail if not t.startswith(("※", "◇")))
     return {
         "v1": _num(v1), "v2": _num(v2), "units": _num(units), "cap": _num(cap), "opcap": _num(opcap),
         "flow": flow, "cur": cur, "up": up, "n1": n1, "n1_amount": n1_amt, "curtail": curtail,
-        "has_up": True,
+        "has_up": True, "cur_eq": "" if cur_eq in DASHES else cur_eq, "up_eq": up_eq, "remark": remark,
+        "factor": _nfkc(tokens[ci]),
     }
+
+
+def _join_equipment(tokens):
+    """「A 29 ,送20,送21,送 ※１」のように折り返しで分かれた上位系設備の欄を1つの文字列に戻す。
+    折り返しで「送 29」が「29 … 送」の順に割れることがあるため、末尾が「送」「変」で終わる場合は
+    直前に浮いている数字を後ろに付ける。"""
+    toks = [t for t in tokens if t and t not in DASHES]
+    s = "".join(toks)
+    m = re.fullmatch(r"(.*?)(\d+)(,.*?)(送|変)$", s)
+    if m:
+        s = f"{m.group(1)}{m.group(3)},{m.group(4)}{m.group(2)}"
+    return s.strip(",")
 
 
 def _separators(page, xm):
@@ -130,7 +149,9 @@ def _name_in_cell(words, y, seps, x_lo, x_hi):
             if _is_num_or_dash(t) or t.startswith(("※", "◇")):
                 continue
             parts.append((yc, w["x0"], t))
-    return re.sub(r"^\d+", "", "".join(t for _, _, t in sorted(parts))).strip()
+    raw = "".join(t for _, _, t in sorted(parts))
+    m = re.match(r"^(\d+)", raw)
+    return (m.group(1) if m else ""), re.sub(r"^\d+", "", raw).strip()
 
 
 def parse_pdf(path):
@@ -169,15 +190,151 @@ def parse_pdf(path):
                     continue
                 if seps is None:
                     seps = _separators(page, name_x[2])
-                name = _name_in_cell(words, y, seps, name_x[0], name_x[1])
+                no, name = _name_in_cell(words, y, seps, name_x[0], name_x[1])
                 if not name:
                     dropped += 1     # 名前が決められないバンクは捨てる（推測で付けない）
                     continue
                 row["name"] = name
+                row["no"] = no
                 out.append(row)
     if dropped:
         print(f"{path}: 名前を決められなかったバンク {dropped}行", file=sys.stderr)
     return date, out
+
+
+def _clean_alias_body(body):
+    """略号の定義「送68,送69,変228」や「『187kV以上系統』の変213」（PDFの文字が交ざって崩れることがある）から
+    設備番号だけを取り出す。187kV以上系統の設備を指すときは「基送N」「基変N」にする（build_grid_topology.py が
+    187kV以上のPDFの番号として引き当てる）。"""
+    j = _nfkc(body)
+    if j.startswith("?"):
+        return "略号(定義を判読できず)"
+    kikan = "上系統" in j or "kV" in j
+    # 2行に折り返した定義は文字が交互に混ざって読めないことがある（例:「送 72 2 ,変 7,送 20 3 5 3」）。
+    # 番号の途中に空白が入っているものは読み取り不能として展開しない（誤った設備に引き当てないため）
+    compact = re.sub(r"[\s,、]+", ",", j).strip(",")
+    if re.search(r"\d\s+\d", j) or re.search(r"(送|変)\s+\d", j):
+        return "?" + compact[:40]
+    toks = re.findall(r"(送|変)(\d+)", compact)
+    if not toks:
+        return body.strip(",")
+    return ",".join(("基" if kikan else "") + k + n for k, n in toks)
+
+
+def expand_alias(rows, alias=None, letter_hints=None):
+    """上位系設備の欄の略号を展開する。北海道は最初の行で「送68,送69,変228⇒以下、これらをAと表示」のように
+    定義し、以降の行では「A,送2」と書く。定義行の「⇒」より前を略号（既定A）の中身とする。
+    見つけた略号の辞書を返す（同じPDFの変電所の表にも同じ略号が使われるので、そちらにも渡す）。"""
+    alias = dict(alias or {})
+    hints = dict(letter_hints or {})
+    for r in rows:
+        s = r.get("up_eq") or ""
+        if "⇒" in s:
+            body, tail = s.split("⇒", 1)
+            m = re.search(r"([A-Z])", _nfkc(tail))
+            # 「⇒以下、これらをAと表示」が2行に折り返すと略号の文字が次の行に行く。その場合は行番号から拾った文字を使う
+            letter = m.group(1) if m else hints.get(r.get("no"), "A")
+            alias[letter] = _clean_alias_body(body)
+            r["up_eq"] = alias[letter]
+    if not alias:
+        return alias
+    for r in rows:
+        toks = [t for t in (r.get("up_eq") or "").split(",") if t]
+        r["up_eq"] = ",".join(alias.get(t, t) for t in toks)
+    return alias
+
+
+def parse_pdf_all(path):
+    """送電線の表と変電所の表を両方読み、略号を揃えて (更新日, 変電所バンク行, 送電線行) を返す。"""
+    date, lines, alias = parse_line_table(path)
+    d2, banks = parse_pdf(path)
+    expand_alias(banks, alias)
+    return date or d2, banks, lines
+
+
+_LINE_RE = re.compile(r"^(\d+)(\S+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(" + "|".join(CONSTRAINTS) + r"\S*)\s*(.*)$")
+
+
+def parse_line_table(path):
+    """PDFの「送電線」の表を読む（系統トポロジー用）。(更新日, 行のリスト) を返す。
+    行は build_grid_topology.parse_file の送電線行と同じキー（no, name, kv, circ, cap, opcap, factor, dir, flow,
+    cur, up, n1, n1amt, curtail, cur_eq, up_eq, remark）。1行＝1区間（分岐点で区切られる）。
+    文字の並びで読むため、送電線名に空白が入るものは名前の途中で切れる可能性がある。"""
+    import pdfplumber
+
+    date, mode, out, hints = "", None, [], {}
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            for line in (page.extract_text() or "").split("\n"):
+                j = _nfkc(line)
+                # 直前の行が略号の定義（⇒）で文字が無かったとき、折り返しの続き（「をAと表示」）から文字を拾う
+                if out and "⇒" in (out[-1].get("up_eq") or "") and not re.search(r"[A-Z]", _nfkc(out[-1]["up_eq"].split("⇒", 1)[1])):
+                    m = re.search(r"([A-Z])と", j.replace(" ", ""))
+                    if m:
+                        hints[out[-1]["no"]] = m.group(1)
+                m = re.search(r"更新日[：:]\s*(\d{4}年\d{1,2}月\d{1,2}日)", j.replace(" ", ""))
+                if m:
+                    date = m.group(1)
+                if "送電線名" in j.replace(" ", ""):
+                    mode = "line"
+                    continue
+                if "変電所名" in j.replace(" ", ""):
+                    mode = "sub"
+                    continue
+                if mode != "line":
+                    continue
+                m = _LINE_RE.match(j)
+                if not m:
+                    continue
+                no, name, kv, circ, cap, opcap, factor, rest = m.groups()
+                toks = rest.split()
+                d, i = "", 0
+                if toks and toks[0] in DASHES:
+                    i = 1
+                elif "→" in toks:
+                    a = toks.index("→")
+                    d = f"{' '.join(toks[:a])}→{toks[a + 1] if a + 1 < len(toks) else ''}"
+                    i = a + 2
+                vals = toks[i:i + 3]
+                if len(vals) < 3:
+                    continue
+                flow, cur, up = (_num(t) for t in vals)
+                i += 3
+                n1 = toks[i] if i < len(toks) else ""
+                i += 1
+                if n1 == "不可":
+                    while i < len(toks) and re.match(r"^[♯#、]", toks[i]):
+                        n1 += " " + toks[i].replace("♯", "#")
+                        i += 1
+                elif n1 in DASHES:
+                    n1 = ""
+                n1amt = _num(toks[i]) if i < len(toks) else None
+                i += 1
+                curtail = toks[i] if i < len(toks) else ""
+                curtail = "有り" if curtail.startswith("有") else ("なし" if curtail in DASHES else "")
+                i += 1
+                cur_eq = toks[i] if i < len(toks) else ""
+                i += 1
+                tail = toks[i:]
+                remark = " ".join(t for t in tail if t.startswith(("※", "◇")))
+                up_eq = _join_equipment(t for t in tail if not t.startswith(("※", "◇")))
+                if "⇒" in up_eq:
+                    # 略号の定義行。2行に折り返して文字が交互に混ざると「送 72 2 ,変 7,送 20 3 5 3」のように
+                    # 番号が割れる。定義の前半に数字だけ・「送」「変」だけの語があれば判読不能として展開しない
+                    pre = []
+                    for t in tail:
+                        if "⇒" in t:
+                            break
+                        pre.append(t)
+                    if any(re.fullmatch(r"\d+", t) or t in ("送", "変") for t in pre):
+                        up_eq = "?⇒" + up_eq.split("⇒", 1)[1]
+                out.append({
+                    "no": no, "name": name, "kv": _num(kv), "circ": _num(circ), "cap": _num(cap), "opcap": _num(opcap),
+                    "factor": factor, "dir": d, "flow": flow, "cur": cur, "up": up, "n1": n1, "n1amt": n1amt,
+                    "curtail": curtail, "cur_eq": "" if cur_eq in DASHES else cur_eq, "up_eq": up_eq, "remark": remark,
+                })
+    alias = expand_alias(out, letter_hints=hints)
+    return date, out, alias
 
 
 def main():
