@@ -1,0 +1,921 @@
+{
+ "fetched": "2026-10-20",
+ "areas": {
+  "東北": {
+   "page": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/index.html",
+   "files": [
+    {
+     "file": "東北__sys_capa_kikan01_line_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_kikan01_line_202607_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_kikan01_tr_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_kikan01_tr_202607_02.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "東北__sys_capa_local01_line_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local01_line_202607_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_local01_tr_202609_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local01_tr_202609_02.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "東北__sys_capa_local02_line_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local02_line_202607_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_local02_tr_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local02_tr_202607_02.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "東北__sys_capa_local03_line_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local03_line_202607_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_local03_tr_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local03_tr_202607_02.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "東北__sys_capa_local04_line_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local04_line_202607_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_local04_tr_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local04_tr_202607_02.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "東北__sys_capa_local05_line_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local05_line_202607_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_local05_tr_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local05_tr_202607_02.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "東北__sys_capa_local06_line_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local06_line_202607_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_local06_tr_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local06_tr_202607_02.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "東北__sys_capa_local07_line_202608_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local07_line_202608_02.csv",
+     "kind": "line"
+    },
+    {
+     "file": "東北__sys_capa_local07_tr_202607_02.csv",
+     "url": "https://nw.tohoku-epco.co.jp/consignment/system/announcement/data/sys_capa_local07_tr_202607_02.csv",
+     "kind": "tr"
+    }
+   ]
+  },
+  "北陸": {
+   "page": "https://www.rikuden.co.jp/nw_notification/U_154seiyaku.html",
+   "files": [
+    {
+     "file": "北陸__sys_capa_kikan01_line_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_kikan01_line_202610_05.csv",
+     "kind": "line"
+    },
+    {
+     "file": "北陸__sys_capa_kikan01_tr_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_kikan01_tr_202610_05.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "北陸__sys_capa_local01_line_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_local01_line_202610_05.csv",
+     "kind": "line"
+    },
+    {
+     "file": "北陸__sys_capa_local01_tr_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_local01_tr_202610_05.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "北陸__sys_capa_local02_line_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_local02_line_202610_05.csv",
+     "kind": "line"
+    },
+    {
+     "file": "北陸__sys_capa_local02_tr_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_local02_tr_202610_05.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "北陸__sys_capa_local03_line_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_local03_line_202610_05.csv",
+     "kind": "line"
+    },
+    {
+     "file": "北陸__sys_capa_local03_tr_202610_05.csv",
+     "url": "https://www.rikuden.co.jp/nw_notification/attach/sys_capa_local03_tr_202610_05.csv",
+     "kind": "tr"
+    }
+   ]
+  },
+  "関西": {
+   "page": "https://www.kansai-td.co.jp/consignment/disclosure/distribution-equipment/index.html",
+   "files": [
+    {
+     "file": "関西__154kv_less_line.csv",
+     "url": "https://www.kansai-td.co.jp/interchange/takusou/pdf/154kv_less_line.csv",
+     "kind": "line"
+    },
+    {
+     "file": "関西__154kv_less_trans.csv",
+     "url": "https://www.kansai-td.co.jp/interchange/takusou/pdf/154kv_less_trans.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "関西__154kv_more_line.csv",
+     "url": "https://www.kansai-td.co.jp/interchange/takusou/pdf/154kv_more_line.csv",
+     "kind": "line"
+    },
+    {
+     "file": "関西__154kv_more_trans.csv",
+     "url": "https://www.kansai-td.co.jp/interchange/takusou/pdf/154kv_more_trans.csv",
+     "kind": "tr"
+    }
+   ]
+  },
+  "中国": {
+   "page": "https://www.energia.co.jp/nw/service/retailer/keitou/access/index.html",
+   "files": [
+    {
+     "file": "中国__csv_220kv.zip__sys_capa_kikan01_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_220kv.zip",
+     "member": "sys_capa_kikan01_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_220kv.zip__sys_capa_kikan01_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_220kv.zip",
+     "member": "sys_capa_kikan01_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local44_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local44_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local45_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local45_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local45_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local45_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local46_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local46_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local46_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local46_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local41_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local41_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local41_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local41_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local42_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local42_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local42_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local42_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local43_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local43_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local43_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local43_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_hiro.zip__sys_capa_local44_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_hiro.zip",
+     "member": "sys_capa_local44_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local33_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local33_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local34_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local34_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local34_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local34_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local35_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local35_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local35_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local35_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local36_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local36_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local36_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local36_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local31_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local31_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local31_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local31_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local32_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local32_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local32_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local32_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_oka.zip__sys_capa_local33_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_oka.zip",
+     "member": "sys_capa_local33_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local25_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local25_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local25_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local25_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local26_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local26_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local26_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local26_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local21_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local21_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local21_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local21_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local22_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local22_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local22_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local22_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local23_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local23_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local23_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local23_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local24_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local24_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_shima.zip__sys_capa_local24_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_shima.zip",
+     "member": "sys_capa_local24_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_tori.zip__sys_capa_local12_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_tori.zip",
+     "member": "sys_capa_local12_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_tori.zip__sys_capa_local12_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_tori.zip",
+     "member": "sys_capa_local12_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_tori.zip__sys_capa_local13_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_tori.zip",
+     "member": "sys_capa_local13_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_tori.zip__sys_capa_local13_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_tori.zip",
+     "member": "sys_capa_local13_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_tori.zip__sys_capa_local11_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_tori.zip",
+     "member": "sys_capa_local11_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_tori.zip__sys_capa_local11_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_tori.zip",
+     "member": "sys_capa_local11_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local53_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local53_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local53_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local53_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local54_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local54_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local54_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local54_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local55_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local55_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local55_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local55_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local51_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local51_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local51_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local51_tr_202609_07.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local52_line_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local52_line_202609_07.csv",
+     "kind": "line"
+    },
+    {
+     "file": "中国__csv_yama.zip__sys_capa_local52_tr_202609_07.csv",
+     "url": "https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip",
+     "member": "sys_capa_local52_tr_202609_07.csv",
+     "kind": "tr"
+    }
+   ]
+  },
+  "四国": {
+   "page": "https://www.yonden.co.jp/nw/line_access/data.html",
+   "files": [
+    {
+     "file": "四国__sys_capa_kikan00_line_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_kikan00_line_202610_08.csv",
+     "kind": "line"
+    },
+    {
+     "file": "四国__sys_capa_kikan00_tr_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_kikan00_tr_202610_08.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "四国__sys_capa_local01_line_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local01_line_202610_08.csv",
+     "kind": "line"
+    },
+    {
+     "file": "四国__sys_capa_local01_tr_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local01_tr_202610_08.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "四国__sys_capa_local02_line_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local02_line_202610_08.csv",
+     "kind": "line"
+    },
+    {
+     "file": "四国__sys_capa_local02_tr_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local02_tr_202610_08.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "四国__sys_capa_local03_line_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local03_line_202610_08.csv",
+     "kind": "line"
+    },
+    {
+     "file": "四国__sys_capa_local03_tr_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local03_tr_202610_08.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "四国__sys_capa_local04_line_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local04_line_202610_08.csv",
+     "kind": "line"
+    },
+    {
+     "file": "四国__sys_capa_local04_tr_202610_08.csv",
+     "url": "https://www.yonden.co.jp/nw/assets/line_access/data/sys_capa_local04_tr_202610_08.csv",
+     "kind": "tr"
+    }
+   ]
+  },
+  "九州": {
+   "page": "https://www.kyuden.co.jp/td/service/wheeling/disclosure.html",
+   "files": [
+    {
+     "file": "九州__td_vHd7yu8i.zip___離島①_②_③_④_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★離島①、②、③、④_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１_門司_苅田地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１　門司、苅田地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１０_伊都地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１０　伊都地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１１_豊前_宇佐_中津_高田地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１１　豊前、宇佐、中津、高田地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１２_中央_山家地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１２　中央、山家地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１３_久留米_鳥栖地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１３　久留米、鳥栖地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１４_大牟田地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１４　大牟田地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１５_大分地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１５　大分地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１６_日田地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１６　日田地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１７_佐伯_竹田地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１７　佐伯、竹田地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１８_唐津_佐賀地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１８　唐津、佐賀地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___１９_武雄_東佐世保地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★１９　武雄、東佐世保地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２____小倉地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２    小倉地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２０_長崎地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２０　長崎地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２１_諫早地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２１　諫早地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２２_熊本地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２２　熊本地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２３_八代_水俣_天草地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２３　八代、水俣、天草地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２４_人吉地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２４　人吉地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２５_日向地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２５　日向地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２６_宮崎地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２６　宮崎地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２７_川内_出水地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２７　川内、出水地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２８_霧島_都城地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２８　霧島、都城地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___２９_鹿児島地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★２９　鹿児島地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___３____若松地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★３    若松地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___３０_大隅地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★３０　大隅地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___４____八幡_遠賀地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★４    八幡・遠賀地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___５_古賀地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★５　古賀地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___６____飯塚_田川地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★６    飯塚、田川地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___７_東福岡地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★７　東福岡地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___８_南福岡地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★８　南福岡地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_vHd7yu8i.zip___９_赤坂地区_送電線.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6794/td_vHd7yu8i.zip",
+     "member": "送電線CSV/★９　赤坂地区_送電線.csv",
+     "kind": "line"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___離島①_②_③_④_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★離島①、②、③、④_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１_門司_苅田地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１　門司、苅田地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１０_伊都地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１０　伊都地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１１_豊前_宇佐_中津_高田地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１１　豊前、宇佐、中津、高田地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１２_中央_山家地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１２　中央、山家地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１３_久留米_鳥栖地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１３　久留米、鳥栖地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１４_大牟田地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１４　大牟田地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１５_大分地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１５　大分地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１６_日田地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１６　日田地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１７_佐伯_竹田地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１７　佐伯、竹田地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１８_唐津_佐賀地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１８　唐津、佐賀地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___１９_武雄_東佐世保地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★１９　武雄、東佐世保地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２____小倉地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２    小倉地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２０_長崎地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２０　長崎地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２１_諫早地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２１　諫早地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２２_熊本地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２２　熊本地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２３_八代_水俣_天草地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２３　八代、水俣、天草地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２４_人吉地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２４　人吉地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２５_日向地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２５　日向地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２６_宮崎地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２６　宮崎地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２７_川内_出水地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２７　川内、出水地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２８_霧島_都城地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２８　霧島、都城地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___２９_鹿児島地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★２９　鹿児島地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___３____若松地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★３    若松地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___３０_大隅地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★３０　大隅地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___４____八幡_遠賀地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★４    八幡・遠賀地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___５_古賀地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★５　古賀地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___６____飯塚_田川地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★６    飯塚、田川地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___７_東福岡地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★７　東福岡地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___８_南福岡地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★８　南福岡地区_変圧器.csv",
+     "kind": "tr"
+    },
+    {
+     "file": "九州__td_oLsu7j3Y.zip___９_赤坂地区_変圧器.csv",
+     "url": "https://www.kyuden.co.jp/var/rev0/0925/6795/td_oLsu7j3Y.zip",
+     "member": "変圧器CSV/★９　赤坂地区_変圧器.csv",
+     "kind": "tr"
+    }
+   ]
+  }
+ }
+}
