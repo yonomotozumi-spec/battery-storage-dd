@@ -141,6 +141,8 @@ def main():
             "gridRank": {"S": S.P["rank_s"]["thr"], "A": S.P["rank_a"]["thr"], "B": S.P["rank_b"]["thr"]},
             # S1 空容量の段階 [(MW以上, 点)]。画面の「要接続検討」（ゲート除外だが当該設備に空き）の閾値にも使う
             "s1Steps": [[S.P["s1_t1"]["thr"], S.P["s1_t1"]["pts"]], [S.P["s1_t2"]["thr"], S.P["s1_t2"]["pts"]]],
+            # 最低必要容量（MW）。これ未満の空容量は画面でも「空き無し」と判定する
+            "minMw": S.MIN_MW,
         },
         "areaPoints": [list(a) for a in S.AREA_POINTS],
         "scoreDefs": [list(s) for s in S.SCORE_DEFS],
