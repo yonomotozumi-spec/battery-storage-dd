@@ -56,6 +56,7 @@ class GridStatus:
         self.results = d["results"]
         s1 = d.get("params", {}).get("s1Steps") or []
         self.need_check_mw = s1[1][0] if len(s1) > 1 else 6
+        self.grid_rank = d.get("params", {}).get("gridRank", {"S": 60, "A": 48, "B": 36})
         self.memo = {}
         self.result_index = {id(r): i for i, r in enumerate(self.results)}
         for r in self.results:
@@ -320,6 +321,18 @@ class GridStatus:
             return ""
         parts = [f"{MEMO_LABEL[k]}{c[k]}" for k in ("none", "bank", "yes", "unk") if c[k]]
         return f"{c['n']}件（" + "・".join(parts) + (f"・うち変電所は推定{c['est']}" if c["est"] else "") + "）"
+
+    def rank_meaning(self, rk):
+        """系統ランク（80点満点）の意味。画面の rankMeaning と同じ文言"""
+        g = self.grid_rank
+        return {
+            "S": f"S：系統スコア{g['S']}点以上（最優先で接続検討を申し込む）",
+            "A": f"A：系統スコア{g['A']}〜{g['S'] - 1}点（接続検討の候補）",
+            "B": f"B：系統スコア{g['B']}〜{g['A'] - 1}点（近くにS・Aが無いときの次点）",
+            "C": f"C：系統スコア{g['B'] - 1}点以下（見送り推奨）",
+            "除外": "ゲート除外：空容量(上位系考慮)が0以下かつN-1電制が「可」でない（上位系増強で長期化しやすい）",
+            "データ無": "データ無：送配電事業者の空容量が未公表・未取得で採点できない",
+        }.get(rk, "")
 
     def category_text(self, row):
         """地図と同じカテゴリ（5色）。例「紫：変電所は空きあり・上位系は空き無し（要接続検討）」"""

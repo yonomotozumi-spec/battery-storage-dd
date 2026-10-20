@@ -157,6 +157,11 @@ select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(2
 .rk-C { background:var(--surf2); color:var(--txt3); }
 .rk-x { background:var(--fail-bg); color:var(--fail); }
 .rk-n { background:var(--surf2); color:var(--txt3); border:1px dashed var(--bdr); }
+.rk[title] { cursor:help; }
+.rank-legend { display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; padding:8px 16px; font-size:11px; color:var(--txt2);
+  background:var(--surf); border-bottom:1px solid var(--bdr); line-height:1.5; }
+.rank-legend .rl-item { display:inline-flex; gap:5px; align-items:center; white-space:nowrap; }
+.rank-legend .rl-head { font-weight:700; color:var(--txt); }
 
 /* ── Result table ── */
 .tbl-scroll { overflow-x:auto; }
@@ -445,13 +450,14 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <span class="card-title">候補変電所</span>
       <span class="card-note" id="tbl-note">行をクリックすると内訳を表示</span>
     </div>
+    <div class="rank-legend" id="rank-legend-loc"></div>
     <div class="tbl-scroll">
       <table class="rtbl">
         <thead>
           <tr>
             <th>#</th><th>変電所</th><th class="num">距離</th>
             <th class="num">S7近接<br>(20)</th><th class="num">系統<br>(80)</th>
-            <th class="num">総合<br>(100)</th><th>ランク</th><th>地図</th>
+            <th class="num">総合<br>(100)</th><th>系統ランク</th><th>地図</th>
           </tr>
         </thead>
         <tbody id="rtbody"></tbody>
@@ -474,7 +480,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <div class="tbl-scroll">
       <table class="rtbl">
         <thead>
-          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>ランク</th></tr>
+          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>系統ランク</th></tr>
         </thead>
         <tbody id="nctbody"></tbody>
       </table>
@@ -565,10 +571,11 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <a class="chip" href="https://github.com/yonomotozumi-spec/battery-storage-dd/tree/main/exports" target="_blank" rel="noopener">🗂 都道府県別CSVの一覧</a>
   </div>
   <div class="tbl-scroll" id="l-wrap" style="display:none">
+    <div class="rank-legend" id="rank-legend-list"></div>
     <table class="rtbl">
       <thead>
         <tr><th>#</th><th>変電所</th><th class="num">空容量<br>上位系(MW)</th><th class="num">空容量<br>当該(MW)</th>
-          <th>N-1電制</th><th class="num">系統<br>(80)</th><th>ランク</th><th>カテゴリ（地図の色）</th><th>実績</th><th>地図</th></tr>
+          <th>N-1電制</th><th class="num">系統<br>(80)</th><th>系統ランク</th><th>カテゴリ（地図の色）</th><th>実績</th><th>地図</th></tr>
       </thead>
       <tbody id="ltbody"></tbody>
     </table>
@@ -765,6 +772,33 @@ function totalRank(total) {
   return 'C';
 }
 const rkClass = r => ({ S: 'rk-S', A: 'rk-A', B: 'rk-B', C: 'rk-C' }[r] || (r === '除外' ? 'rk-x' : 'rk-n'));
+// 系統ランク（80点満点）の意味。閾値は substations.js の params（substation_scoring.py が唯一の定義）から
+function rankMeaning(r) {
+  if (!D) return '';
+  const g = D.params.gridRank;
+  return {
+    S: `S：系統スコア${g.S}点以上（最優先で接続検討を申し込む）`,
+    A: `A：系統スコア${g.A}〜${g.S - 1}点（接続検討の候補）`,
+    B: `B：系統スコア${g.B}〜${g.A - 1}点（近くにS・Aが無いときの次点）`,
+    C: `C：系統スコア${g.B - 1}点以下（見送り推奨）`,
+    '除外': 'ゲート除外：空容量(上位系考慮)が0以下かつN-1電制が「可」でない（上位系増強で長期化しやすい）',
+    'データ無': 'データ無：送配電事業者の空容量が未公表・未取得で採点できない',
+  }[r] || '';
+}
+const rkBadge = r => `<span class="rk ${rkClass(r)}" title="${esc(rankMeaning(r))}">${esc(r)}</span>`;
+// 総合ランク（100点満点＝系統80＋近接20）の意味
+function totalRankMeaning(r) {
+  if (!D) return '';
+  const [s, a, b] = D.params.totalRankSteps.map(x => x[0]);
+  return { S: `総合S：${s}点以上`, A: `総合A：${a}〜${s - 1}点`, B: `総合B：${b}〜${a - 1}点`, C: `総合C：${b - 1}点以下` }[r] || '';
+}
+// ランクの凡例（表の上に出す）。withTotal で総合ランクの基準も付ける
+function rankLegendHtml(withTotal) {
+  const ranks = ['S', 'A', 'B', 'C', '除外', 'データ無'];
+  return `<span class="rl-head">系統ランク（80点満点）：</span>` +
+    ranks.map(r => `<span class="rl-item"><span class="rk ${rkClass(r)}">${esc(r)}</span>${esc(rankMeaning(r).replace(/^[^：]+：/, ''))}</span>`).join('') +
+    (withTotal ? `<span class="rl-item"><span class="rl-head">総合（100点＝系統80＋近接20）：</span>${['S', 'A', 'B', 'C'].map(totalRankMeaning).join('／')}</span>` : '');
+}
 const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
 const fmtNum = v => v == null ? '—' : String(v);
 const gmaps = (la, lo) => `https://www.google.com/maps?q=${la},${lo}`;
@@ -897,9 +931,9 @@ function render(hits, ctx) {
 
   if (best) {
     $('sum-best').innerHTML = `${best.total} <span style="font-size:12px;color:var(--txt3)">/100</span> ` +
-      `<span class="rk ${rkClass(totalRank(best.total))}">${totalRank(best.total)}</span>`;
+      `<span class="rk ${rkClass(totalRank(best.total))}" title="${esc(totalRankMeaning(totalRank(best.total)))}">総合${totalRank(best.total)}</span>`;
     $('sum-best-sub').innerHTML = `${esc(val(best.row, 'name'))}（${esc(area(best.row))}）` +
-      `<br>系統${best.grid} ＋ 近接${best.s7}　${fmtDist(best.dist)}　系統ランク <span class="rk ${rkClass(rank(best.row))}">${esc(rank(best.row))}</span>`;
+      `<br>系統${best.grid} ＋ 近接${best.s7}　${fmtDist(best.dist)}　系統ランク ${rkBadge(rank(best.row))}`;
   } else {
     $('sum-best').textContent = '—';
     $('sum-best-sub').textContent = '範囲内に該当なし';
@@ -950,7 +984,7 @@ function render(hits, ctx) {
       <td class="num">${h.s7}</td>
       <td class="num">${h.grid}</td>
       <td class="num total-cell">${h.total}</td>
-      <td><span class="rk ${rkClass(rk)}">${esc(rk)}</span>${upTag(row)}</td>
+      <td>${rkBadge(rk)}${upTag(row)}</td>
       <td class="tbl-links"><a href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">地図</a></td>`;
     const dtr = document.createElement('tr');
     dtr.className = 'row-detail';
@@ -1075,7 +1109,7 @@ function renderNoCoord(areaName, pref) {
       <td class="num">${fmtNum(val(r, 'availUp') != null ? val(r, 'availUp') : val(r, 'availCur'))}</td>
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
-      <td><span class="rk ${rkClass(rank(r))}">${esc(rank(r))}</span>${upTag(r)}</td>
+      <td>${rkBadge(rank(r))}${upTag(r)}</td>
     </tr>`).join('');
   $('nocoord-note').textContent = `${areaName}エリア ${list.length}件中 上位${Math.min(20, list.length)}件`;
   card.style.display = '';
@@ -1086,7 +1120,7 @@ const CSV_COLS = [
   ['No.', r => val(r, 'no')], ['エリア', r => area(r)], ['変電所名', r => val(r, 'name')],
   ['都道府県', r => prefOf(r)], ['市区町村', r => muniOf(r)],
   ['元リストの都道府県', r => val(r, 'pref')], ['最大電圧kV', r => val(r, 'vmax')], ['二次電圧kV', r => val(r, 'vsec')],
-  ['系統スコア(80)', r => val(r, 'grid')], ['系統ランク', r => rank(r)],
+  ['系統スコア(80)', r => val(r, 'grid')], ['系統ランク', r => rank(r)], ['系統ランクの意味', r => rankMeaning(rank(r))],
   // 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類（scripts/grid_status.py と同じ）
   ['カテゴリ（地図の色）', r => catText(r)],
   ['接続検討の実績（件数・分類）', r => memoText(r)],
@@ -1185,9 +1219,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function csvNear() {
   if (!lastResults.length) return;
-  const header = ['順位', '距離km', 'S7近接(20)', '総合(100)', '総合ランク', ...CSV_COLS.map(c => c[0])];
+  const header = ['順位', '距離km', 'S7近接(20)', '総合(100)', '総合ランク', '総合ランクの意味', ...CSV_COLS.map(c => c[0])];
   const lines = lastResults.map((h, i) => [i + 1, (h.dist / 1000).toFixed(2), h.s7, h.total,
-    totalRank(h.total), ...CSV_COLS.map(c => c[1](h.row))]);
+    totalRank(h.total), totalRankMeaning(totalRank(h.total)), ...CSV_COLS.map(c => c[1](h.row))]);
   const lat = parseFloat($('lat').value).toFixed(4), lon = parseFloat($('lon').value).toFixed(4);
   // ファイル名は半角のみ。日本語名はブラウザによって「download」に化けるため
   downloadCsv(`substations_near_${lat}_${lon}_${today()}.csv`, header, lines);
@@ -1250,7 +1284,7 @@ function showList() {
       <td class="num">${fmtNum(val(r, 'availCur'))}</td>
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
-      <td><span class="rk ${rkClass(rank(r))}">${esc(rank(r))}</span>${upTag(r)}</td>
+      <td>${rkBadge(rank(r))}${upTag(r)}</td>
       <td>${gsBadge(r)}</td>
       <td>${memoOf(r) ? `<a href="#" class="res-jump" data-res="${memoOf(r).map(m => D.results.indexOf(m)).join(',')}">${esc(memoText(r))}</a>` : '—'}</td>
       <td class="tbl-links">${val(r, 'lat') != null
@@ -1333,7 +1367,7 @@ function initList() {
 
   $('l-word').addEventListener('keydown', e => { if (e.key === 'Enter') showList(); });
   $('l-ranks').innerHTML = ['S', 'A', 'B', 'C', 'データ無', '除外'].map(r =>
-    `<label class="chk"><input type="checkbox" value="${r}" ${r === 'S' || r === 'A' ? 'checked' : ''}> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
+    `<label class="chk" title="${esc(rankMeaning(r))}"><input type="checkbox" value="${r}" ${r === 'S' || r === 'A' ? 'checked' : ''}> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
   const setRanks = keep => document.querySelectorAll('#l-ranks input').forEach(i => { i.checked = keep.includes(i.value); });
   $('l-preset-sa').addEventListener('click', () => setRanks(['S', 'A']));
   $('l-preset-all').addEventListener('click', () => setRanks(['S', 'A', 'B', 'C', 'データ無', '除外']));
@@ -1357,6 +1391,8 @@ function setMode(mode) {
 
 // ── 定義・実績DBの描画 ──
 function renderStatic() {
+  $('rank-legend-loc').innerHTML = rankLegendHtml(true);
+  $('rank-legend-list').innerHTML = rankLegendHtml(false);
   $('defbody').innerHTML = D.scoreDefs.map(d =>
     `<tr>${d.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
   const [sThr, aThr, bThr] = D.params.totalRankSteps.map(s => s[0]);
@@ -1631,7 +1667,7 @@ function endLabel(e, ni) {
   const rows = nodeRows(e), cr = nodeCoordRow(e), name = TOPO.nodes[e][1];
   if (!rows.length) return `${esc(name)} <span class="topo-txt">(本体リスト外)</span>`;
   const rk = rank(rows[0]), g = gridStatus(rows[0]);
-  return `<span class="topo-link" data-node="${e}">${esc(name)}</span> <span class="rk ${rkClass(rk)}">${esc(rk)}</span>` +
+  return `<span class="topo-link" data-node="${e}">${esc(name)}</span> ${rkBadge(rk)}` +
     ` <span class="lg-dot" style="background:${GS_COLOR[g.cls]}" title="${esc(g.label)}：${esc(g.reason)}"></span>` +
     (cr ? '' : ' <span class="topo-txt">(座標なし)</span>');
 }
@@ -1901,7 +1937,7 @@ function renderLegend() {
   const byStatus = $('m-color').value === 'status';
   const dots = byStatus
     ? `<span><b>丸の色＝変電所単体の空き × 上位系の空き：</b></span>` + ['both', 'upunk', 'upbad', 'ownbad', 'none'].map(k => `<span>${dot(GS_COLOR[k])}${GS_LABEL[k]}</span>`).join('')
-    : `<span><b>丸の色＝系統ランク：</b></span>` + Object.entries(RANK_COLOR).map(([k, c]) => `<span>${dot(c)}${k === 'データ無' ? '空容量データ無し' : k === '除外' ? 'ゲート除外' : k}</span>`).join('');
+    : `<span><b>丸の色＝系統ランク（80点満点）：</b></span>` + Object.entries(RANK_COLOR).map(([k, c]) => `<span title="${esc(rankMeaning(k))}">${dot(c)}${esc(rankMeaning(k))}</span>`).join('');
   $('map-legend').innerHTML = dots +
     `<span>${dot('#fff', 'big')}154kV以上（上位系側）</span>` +
     `<span style="margin-left:6px"><span class="lg-pin memo-std">実</span>接続検討の実績あり（内容は内訳・CSV）</span><span><span class="lg-pin memo-std memo-est">推</span>実績の変電所は推定</span>` +
@@ -2041,14 +2077,14 @@ function selectRow(row, opts = {}) {
       <span class="ss-name">${esc(val(row, 'name'))}</span>
       <span class="ss-meta">${esc(area(row))}${prefOf(row) ? ' / ' + esc(prefOf(row)) : ''}${muniOf(row) ? ' ' + esc(muniOf(row)) : ''}
         ${val(row, 'vmax') != null ? ' ・ ' + val(row, 'vmax') + 'kV' : ''}${val(row, 'vsec') != null ? '→' + val(row, 'vsec') + 'kV' : ''}</span>
-      <span class="rk ${rkClass(rk)}">${esc(rk)}</span>${upTag(row)} ${ustBadge(row)}
+      ${rkBadge(rk)}${upTag(row)} ${ustBadge(row)}
       <span class="ss-meta">系統スコア ${val(row, 'grid')}/80${dist != null ? `　候補地から ${fmtDist(dist)}（S7 ${s7}点・総合 ${val(row, 'grid') + s7}）` : ''}</span>
       ${val(row, 'lat') == null ? '<span class="up-tag up-ng">座標なし（地図に出ません）</span>' : ''}
     </div>
     ${detailHtml({ row, s7, dist, noMapChip: true })}`;
   drawLinks(row);
   if (opts.pan && val(row, 'lat') != null) MAP.setView([val(row, 'lat'), val(row, 'lon')], Math.max(MAP.getZoom(), 11));
-  if (m) m.bindPopup(`<b>${esc(val(row, 'name'))}</b> <span class="rk ${rkClass(rk)}">${esc(rk)}</span><br>` +
+  if (m) m.bindPopup(`<b>${esc(val(row, 'name'))}</b> ${rkBadge(rk)}<br>` +
     `空容量 上位系 ${fmtNum(val(row, 'availUp'))}／当該 ${fmtNum(val(row, 'availCur'))} MW<br>` +
     `<span style="color:var(--txt3)">内訳・上位系統は地図の下に表示しています</span>`, { closeButton: false, autoPan: false }).openPopup();
   const mc = opts.focusMemo && $('map-panel').querySelector('#memo-card');
@@ -2090,7 +2126,7 @@ function initMapControls() {
   $('m-ranks').innerHTML = `<button class="btn-sub" type="button" id="m-preset-all">全変電所</button>
     <button class="btn-sub" type="button" id="m-preset-sa">良い変電所（S・A）だけ</button>` +
     ['S', 'A', 'B', 'C', 'データ無', '除外'].map(r =>
-    `<label class="chk"><input type="checkbox" value="${r}" checked> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
+    `<label class="chk" title="${esc(rankMeaning(r))}"><input type="checkbox" value="${r}" checked> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
   const setMapRanks = keep => { document.querySelectorAll('#m-ranks input').forEach(i => { i.checked = keep.includes(i.value); }); renderMarkers(); };
   $('m-preset-all').addEventListener('click', () => setMapRanks(['S', 'A', 'B', 'C', 'データ無', '除外']));
   $('m-preset-sa').addEventListener('click', () => setMapRanks(['S', 'A']));
