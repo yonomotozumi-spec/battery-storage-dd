@@ -1600,9 +1600,9 @@ function endLabel(e, ni) {
   if (e === ni) return '（この変電所）';
   const rows = nodeRows(e), cr = nodeCoordRow(e), name = TOPO.nodes[e][1];
   if (!rows.length) return `${esc(name)} <span class="topo-txt">(本体リスト外)</span>`;
-  const rk = rank(rows[0]), u = upperStatus(rows[0]);
+  const rk = rank(rows[0]), g = gridStatus(rows[0]);
   return `<span class="topo-link" data-node="${e}">${esc(name)}</span> <span class="rk ${rkClass(rk)}">${esc(rk)}</span>` +
-    ` <span class="lg-dot" style="background:${STATUS_COLOR[u.cls]}" title="${esc(u.label)}：${esc(u.reason)}"></span>` +
+    ` <span class="lg-dot" style="background:${GS_COLOR[g.cls]}" title="${esc(g.label)}：${esc(g.reason)}"></span>` +
     (cr ? '' : ' <span class="topo-txt">(座標なし)</span>');
 }
 
@@ -1942,7 +1942,7 @@ function drawLinks(row) {
         `　→ <b style="color:${col}">${st === 'bad' ? '上位系に空き無し（ダメ）' : st === 'ok' ? '上位系に空きあり' : '非公表（不明）'}</b>${us.via && us.cap != null ? `（${esc(us.via)} ${fmtNum(us.cap)}MW で判定）` : ''}`,
         { sticky: true }).addTo(MAP_LAYERS.links);
       // 相手側（フィルタで非表示でも位置が分かるように小さな印を置く。色＝相手側の上位系統の状態）
-      const m = L.circleMarker(to, { radius: depth === 1 ? 6 : 4, color: '#16213D', weight: 1.5, fillColor: STATUS_COLOR[upperStatus(cr).cls], fillOpacity: 1 })
+      const m = L.circleMarker(to, { radius: depth === 1 ? 6 : 4, color: '#16213D', weight: 1.5, fillColor: GS_COLOR[gridStatus(cr).cls], fillOpacity: 1 })
         .bindTooltip(markerTip(cr), { direction: 'top', offset: [0, -6] });
       m.on('click', () => selectRow(cr, { pan: false }));
       m.addTo(MAP_LAYERS.links);
