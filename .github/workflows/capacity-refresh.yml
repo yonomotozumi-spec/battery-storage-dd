@@ -43,14 +43,7 @@ jobs:
             --report capacity_report.csv --summary-json capacity_summary.json \
             --report-md "docs/スコア元データ_更新レポート.md"
 
-      - name: スコア・Web用データ・地域別CSVを再生成
-        run: |
-          python3 scripts/score_substations.py --in "$LIST" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
-          python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
-          python3 scripts/build_priority_munis.py
-          python3 scripts/export_substations.py --by-pref exports
-
-      - name: 系統トポロジー（上位系統のつながり）を再生成
+      - name: 系統トポロジー（上位系統のつながり）を再生成（地域別CSVの判定列が使うので先に）
         id: topo
         run: |
           # 送電線CSVも含めて取り直す。取得に失敗したエリアは前回の grid_cache/ のまま生成する
@@ -58,6 +51,13 @@ jobs:
           python3 scripts/build_grid_topology.py build --in "$LIST" --cache-dir grid_cache \
             --out data/grid_topology.js --report "docs/系統トポロジー_照合レポート.md"
           if git diff --quiet -- data/grid_topology.js; then echo "changed=0"; else echo "changed=1"; fi >> "$GITHUB_OUTPUT"
+
+      - name: スコア・Web用データ・地域別CSVを再生成
+        run: |
+          python3 scripts/score_substations.py --in "$LIST" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
+          python3 scripts/build_substation_web_data.py --in "$LIST" --out data/substations.js
+          python3 scripts/build_priority_munis.py
+          python3 scripts/export_substations.py --by-pref exports
 
       - name: 結果の確認（照合率・ランクの変化）
         id: check

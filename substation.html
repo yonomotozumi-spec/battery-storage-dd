@@ -1080,7 +1080,59 @@ const CSV_COLS = [
   ['所在地(参考)', r => val(r, 'addr')],
   ['接続検討の実績', r => (memoOf(r) || []).map(m => m[8]).join(' / ')],
   ['Googleマップ', r => val(r, 'lat') != null ? gmaps(val(r, 'lat'), val(r, 'lon')) : ''],
+  // ── 地図モードと同じ判定（scripts/grid_status.py と同じ列。システム側のCSVと揃える）──
+  ['上位系統の状態', r => TOPO ? upperStatus(r).label : ''],
+  ['上位系統の判定理由', r => TOPO ? upperStatus(r).reason : ''],
+  ['要接続検討', r => TOPO && upperStatus(r).cls === 'check' ? '○' : ''],
+  ['要接続検討の理由', r => TOPO ? (needCheck(r) || []).join('、') : ''],
+  ['実績の分類', r => TOPO ? memoText(r) : ''],
+  ['実績_対策なし', r => TOPO ? memoSummary(r).none || '' : ''],
+  ['実績_バンク等の対策待ち', r => TOPO ? memoSummary(r).bank || '' : ''],
+  ['実績_上位系対策あり', r => TOPO ? memoSummary(r).yes || '' : ''],
+  ['実績_記載なし', r => TOPO ? memoSummary(r).unk || '' : ''],
+  ['実績_うち変電所は推定', r => TOPO ? memoSummary(r).est || '' : ''],
+  ['つながりデータ', r => TOPO ? (TOPO.meta.areas.includes(area(r)) ? (nodeOf(r) != null ? 'あり' : 'なし（公表物に同名なし）') : '対象外エリア') : ''],
+  ['つながる送電線の本数', r => TOPO && nodeOf(r) != null ? nodeLinks(nodeOf(r)).length : ''],
+  ['上位側の送電線（相手側・上位側の空き）', r => TOPO ? upLinesText(r) : ''],
+  ['上位系の制約設備（▼＝空き0以下）', r => TOPO ? upperEquipText(r) : ''],
 ];
+
+// ── CSV向けの文字（HTMLなし）。scripts/grid_status.py の up_lines_text / upper_equipment_text / memo_text と同じ内容 ──
+function upLinesFor(row) {
+  const ni = nodeOf(row);
+  if (ni == null) return [];
+  const banks = TOPO.nodes[ni][3];
+  const v1s = banks.map(b => b[BF.v1]).filter(v => v != null);
+  const v1max = v1s.length ? Math.max(...v1s) : null;
+  return nodeLinks(ni).filter(x => typeof x.other === 'number' && (v1max == null || (lineKv(x.line) != null && lineKv(x.line) >= v1max)))
+    .map(x => ({ ...x, u: lineUpStatus(x.line, ni) })).filter(x => x.u.st !== 'peer');
+}
+function upLinesText(row) {
+  return upLinesFor(row).map(x => {
+    const st = x.u.st === 'ok' ? `空きあり${fmtNum(x.u.cap)}MW` : x.u.st === 'bad' ? `空き無し${fmtNum(x.u.cap)}MW` : '非公表';
+    return `${x.line[LF.name]}(${fmtNum(lineKv(x.line))}kV)→${TOPO.nodes[x.other][1]}[${st}]${x.n > 1 ? `×${x.n}` : ''}`;
+  }).join(' / ');
+}
+function upperEquipText(row) {
+  const ni = nodeOf(row);
+  if (ni == null) return '';
+  const seen = new Set(), out = [];
+  TOPO.nodes[ni][3].forEach(b => b[BF.upRefs].forEach(([k, v]) => {
+    let t;
+    if (k === 'L') { const l = TOPO.lines[v], c = lineCap(l); t = `${l[LF.name]}(${fmtNum(lineKv(l))}kV)${c != null && c <= 0 ? '▼' : ''}`; }
+    else if (k === 'N') t = TOPO.nodes[v][1] + (nodeBad(v) ? '▼' : '');
+    else t = String(v);
+    if (!seen.has(t)) { seen.add(t); out.push(t); }
+  }));
+  return out.join('、');
+}
+function memoText(row) {
+  const c = memoSummary(row);
+  if (!c.n) return '';
+  const parts = ['none', 'bank', 'yes', 'unk'].filter(k => c[k]).map(k => `${MEMO_LABEL_SHORT[k]}${c[k]}`);
+  return `${c.n}件（${parts.join('・')}${c.est ? `・うち変電所は推定${c.est}` : ''}）`;
+}
+const MEMO_LABEL_SHORT = { none: '対策なし', bank: 'バンク等の対策待ち', yes: '上位系対策あり', unk: '記載なし' };
 
 function downloadCsv(filename, header, lines) {
   const cell = v => {
