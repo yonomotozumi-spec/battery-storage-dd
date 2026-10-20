@@ -1,8 +1,8 @@
 # スコアの元データ（空容量・運用容量・予想潮流・N-1電制・出力制御）の定期更新（月1回）
-# 東北・北陸・関西・中国・四国・九州の公表CSVを取得して本体リストを書き換え、スコア・Web用データ・
-# 地域別CSVを作り直す。照合率やランクの変化が普段どおりならそのまま main に反映し、
-# おかしければ別ブランチに置いて確認を求める Issue を起票する。
-# 東京・中部・北海道・沖縄は自動取得できないため、レポートに手作業の確認先を出す。
+# 東北・北陸・関西・中国・四国・九州の公表CSVと北海道の公表PDF（予想潮流等一覧表）を取得して
+# 本体リストを書き換え、スコア・Web用データ・地域別CSVを作り直す。照合率やランクの変化が
+# 普段どおりならそのまま main に反映し、おかしければ別ブランチに置いて確認を求める Issue を起票する。
+# 東京・中部・沖縄は自動取得できないため、レポートに手作業の確認先を出す。
 name: capacity-refresh
 
 on:
@@ -31,7 +31,7 @@ jobs:
           python-version: '3.11'
 
       - name: 依存パッケージ
-        run: pip install openpyxl
+        run: pip install openpyxl pdfplumber   # pdfplumber は北海道のPDF読み取り用
 
       - name: 各社の公表CSVを取得
         run: python3 scripts/update_capacity.py fetch --cache-dir capacity_cache
