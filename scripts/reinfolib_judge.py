@@ -2,16 +2,20 @@
 # -*- coding: utf-8 -*-
 """
 不動産情報ライブラリ(reinfolib)API の GeoJSON から、座標の「該当/非該当」と詳細を判定する。
-ネットワークはしない。GeoJSON取得は呼び出し側(Claude)が web_fetch で行い、本スクリプトは
-(1)取得URL生成 と (2)点内判定→値・許認可の組み立て を担う。
+(1)取得URL生成、(2)APIからのGeoJSON取得（fetch / run のみネットワークを使う）、
+(3)点内判定→値・許認可の組み立て を担う。judge だけなら取得済みGeoJSONでネットワーク無しで動く。
 
 使い方:
+  # 取得＋判定を一度に行う（APIキーは環境変数 REINFOLIB_API_KEY か --key で渡す。キーはリポジトリに置かない）
+  REINFOLIB_API_KEY=... python reinfolib_judge.py run   --lat L --lon N --out values.json [--dir <reinfolibdir>]
+  # 個別に行う場合
   python reinfolib_judge.py urls  --lat L --lon N --key <APIKEY>
+  python reinfolib_judge.py fetch --lat L --lon N --dir <reinfolibdir> [--key <APIKEY>]
   python reinfolib_judge.py judge --lat L --lon N --dir <reinfolibdir> --out values.json
 出力 values.json:
   {"values": {DD項目No: {"value","comment"}}, "permits": {法令No: {"req","note"}}, "raw": {...}}
 """
-import argparse, json, math, os
+import argparse, json, math, os, sys, tempfile, time, urllib.error, urllib.request
 
 BASE = "https://www.reinfolib.mlit.go.jp/ex-api/external/{code}?response_format=geojson&z={z}&x={x}&y={y}"
 
@@ -93,6 +97,53 @@ def build_urls(lat, lon, key):
             url += "&subscription-key=" + key
         out.append(f"{code}\t{url}")
     return out
+
+def resolve_key(key):
+    """--key が空なら環境変数 REINFOLIB_API_KEY を使う。どちらも無ければ None。"""
+    return key or os.environ.get("REINFOLIB_API_KEY") or None
+
+
+def fetch(lat, lon, directory, key, retries=3, timeout=30):
+    """全レイヤのGeoJSONを <directory>/<code>.geojson に保存する。失敗したレイヤはファイルを作らない
+    （judge 側で「未取得」として扱われる）。戻り値は {code: "ok"|"error: ..."}。"""
+    key = resolve_key(key)
+    if not key:
+        sys.exit("APIキーがありません。環境変数 REINFOLIB_API_KEY を設定するか --key を指定してください。")
+    os.makedirs(directory, exist_ok=True)
+    status = {}
+    for code, (z, desc) in LAYERS.items():
+        x, y = deg2num(lat, lon, z)
+        url = BASE.format(code=code, z=z, x=x, y=y)
+        req = urllib.request.Request(url, headers={"Ocp-Apim-Subscription-Key": key, "Accept": "application/json"})
+        last = None
+        for i in range(retries):
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    body = r.read().decode("utf-8")
+                json.loads(body)  # JSONとして読めることだけ確認
+                with open(os.path.join(directory, code + ".geojson"), "w", encoding="utf-8") as f:
+                    f.write(body)
+                status[code] = "ok"; last = None
+                break
+            except urllib.error.HTTPError as e:
+                last = f"HTTP {e.code}"
+                if e.code in (401, 403):
+                    sys.exit(f"{code}: {last} — APIキーが無効か期限切れです（キーは本文に出しません）。")
+                if e.code == 404:
+                    # 範囲外などで404を返すことがあるため、空のFeatureCollectionとして扱う
+                    with open(os.path.join(directory, code + ".geojson"), "w", encoding="utf-8") as f:
+                        f.write('{"type":"FeatureCollection","features":[]}')
+                    status[code] = "ok(404→空)"; last = None
+                    break
+                if e.code == 429:
+                    time.sleep(2 * (i + 1)); continue
+            except Exception as e:  # ネットワーク断・JSON不正など
+                last = f"{type(e).__name__}: {e}"
+                time.sleep(1 + i)
+        if last:
+            status[code] = "error: " + last
+        print(f"  {code} {desc}: {status[code]}")
+    return status
 
 
 def judge(lat, lon, directory):
@@ -225,10 +276,18 @@ def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     pu = sub.add_parser("urls"); pu.add_argument("--lat", type=float, required=True); pu.add_argument("--lon", type=float, required=True); pu.add_argument("--key", default="")
     pj = sub.add_parser("judge"); pj.add_argument("--lat", type=float, required=True); pj.add_argument("--lon", type=float, required=True); pj.add_argument("--dir", required=True); pj.add_argument("--out", required=True)
+    pf = sub.add_parser("fetch", help="APIから全レイヤのGeoJSONを取得して --dir に保存"); pf.add_argument("--lat", type=float, required=True); pf.add_argument("--lon", type=float, required=True); pf.add_argument("--dir", required=True); pf.add_argument("--key", default="")
+    pr = sub.add_parser("run", help="fetch と judge を一度に実行"); pr.add_argument("--lat", type=float, required=True); pr.add_argument("--lon", type=float, required=True); pr.add_argument("--out", required=True); pr.add_argument("--dir", default=""); pr.add_argument("--key", default="")
     a = ap.parse_args()
     if a.cmd == "urls":
         for ln in build_urls(a.lat, a.lon, a.key): print(ln)
+    elif a.cmd == "fetch":
+        fetch(a.lat, a.lon, a.dir, a.key)
     else:
+        if a.cmd == "run":
+            a.dir = a.dir or tempfile.mkdtemp(prefix="reinfolib_")
+            print("取得先:", a.dir)
+            fetch(a.lat, a.lon, a.dir, a.key)
         res = judge(a.lat, a.lon, a.dir)
         json.dump(res, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
         print("OK:", a.out)
