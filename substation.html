@@ -255,6 +255,34 @@ details.foldable[open] > summary::before { content:'▾ '; }
 #result { display:none; }
 #result.show { display:block; }
 
+/* ── 地図モード ── */
+#map { height:620px; background:var(--surf2); border-top:1px solid var(--bdr); }
+#map:empty::before { content:'地図を読み込んでいます…'; display:block; padding:40px; text-align:center; color:var(--txt3); font-size:12px; }
+.map-legend { display:flex; flex-wrap:wrap; gap:6px 16px; padding:8px 16px; font-size:11px; color:var(--txt2); border-top:1px solid var(--bdr); align-items:center; }
+.lg-dot { display:inline-block; width:11px; height:11px; border-radius:50%; border:1.5px solid #4a5568; vertical-align:middle; margin-right:4px; }
+.lg-dot.big { width:15px; height:15px; }
+.lg-dot.up-ng { border-color:#E08A00; border-width:2.5px; }
+.lg-line { display:inline-block; width:22px; height:0; border-top:3px solid; vertical-align:middle; margin-right:4px; }
+.map-sel { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 16px; background:var(--surf2); border-top:1px solid var(--bdr); border-bottom:1px solid var(--bdr); }
+.map-sel .ss-name { font-size:14px; }
+.topo-box { grid-column:1/-1; border:1px solid var(--bdr); border-radius:6px; background:var(--surf); padding:8px 10px; }
+.topo-box .dt-title { margin-bottom:5px; }
+.topo-sub { font-size:11px; color:var(--txt2); margin:6px 0 3px; font-weight:600; }
+.topo-tbl { width:100%; border-collapse:collapse; font-size:11px; }
+.topo-tbl th, .topo-tbl td { padding:3px 6px; border-bottom:1px solid var(--bdr); text-align:left; vertical-align:top; }
+.topo-tbl th { color:var(--txt3); font-weight:600; background:var(--surf2); white-space:nowrap; }
+.topo-tbl td.num { text-align:right; }
+.topo-link { color:var(--link); cursor:pointer; text-decoration:underline dotted; }
+.topo-txt { color:var(--txt3); }
+.topo-tag { display:inline-block; font-size:10px; font-weight:600; padding:0 5px; border-radius:3px; white-space:nowrap; }
+.topo-tag.up { background:rgba(27,85,204,.12); color:var(--acc); }
+.topo-tag.dn { background:var(--surf2); color:var(--txt3); }
+.topo-note { font-size:10.5px; color:var(--txt3); margin-top:6px; line-height:1.5; }
+.leaflet-container { font-family:inherit; }
+.leaflet-tooltip { font-size:11px; line-height:1.4; }
+.leaflet-popup-content { font-size:12px; line-height:1.5; margin:10px 12px; }
+.leaflet-popup-content b { font-size:13px; }
+
 @media(max-width:640px){
   .frow{grid-template-columns:1fr;gap:5px;} .flabel{padding-top:0;}
   .coord-row{grid-template-columns:1fr;}
@@ -286,6 +314,8 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <small>候補地の緯度経度から、近くの変電所を総合スコア順に</small></button>
   <button class="mode-tab" role="tab" id="tab-pref" aria-selected="false">🗾 都道府県から一覧・CSV
     <small>都道府県を選んで（複数可）、S/Aなど良い変電所や全変電所をCSVに</small></button>
+  <button class="mode-tab" role="tab" id="tab-map" aria-selected="false">🗺 地図で見る・上位系統をたどる
+    <small>全国の変電所を地図に。クリックで系統情報と、つながる送電線・上位側の変電所</small></button>
 </div>
 
 <!-- ── 入力 ── -->
@@ -401,6 +431,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
     <div class="msg" id="tbl-empty" style="display:none"></div>
     <div class="res-tools">
+      <button class="btn-sub" id="btn-map-near">🗺 この範囲を地図で見る</button>
       <button class="btn-sub" id="btn-csv-near">この検索結果をCSVで保存（全件）</button>
       <span class="fnote">表の上位50件に限らず、該当した全件を距離・総合スコア付きで保存します（Excelでそのまま開けます）</span>
     </div>
@@ -516,6 +547,63 @@ details.foldable[open] > summary::before { content:'▾ '; }
   </div>
 </div>
 
+<!-- ── 地図モード ── -->
+<div class="card" id="map-card" style="display:none">
+  <div class="card-head">
+    <span class="sec-tag">Map</span>
+    <span class="card-title">全国の変電所を地図で見る・上位系統をたどる</span>
+    <span class="card-note" id="map-count"></span>
+  </div>
+  <div class="frow">
+    <div class="flabel">表示する変電所<div class="fnote">丸の色＝系統ランク、大きい丸＝154kV以上（上位系側）、橙の縁＝上位系の空容量が未確認。座標がある変電所だけ地図に出ます</div></div>
+    <div class="fcontrol">
+      <div class="opt-row" id="m-ranks"></div>
+      <div class="coord-row list-row">
+        <div><div class="coord-label">上位系の確認</div>
+          <select id="m-up">
+            <option value="all">すべて</option>
+            <option value="ok">上位系を確認できたものだけ</option>
+            <option value="ng">上位系が未確認（当該設備で代用）のものだけ</option>
+          </select></div>
+        <div><div class="coord-label">空容量の下限 (MW)</div><input type="number" id="m-mincap" placeholder="例: 6" step="0.1" min="0"></div>
+        <div><div class="coord-label">電圧階級</div>
+          <select id="m-kv">
+            <option value="all">すべて</option>
+            <option value="hi">154kV以上（上位系側の変電所）</option>
+            <option value="lo">66〜132kV（配電側の変電所）</option>
+          </select></div>
+      </div>
+      <div class="opt-row">
+        <label class="chk"><input type="checkbox" id="m-n1"> N-1電制「可」だけ</label>
+        <label class="chk"><input type="checkbox" id="m-curtail"> 出力制御「なし」だけ</label>
+        <label class="chk"><input type="checkbox" id="m-topo"> つながり（送電線）のデータがある変電所だけ</label>
+      </div>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">重ねて表示<div class="fnote">つながりの線は、公表CSVの「潮流方向」の両端を直線で結んだ模式表示です。実際の送電線の経路ではありません</div></div>
+    <div class="fcontrol">
+      <div class="opt-row">
+        <label class="chk"><input type="checkbox" id="m-links" checked> 選んだ変電所のつながり（模式線）</label>
+        <label class="chk"><input type="checkbox" id="m-hop2"> 2段先まで</label>
+        <label class="chk"><input type="checkbox" id="m-chuden"> 中部電力PG公表の送電線・変電所（実形状）</label>
+        <label class="chk"><input type="checkbox" id="m-site" checked> 候補地と検索範囲</label>
+        <label class="chk">背景
+          <select id="m-base" style="width:auto;padding:3px 8px">
+            <option value="pale">地理院 淡色</option>
+            <option value="std">地理院 標準</option>
+            <option value="photo">地理院 航空写真</option>
+          </select></label>
+      </div>
+      <div class="fnote" id="m-chuden-note"></div>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div class="map-legend" id="map-legend"></div>
+  <div class="msg" id="map-msg" style="border-top:1px solid var(--bdr)"></div>
+  <div id="map-panel" style="display:none"></div>
+</div>
+
 <!-- ── スコア定義 ── -->
 <details class="card foldable">
   <summary>スコアの定義と前提（配点・ゲート・ランク）</summary>
@@ -592,6 +680,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
 </div><!-- /wrap -->
 
 <script src="data/substations.js"></script>
+<script src="data/grid_topology.js"></script>
 <script>
 'use strict';
 
@@ -908,7 +997,9 @@ function detailHtml(h) {
       <div><div class="dt-title">スコア内訳</div>${bars}</div>
       <div><div class="dt-title">系統データ</div>${kv}</div>
       ${gateHtml}${upHtml}${noDataHtml}${accHtml}${memoHtml}
+      ${topologyHtml(row)}
       <div class="detail-links">
+        ${h.noMapChip ? '' : `<a class="chip topo-map" data-no="${val(row, 'no')}" href="#map">🗺 地図で系統のつながりを見る</a>`}
         <a class="chip" href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">📍 変電所をGoogleマップで見る</a>
         <a class="chip" href="https://maps.gsi.go.jp/#15/${val(row, 'lat')}/${val(row, 'lon')}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>
         <a class="chip" href="https://www.google.com/maps/dir/?api=1&origin=${$('lat').value},${$('lon').value}&destination=${val(row, 'lat')},${val(row, 'lon')}" target="_blank" rel="noopener">🚗 候補地からのルート</a>
@@ -1135,13 +1226,16 @@ function initList() {
 
 // ── 使い方の切り替え（場所から検索 / 都道府県から一覧）──
 function setMode(mode) {
-  const pref = mode === 'pref';
-  $('tab-loc').setAttribute('aria-selected', String(!pref));
+  const pref = mode === 'pref', map = mode === 'map';
+  $('tab-loc').setAttribute('aria-selected', String(!pref && !map));
   $('tab-pref').setAttribute('aria-selected', String(pref));
-  $('loc-card').style.display = pref ? 'none' : '';
-  $('result').style.display = pref ? 'none' : '';
+  $('tab-map').setAttribute('aria-selected', String(map));
+  $('loc-card').style.display = pref || map ? 'none' : '';
+  $('result').style.display = pref || map ? 'none' : '';
   $('list-card').style.display = pref ? '' : 'none';
-  try { history.replaceState(null, '', pref ? '#pref' : location.pathname + location.search); } catch (e) { /* file:// 等 */ }
+  $('map-card').style.display = map ? '' : 'none';
+  try { history.replaceState(null, '', pref ? '#pref' : map ? '#map' : location.pathname + location.search); } catch (e) { /* file:// 等 */ }
+  if (map) ensureMap().then(() => { MAP.invalidateSize(); updateSite(); }).catch(() => {});
 }
 
 // ── 定義・実績DBの描画 ──
@@ -1161,7 +1255,8 @@ function renderStatic() {
   $('analysislist').innerHTML = D.analysisNotes.map(n => `<li>${esc(n)}</li>`).join('');
 
   const noCoord = D.meta.total - D.meta.withCoords;
-  $('data-note').innerHTML = `全${D.meta.total.toLocaleString()}変電所<br>うち座標あり ${D.meta.withCoords.toLocaleString()}件`;
+  $('data-note').innerHTML = `全${D.meta.total.toLocaleString()}変電所<br>うち座標あり ${D.meta.withCoords.toLocaleString()}件` +
+    (TOPO ? `<br>つながりデータあり ${TOPO.meta.linkedRows.toLocaleString()}件` : '');
   $('disclaimer').innerHTML =
     `元データ: ${esc(D.meta.source)}（生成 ${esc(D.meta.generated)}）。スコア定義は substation_scoring.py と共通で、xlsx版と同じ配点です。<br>` +
     `<b>制約</b>: 座標が未取得の${noCoord.toLocaleString()}件は距離判定の対象外です（送配電事業者の公表データには載っているが座標が取れていない変電所）。` +
@@ -1179,6 +1274,385 @@ function renderStatic() {
   updateExtLink();
 }
 
+// ── 上位系統・つながり（data/grid_topology.js。各社の公表CSVの変圧器・送電線から生成）──
+// 変電所ノード: [area, name, [本体No.…], [bank…], _, [公表物の変電所No…]]
+// 送電線:      [area, no, name, kv, 回線数, from, to, cap, opcap, 制約要因, flow, availCur, availUp, n1, n1amt, curtail, upEq(文字表の添字), upRefs, 備考]
+// from/to は変電所ノードの添字（数値）か、引き当てられなかった端点の文字（発電所・需要家・○○線分岐 など）
+const TOPO = window.GRID_TOPOLOGY || null;
+const LF = {}, BF = {};
+if (TOPO) {
+  TOPO.lineFields.forEach((n, i) => { LF[n] = i; });
+  TOPO.bankFields.forEach((n, i) => { BF[n] = i; });
+}
+const ROW_BY_NO = {};
+if (D) D.rows.forEach(r => { ROW_BY_NO[String(val(r, 'no'))] = r; });
+const NODE_LINES = [];   // ノード添字 → つながる送電線の添字
+if (TOPO) TOPO.lines.forEach((l, i) => {
+  [l[LF.from], l[LF.to]].forEach(e => { if (typeof e === 'number') (NODE_LINES[e] ||= []).push(i); });
+});
+const nodeOf = row => (TOPO && TOPO.byNo[String(val(row, 'no'))] != null) ? TOPO.byNo[String(val(row, 'no'))] : null;
+const nodeRows = ni => TOPO.nodes[ni][2].map(no => ROW_BY_NO[String(no)]).filter(Boolean);
+const nodeCoordRow = ni => nodeRows(ni).find(r => val(r, 'lat') != null) || null;
+const nodeBestRow = ni => nodeCoordRow(ni) || nodeRows(ni)[0] || null;
+const lineKv = l => l[LF.kv];
+const kvColor = kv => kv >= 400 ? '#6A1B9A' : kv >= 187 ? '#C62828' : kv >= 110 ? '#EF6C00' : kv >= 60 ? '#1B55CC' : '#607D8B';
+const topoDates = a => (TOPO && TOPO.meta.sources[a] ? TOPO.meta.sources[a].dates.join('・') : '');
+const TOPO_MANUAL = {
+  '東京': '東京電力PGのサイトが自動取得を拒否（403）するため、県別PDF「予想潮流等一覧表」を手で確認してください',
+  '中部': '中部電力PGのマッピングが自動取得を拒否（403）するため一覧CSVは未取得です。地図モードの「中部電力PG公表の送電線」で実形状の送電線を確認できます',
+  '北海道': '北海道電力NWの公表がPDFのみのため未取得です',
+  '沖縄': '沖縄電力のサイトが自動取得を拒否（403）するため未取得です',
+  'J-POWER': '対象外（送配電事業者の公表物に含まれません）',
+};
+
+// 上位系設備の参照（["L", 送電線添字] / ["N", ノード添字] / ["T", 文字]）を表示用の文字にする
+function refLabel(ref) {
+  const [k, v] = ref;
+  if (k === 'L') { const l = TOPO.lines[v]; return `${esc(l[LF.name])}${lineKv(l) != null ? `(${lineKv(l)}kV)` : ''}`; }
+  if (k === 'N') {
+    const rows = nodeRows(v);
+    return rows.length ? `<span class="topo-link" data-node="${v}">${esc(TOPO.nodes[v][1])}</span>` : esc(TOPO.nodes[v][1]);
+  }
+  return `<span class="topo-txt">${esc(v)}</span>`;
+}
+
+// 端点（from/to）の表示。相手側の変電所は本体リストにあればクリックで選べる
+function endLabel(e, ni) {
+  if (typeof e !== 'number') return `<span class="topo-txt">${esc(e || '—')}</span>`;
+  if (e === ni) return '（この変電所）';
+  const rows = nodeRows(e), cr = nodeCoordRow(e), name = TOPO.nodes[e][1];
+  if (!rows.length) return `${esc(name)} <span class="topo-txt">(本体リスト外)</span>`;
+  const rk = rank(rows[0]);
+  return `<span class="topo-link" data-node="${e}">${esc(name)}</span> <span class="rk ${rkClass(rk)}">${esc(rk)}</span>` +
+    (cr ? '' : ' <span class="topo-txt">(座標なし)</span>');
+}
+
+// この変電所につながる送電線を、相手側ごとにまとめて返す
+function nodeLinks(ni) {
+  const out = [], seen = {};
+  for (const li of (NODE_LINES[ni] || [])) {
+    const l = TOPO.lines[li];
+    const other = l[LF.from] === ni ? l[LF.to] : l[LF.from];
+    const key = `${l[LF.name]}|${typeof other === 'number' ? 'n' + other : 't' + other}`;
+    if (seen[key]) { seen[key].n++; continue; }
+    seen[key] = { line: l, li, other, n: 1 };
+    out.push(seen[key]);
+  }
+  out.sort((a, b) => (lineKv(b.line) || 0) - (lineKv(a.line) || 0));
+  return out;
+}
+
+function topologyHtml(row) {
+  if (!TOPO) return '';
+  const a = area(row), ni = nodeOf(row);
+  const head = '<div class="dt-title">上位系統・つながり（送配電事業者の公表CSVから）</div>';
+  if (!TOPO.meta.areas.includes(a)) {
+    return `<div class="topo-box">${head}<div class="topo-note">${esc(a)}エリアは公表CSVを自動取得できないため、つながりの情報はありません。${esc(TOPO_MANUAL[a] || '')}</div></div>`;
+  }
+  if (ni == null) {
+    return `<div class="topo-box">${head}<div class="topo-note">${esc(a)}の公表CSV（${esc(topoDates(a))}）に同じ名前の変電所が見つからず、つながりを付与できませんでした。名前の表記違いか、公表対象外（配電用変電所の一部など）の可能性があります。</div></div>`;
+  }
+  const node = TOPO.nodes[ni];
+  const banks = node[3];
+  const v1s = banks.map(b => b[BF.v1]).filter(v => v != null);
+  const v1max = v1s.length ? Math.max(...v1s) : null, v2min = banks.length ? Math.min(...banks.map(b => b[BF.v2] == null ? Infinity : b[BF.v2])) : null;
+  const fmt = v => v == null ? '—' : String(v);
+  const bankRows = banks.map(b => `<tr>
+      <td class="num">${fmt(b[BF.v1])}→${fmt(b[BF.v2])}</td><td class="num">${fmt(b[BF.units])}</td>
+      <td class="num">${fmt(b[BF.opcap])}</td><td class="num">${fmt(b[BF.flow])}</td>
+      <td class="num">${fmt(b[BF.availCur])}</td><td class="num">${fmt(b[BF.availUp])}</td>
+      <td>${esc(b[BF.n1] || '—')}</td><td>${esc(b[BF.curtail] || '—')}</td><td>${esc(b[BF.factor] || '—')}</td>
+      <td>${b[BF.upRefs].length ? b[BF.upRefs].map(refLabel).join('、') : (TOPO.strings[b[BF.upEq]] && !/^[-－ー―]+$/.test(TOPO.strings[b[BF.upEq]]) ? esc(TOPO.strings[b[BF.upEq]]) : '—')}</td>
+    </tr>`).join('');
+  const links = nodeLinks(ni);
+  const linkRows = links.map(({ line: l, other, n }) => {
+    const kv = lineKv(l);
+    const side = v1max == null || kv == null ? '' : kv >= v1max ? '<span class="topo-tag up">上位側</span>'
+      : kv <= v2min ? '<span class="topo-tag dn">下位側</span>' : '';
+    return `<tr>
+      <td>${esc(l[LF.name] || l[LF.no])}${n > 1 ? ` <span class="topo-txt">×${n}</span>` : ''}</td>
+      <td class="num" style="color:${kvColor(kv)};font-weight:700">${fmt(kv)}</td><td>${side}</td>
+      <td>${endLabel(other, ni)}</td>
+      <td class="num">${fmt(l[LF.opcap])}</td><td class="num">${fmt(l[LF.flow])}</td>
+      <td class="num">${fmt(l[LF.availCur])}</td><td class="num">${fmt(l[LF.availUp])}</td>
+      <td>${esc(l[LF.n1] || '—')}</td><td>${esc(l[LF.curtail] || '—')}</td>
+      <td>${l[LF.upRefs].length ? l[LF.upRefs].map(refLabel).join('、') : '—'}</td>
+    </tr>`;
+  }).join('');
+  const nUp = links.filter(x => v1max != null && lineKv(x.line) != null && lineKv(x.line) >= v1max).length;
+  return `<div class="topo-box">${head}
+    <div class="topo-note">${esc(a)}の公表（${esc(topoDates(a))}）。公表物の変電所名「${esc(node[1])}」${node[5].length ? '（No. ' + esc(node[5].join('・')) + '）' : ''}に引き当て。
+      ${banks.length ? '' : '変圧器の公表行は無く（開閉所など）、送電線の端点として出てくるものです。'}</div>
+    ${banks.length ? `<div class="topo-sub">変圧器（バンク）ごとの公表値</div>
+    <div class="tbl-scroll"><table class="topo-tbl"><thead><tr>
+      <th>一次→二次 kV</th><th>台数</th><th>運用容量</th><th>予想潮流</th><th>空容量<br>当該</th><th>空容量<br>上位系</th><th>N-1電制</th><th>出力制御</th><th>制約要因</th><th>上位系の制約設備（出力制御の要因になりうる上位設備）</th>
+    </tr></thead><tbody>${bankRows}</tbody></table></div>` : ''}
+    <div class="topo-sub">つながっている送電線 ${links.length}本${nUp ? `（うち上位側 ${nUp}本）` : ''}。相手側の名前をクリックすると、その変電所に移ってさらに上位をたどれます</div>
+    ${links.length ? `<div class="tbl-scroll"><table class="topo-tbl"><thead><tr>
+      <th>送電線</th><th>kV</th><th></th><th>相手側</th><th>運用容量</th><th>予想潮流</th><th>空容量<br>当該</th><th>空容量<br>上位系</th><th>N-1電制</th><th>出力制御</th><th>上位系の制約設備</th>
+    </tr></thead><tbody>${linkRows}</tbody></table></div>`
+    : '<div class="topo-note">送電線CSVの「潮流方向」にこの変電所が出てきません（端点が○○線分岐・需要家などで書かれている場合）。</div>'}
+    <div class="topo-note">「上位側」＝送電線の電圧がこの変電所の一次電圧以上。相手側が「発電所」「需要家」「○○線分岐」のものは変電所ではないため文字のままです。
+      空容量の「—」は公表物で「-」（非公表・該当なし）のもの。値は公表時点のもので、連系可否は接続検討で確定します。</div>
+  </div>`;
+}
+
+// ── 地図モード（Leaflet＋地理院タイル。地図を開いたときだけ読み込む）──
+let MAP = null, MAP_READY = null, MAP_LAYERS = null, MAP_BASE = null, MARKERS = {}, SELECTED = null, CHUDEN_LOADED = false;
+const LEAFLET_VER = '1.9.4';
+const RANK_COLOR = { S: '#0B9966', A: '#5DC391', B: '#E3A600', C: '#9AA3B8', '除外': '#CC2A20', 'データ無': '#C9CFDC' };
+const GSI = {
+  pale: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', 18],
+  std: ['https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', 18],
+  photo: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', 18],
+};
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error(src));
+    document.head.appendChild(s);
+  });
+}
+
+function ensureMap() {
+  if (MAP_READY) return MAP_READY;
+  MAP_READY = (window.L ? Promise.resolve() : (() => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = `https://cdnjs.cloudflare.com/ajax/libs/leaflet/${LEAFLET_VER}/leaflet.min.css`;
+    document.head.appendChild(css);
+    return loadScript(`https://cdnjs.cloudflare.com/ajax/libs/leaflet/${LEAFLET_VER}/leaflet.min.js`);
+  })()).then(() => { initMap(); }).catch(e => {
+    $('map').innerHTML = '';
+    $('map-msg').innerHTML = '地図ライブラリ（Leaflet）を読み込めませんでした。インターネットに接続した状態で開き直してください。' +
+      '地図が使えなくても、「場所から検索」の内訳に上位系統（つながる送電線・相手側の変電所）は表示されます。';
+    MAP_READY = null;
+    throw e;
+  });
+  return MAP_READY;
+}
+
+function initMap() {
+  MAP = L.map('map', { preferCanvas: true, worldCopyJump: false }).setView([36.3, 137.6], 5);
+  const attr = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>';
+  MAP_BASE = {};
+  Object.entries(GSI).forEach(([k, [url, mz]]) => { MAP_BASE[k] = L.tileLayer(url, { attribution: attr, maxZoom: mz }); });
+  MAP_BASE[$('m-base').value].addTo(MAP);
+  MAP_LAYERS = {
+    chuden: L.layerGroup().addTo(MAP),
+    site: L.layerGroup().addTo(MAP),
+    links: L.layerGroup().addTo(MAP),
+    markers: L.layerGroup().addTo(MAP),
+  };
+  renderMarkers();
+  renderLegend();
+  updateSite();
+}
+
+function mapFilter() {
+  const ranks = [...document.querySelectorAll('#m-ranks input:checked')].map(i => i.value);
+  const up = $('m-up').value, kvSel = $('m-kv').value, minCap = parseFloat($('m-mincap').value);
+  return D.rows.filter(r => {
+    if (val(r, 'lat') == null) return false;
+    if (!ranks.includes(rank(r))) return false;
+    if (up === 'ok' && !upChecked(r)) return false;
+    if (up === 'ng' && (upChecked(r) || !hasData(r))) return false;
+    if (isFinite(minCap) && !(effCap(r) >= minCap)) return false;
+    const vm = val(r, 'vmax');
+    if (kvSel === 'hi' && !(vm >= 154)) return false;
+    if (kvSel === 'lo' && !(vm != null && vm < 154)) return false;
+    if ($('m-n1').checked && n1(r) !== '可') return false;
+    if ($('m-curtail').checked && curtail(r) !== 'なし') return false;
+    if ($('m-topo').checked && nodeOf(r) == null) return false;
+    return true;
+  });
+}
+
+function markerStyle(r, selected) {
+  const rk = rank(r), big = val(r, 'vmax') >= 154;
+  return {
+    radius: (big ? 7 : 4.5) + (selected ? 3 : 0),
+    fillColor: RANK_COLOR[rk] || '#999', fillOpacity: rk === 'データ無' ? .6 : .9,
+    color: selected ? '#16213D' : (!hasData(r) ? '#8390AC' : upChecked(r) ? '#334155' : '#E08A00'),
+    weight: selected ? 3 : (hasData(r) && !upChecked(r) ? 2.2 : 1),
+    opacity: 1,
+  };
+}
+
+function markerTip(r) {
+  return `<b>${esc(val(r, 'name'))}</b>（${esc(area(r))}${prefOf(r) ? ' / ' + esc(prefOf(r)) : ''}）<br>` +
+    `系統ランク ${esc(rank(r))}・${val(r, 'grid')}点　${val(r, 'vmax') != null ? val(r, 'vmax') + 'kV' : ''}${val(r, 'vsec') != null ? '→' + val(r, 'vsec') + 'kV' : ''}<br>` +
+    `空容量 上位系 ${fmtNum(val(r, 'availUp'))}／当該 ${fmtNum(val(r, 'availCur'))} MW　N-1 ${esc(n1(r))}` +
+    (nodeOf(r) != null ? `<br>つながる送電線 ${nodeLinks(nodeOf(r)).length}本` : '');
+}
+
+function renderMarkers() {
+  if (!MAP) return;
+  MAP_LAYERS.markers.clearLayers();
+  MARKERS = {};
+  const list = mapFilter();
+  list.forEach(r => {
+    const m = L.circleMarker([val(r, 'lat'), val(r, 'lon')], markerStyle(r, SELECTED === r));
+    m.bindTooltip(markerTip(r), { direction: 'top', offset: [0, -6], opacity: .95 });
+    m.on('click', () => selectRow(r, { pan: false }));
+    m.addTo(MAP_LAYERS.markers);
+    MARKERS[String(val(r, 'no'))] = m;
+  });
+  const sa = list.filter(r => ['S', 'A'].includes(rank(r))).length;
+  $('map-count').textContent = `表示 ${list.length.toLocaleString()}件（S/A ${sa.toLocaleString()}件）`;
+}
+
+function renderLegend() {
+  const dot = (c, extra = '') => `<span class="lg-dot ${extra}" style="background:${c}"></span>`;
+  $('map-legend').innerHTML =
+    Object.entries(RANK_COLOR).map(([k, c]) => `<span>${dot(c)}${k === 'データ無' ? '空容量データ無し' : k === '除外' ? 'ゲート除外' : 'ランク' + k}</span>`).join('') +
+    `<span>${dot('#fff', 'big')}154kV以上（上位系側）</span><span>${dot('#fff', 'up-ng')}上位系未確認</span>` +
+    `<span style="margin-left:6px">送電線の電圧：</span>` +
+    [[500, '500kV'], [275, '187〜275kV'], [154, '110〜154kV'], [66, '66〜77kV'], [33, '33kV以下']]
+      .map(([kv, l]) => `<span><span class="lg-line" style="border-color:${kvColor(kv)}"></span>${l}</span>`).join('') +
+    `<span>◎ 候補地</span>`;
+}
+
+function siteCoords() {
+  const la = parseFloat($('lat').value), lo = parseFloat($('lon').value);
+  return isFinite(la) && isFinite(lo) ? [la, lo] : null;
+}
+function siteBounds() {
+  const c = siteCoords();
+  if (!c) return null;
+  const r = parseInt($('radius').value, 10) || 10000;
+  return L.latLng(c).toBounds(r * 2);
+}
+function updateSite() {
+  if (!MAP) return;
+  MAP_LAYERS.site.clearLayers();
+  const c = siteCoords();
+  if (!c || !$('m-site').checked) return;
+  const r = parseInt($('radius').value, 10);
+  if (r > 0) L.circle(c, { radius: r, color: '#CC2A20', weight: 1.5, dashArray: '4 4', fill: false }).addTo(MAP_LAYERS.site);
+  L.circleMarker(c, { radius: 9, color: '#CC2A20', weight: 3, fillColor: '#fff', fillOpacity: 1 })
+    .bindTooltip(`候補地 ${c[0].toFixed(5)}, ${c[1].toFixed(5)}`, { direction: 'top', offset: [0, -8] }).addTo(MAP_LAYERS.site);
+}
+
+// 選んだ変電所のつながりを模式線で描く（1段目は太線、2段先は細線）
+function drawLinks(row) {
+  if (!MAP) return;
+  MAP_LAYERS.links.clearLayers();
+  if (!$('m-links').checked || !TOPO) return;
+  const ni = nodeOf(row);
+  if (ni == null || val(row, 'lat') == null) return;
+  const origin = [val(row, 'lat'), val(row, 'lon')];
+  const drawn = new Set();
+  const drawFrom = (fromNi, fromLatLng, depth) => {
+    for (const { line: l, other, n } of nodeLinks(fromNi)) {
+      if (typeof other !== 'number') continue;
+      const key = [fromNi, other].sort().join('-') + '|' + l[LF.name];
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const cr = nodeCoordRow(other);
+      if (!cr) continue;
+      const to = [val(cr, 'lat'), val(cr, 'lon')];
+      const kv = lineKv(l);
+      L.polyline([fromLatLng, to], {
+        color: kvColor(kv), weight: depth === 1 ? (kv >= 187 ? 4 : 3) : 1.8, opacity: depth === 1 ? .9 : .5,
+        dashArray: depth === 1 ? null : '6 5',
+      }).bindTooltip(`${esc(l[LF.name])}（${fmtNum(kv)}kV）: ${esc(TOPO.nodes[fromNi][1])} ↔ ${esc(TOPO.nodes[other][1])}` +
+        `<br>空容量 上位系 ${fmtNum(l[LF.availUp])}／当該 ${fmtNum(l[LF.availCur])} MW　N-1 ${esc(l[LF.n1] || '—')}${n > 1 ? `　×${n}` : ''}`,
+        { sticky: true }).addTo(MAP_LAYERS.links);
+      // 相手側（フィルタで非表示でも位置が分かるように小さな印を置く）
+      const m = L.circleMarker(to, { radius: depth === 1 ? 6 : 4, color: kvColor(kv), weight: 2, fillColor: '#fff', fillOpacity: 1 })
+        .bindTooltip(markerTip(cr), { direction: 'top', offset: [0, -6] });
+      m.on('click', () => selectRow(cr, { pan: false }));
+      m.addTo(MAP_LAYERS.links);
+      if (depth === 1 && $('m-hop2').checked) drawFrom(other, to, 2);
+    }
+  };
+  drawFrom(ni, origin, 1);
+}
+
+function selectRow(row, opts = {}) {
+  if (!MAP) return;
+  const prev = SELECTED;
+  SELECTED = row;
+  if (prev && MARKERS[String(val(prev, 'no'))]) MARKERS[String(val(prev, 'no'))].setStyle(markerStyle(prev, false));
+  const m = MARKERS[String(val(row, 'no'))];
+  if (m) { m.setStyle(markerStyle(row, true)); m.bringToFront(); }
+  const c = siteCoords();
+  const dist = c && val(row, 'lat') != null ? distanceM(c[0], c[1], val(row, 'lat'), val(row, 'lon')) : null;
+  const s7 = dist != null ? s7Points(dist) : 0;
+  const rk = rank(row);
+  $('map-panel').style.display = '';
+  $('map-panel').innerHTML = `
+    <div class="map-sel">
+      <span class="ss-name">${esc(val(row, 'name'))}</span>
+      <span class="ss-meta">${esc(area(row))}${prefOf(row) ? ' / ' + esc(prefOf(row)) : ''}${muniOf(row) ? ' ' + esc(muniOf(row)) : ''}
+        ${val(row, 'vmax') != null ? ' ・ ' + val(row, 'vmax') + 'kV' : ''}${val(row, 'vsec') != null ? '→' + val(row, 'vsec') + 'kV' : ''}</span>
+      <span class="rk ${rkClass(rk)}">${esc(rk)}</span>${upTag(row)}
+      <span class="ss-meta">系統スコア ${val(row, 'grid')}/80${dist != null ? `　候補地から ${fmtDist(dist)}（S7 ${s7}点・総合 ${val(row, 'grid') + s7}）` : ''}</span>
+      ${val(row, 'lat') == null ? '<span class="up-tag up-ng">座標なし（地図に出ません）</span>' : ''}
+    </div>
+    ${detailHtml({ row, s7, dist, noMapChip: true })}`;
+  drawLinks(row);
+  if (opts.pan && val(row, 'lat') != null) MAP.setView([val(row, 'lat'), val(row, 'lon')], Math.max(MAP.getZoom(), 11));
+  if (m) m.bindPopup(`<b>${esc(val(row, 'name'))}</b> <span class="rk ${rkClass(rk)}">${esc(rk)}</span><br>` +
+    `空容量 上位系 ${fmtNum(val(row, 'availUp'))}／当該 ${fmtNum(val(row, 'availCur'))} MW<br>` +
+    `<span style="color:var(--txt3)">内訳・上位系統は地図の下に表示しています</span>`, { closeButton: false, autoPan: false }).openPopup();
+  $('map-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function toggleChuden() {
+  if (!MAP) return;
+  if (!$('m-chuden').checked) { MAP_LAYERS.chuden.clearLayers(); return; }
+  const build = () => {
+    const G = window.CHUDEN_GRID;
+    MAP_LAYERS.chuden.clearLayers();
+    G.lines.forEach(([name, kv, no, n1amt, nonfirm, limitEq, coords]) => {
+      L.polyline(coords, { color: kvColor(kv), weight: kv >= 187 ? 3 : kv >= 110 ? 2 : 1.3, opacity: .7 })
+        .bindTooltip(`${esc(name)}（${fmtNum(kv)}kV）${n1amt != null ? '　N-1電制適用可能量 ' + n1amt + 'MW' : ''}${nonfirm ? '　ノンファーム適用' : ''}` +
+          (limitEq ? `<br>N-1故障時の制限対象: ${esc(limitEq)}` : ''), { sticky: true })
+        .addTo(MAP_LAYERS.chuden);
+    });
+    G.points.forEach(([name, kv, no, availCur, n1amt, nonfirm, lat, lon]) => {
+      L.circleMarker([lat, lon], { radius: 3, color: kvColor(kv), weight: 1.5, fillColor: '#fff', fillOpacity: 1 })
+        .bindTooltip(`${esc(name)}（${fmtNum(kv)}kV）${availCur != null ? '　空容量(当該設備) ' + availCur + 'MW' : ''}${n1amt != null ? '　N-1電制 ' + n1amt + 'MW' : ''}`,
+          { direction: 'top' })
+        .addTo(MAP_LAYERS.chuden);
+    });
+    $('m-chuden-note').textContent = `${G.meta.source}　${G.meta.asof}　送電線${G.meta.lines.toLocaleString()}本・地点${G.meta.points.toLocaleString()}件（中部エリアのみ。公表マッピングの実形状）`;
+    CHUDEN_LOADED = true;
+  };
+  if (window.CHUDEN_GRID) { build(); return; }
+  $('m-chuden-note').textContent = '中部電力PGの送電線データを読み込んでいます…（約1MB）';
+  loadScript('data/chuden_grid.js').then(build).catch(() => {
+    $('m-chuden-note').textContent = 'data/chuden_grid.js を読み込めませんでした。';
+    $('m-chuden').checked = false;
+  });
+}
+
+function initMapControls() {
+  $('m-ranks').innerHTML = ['S', 'A', 'B', 'C', 'データ無', '除外'].map(r =>
+    `<label class="chk"><input type="checkbox" value="${r}" ${r === 'S' || r === 'A' ? 'checked' : ''}> ${r === 'データ無' ? '空容量データ無し' : r === '除外' ? 'ゲート除外' : r}</label>`).join('');
+  ['m-ranks', 'm-up', 'm-mincap', 'm-kv', 'm-n1', 'm-curtail', 'm-topo'].forEach(id =>
+    $(id).addEventListener('change', () => { renderMarkers(); }));
+  $('m-mincap').addEventListener('input', () => { renderMarkers(); });
+  ['m-links', 'm-hop2'].forEach(id => $(id).addEventListener('change', () => { if (SELECTED) drawLinks(SELECTED); }));
+  $('m-site').addEventListener('change', updateSite);
+  $('m-chuden').addEventListener('change', toggleChuden);
+  $('m-base').addEventListener('change', () => {
+    if (!MAP) return;
+    Object.values(MAP_BASE).forEach(l => MAP.removeLayer(l));
+    MAP_BASE[$('m-base').value].addTo(MAP);
+  });
+  ['lat', 'lon', 'radius'].forEach(id => $(id).addEventListener('change', updateSite));
+  const areas = TOPO ? TOPO.meta.areas.join('・') : '';
+  $('map-msg').innerHTML = TOPO
+    ? `・丸をクリックすると、その変電所の系統データ・スコア内訳と<b>上位系統（つながっている送電線・相手側の変電所・上位系の制約設備）</b>を下に表示し、相手側までの模式線を引きます。相手側の名前をクリックすると、そこへ移ってさらに上位をたどれます。<br>` +
+      `・つながりのデータは ${esc(areas)} の6エリア（各社の公表CSV・変電所 ${TOPO.meta.linkedRows.toLocaleString()}件に付与、生成 ${esc(TOPO.meta.generated)}）。東京・中部・北海道・沖縄は公表物を自動取得できないため、空容量などの系統データのみです。<br>` +
+      `・模式線は公表CSVの「潮流方向」の両端を直線で結んだもので、実際の送電線の経路ではありません。中部は「中部電力PG公表の送電線」で実形状を重ねられます。`
+    : '・data/grid_topology.js を読み込めなかったため、つながりの表示はできません（空容量などの表示は可能です）。';
+}
+
 // ── 初期化 ──
 function init() {
   if (!D) {
@@ -1191,8 +1665,30 @@ function init() {
   initList();
   $('tab-loc').addEventListener('click', () => setMode('loc'));
   $('tab-pref').addEventListener('click', () => setMode('pref'));
-  setMode(location.hash === '#pref' ? 'pref' : 'loc');
+  $('tab-map').addEventListener('click', () => setMode('map'));
+  initMapControls();
+  setMode(location.hash === '#pref' ? 'pref' : location.hash.startsWith('#map') ? 'map' : 'loc');
   $('btn-csv-near').addEventListener('click', csvNear);
+  $('btn-map-near').addEventListener('click', () => {
+    setMode('map');
+    ensureMap().then(() => { updateSite(); const b = siteBounds(); if (b) MAP.fitBounds(b, { padding: [20, 20] }); }).catch(() => {});
+  });
+  // 内訳の「地図で系統のつながりを見る」／上位系統の表の相手側リンク
+  document.addEventListener('click', e => {
+    const chip = e.target.closest('.topo-map');
+    if (chip) {
+      e.preventDefault();
+      const row = ROW_BY_NO[chip.dataset.no];
+      if (row) { setMode('map'); ensureMap().then(() => selectRow(row, { pan: true })).catch(() => {}); }
+      return;
+    }
+    const link = e.target.closest('.topo-link[data-node]');
+    if (link) {
+      e.preventDefault();
+      const row = nodeBestRow(parseInt(link.dataset.node, 10));
+      if (row) { setMode('map'); ensureMap().then(() => selectRow(row, { pan: true })).catch(() => {}); }
+    }
+  });
 
   $('btn-run').addEventListener('click', run);
   $('paste').addEventListener('input', e => {

@@ -50,6 +50,15 @@ jobs:
           python3 scripts/build_priority_munis.py
           python3 scripts/export_substations.py --by-pref exports
 
+      - name: 系統トポロジー（上位系統のつながり）を再生成
+        id: topo
+        run: |
+          # 送電線CSVも含めて取り直す。取得に失敗したエリアは前回の grid_cache/ のまま生成する
+          python3 scripts/build_grid_topology.py fetch --cache-dir grid_cache || echo "fetch に失敗したエリアあり（前回のキャッシュで続行）"
+          python3 scripts/build_grid_topology.py build --in "$LIST" --cache-dir grid_cache \
+            --out data/grid_topology.js --report "docs/系統トポロジー_照合レポート.md"
+          if git diff --quiet -- data/grid_topology.js; then echo "changed=0"; else echo "changed=1"; fi >> "$GITHUB_OUTPUT"
+
       - name: 結果の確認（照合率・ランクの変化）
         id: check
         run: |
@@ -87,7 +96,7 @@ jobs:
           cat check.md "docs/スコア元データ_更新レポート.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: 反映（問題なければ main、問題があれば別ブランチ＋Issue）
-        if: steps.check.outputs.changed != '0'
+        if: steps.check.outputs.changed != '0' || steps.topo.outputs.changed == '1'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -95,8 +104,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           FILES=("$LIST" data/substations.js "docs/変電所スコアリング_全国66kV以上_v1.xlsx" \
-                 "docs/スコア元データ_更新レポート.md" capacity_report.csv data/priority_munis.json exports)
+                 "docs/スコア元データ_更新レポート.md" capacity_report.csv data/priority_munis.json exports \
+                 grid_cache data/grid_topology.js "docs/系統トポロジー_照合レポート.md")
           MSG="スコア元データの定期更新: ${{ steps.check.outputs.changed }}件 ($(date +%F))"
+          if [ "${{ steps.topo.outputs.changed }}" = "1" ]; then MSG="$MSG ＋系統トポロジー更新"; fi
           gh label create capacity-refresh --color 0E8A16 --description "スコア元データの定期更新" 2>/dev/null || true
           if [ "${{ steps.check.outputs.ok }}" = "1" ]; then
             git add "${FILES[@]}"
