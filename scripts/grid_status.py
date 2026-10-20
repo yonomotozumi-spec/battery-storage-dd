@@ -28,6 +28,13 @@ STATUS_LABEL = {
     "none": "空容量データ無し",
 }
 MEMO_LABEL = {"none": "対策なし", "bank": "バンク等の対策待ち", "yes": "上位系対策あり", "unk": "記載なし"}
+GS_LABEL = {
+    "both": "変電所も上位系も空きあり",
+    "upunk": "変電所は空きあり・上位系は不明",
+    "upbad": "変電所は空きあり・上位系は空き無し（要接続検討）",
+    "ownbad": "変電所単体で空き無し",
+    "none": "空容量データ無し",
+}
 
 
 def _load_js(path):
@@ -177,8 +184,6 @@ class GridStatus:
         return c
 
     def need_check(self, row):
-        if self.rank(row) != "除外":
-            return None
         why = []
         cur = self.v(row, "availCur")
         if cur is not None and cur >= self.need_check_mw:
@@ -238,11 +243,38 @@ class GridStatus:
             r = {"cls": "unk", "reason": "「空容量(上位系考慮)」が未公表" + ("。上位側の変電所・送電線の空容量も非公表" if ups else ("。上位側の送電線がつながりデータに無い" if ni is not None else "。つながりデータなし"))}
         else:
             r = {"cls": "none", "reason": "送配電事業者の空容量が未取得。上位側の空容量も非公表" if ups else "送配電事業者の空容量が未取得"}
-        if r["cls"] == "bad":
-            nc = self.need_check(row)
-            if nc:
-                r = {"cls": "check", "reason": r["reason"] + "。ただし " + "、".join(nc) + " → 接続検討を申し込む価値あり（実績: 王子・由仁・曽根・引野は上位系0でも上位系対策なし）"}
         r["label"] = STATUS_LABEL[r["cls"]]
+        self._cache[key] = r
+        return r
+
+    # ── 整理した判定：変電所単体（当該設備）の空き × 上位系の空き → 5区分（画面の gridStatus と同じ）──
+    def own_status(self, row):
+        c, u = self.v(row, "availCur"), self.v(row, "availUp")
+        if c is not None:
+            return {"st": "ok" if c > 0 else "bad", "cap": c}
+        if u is not None and u > 0:
+            return {"st": "ok", "cap": u}
+        return {"st": "unk", "cap": None}
+
+    def grid_status(self, row):
+        key = ("gs", id(row))
+        if key in self._cache:
+            return self._cache[key]
+        o, u = self.own_status(row), self.upper_status(row)
+        up = "ok" if u["cls"] in ("ok", "part") else "bad" if u["cls"] == "bad" else "unk"
+        if o["st"] == "bad":
+            cls = "ownbad"
+        elif o["st"] == "ok":
+            cls = "both" if up == "ok" else "upbad" if up == "bad" else "upunk"
+        else:
+            cls = "ownbad" if up == "bad" else "none"
+        own_text = f"空きあり {o['cap']}MW" if o["st"] == "ok" else f"空き無し {o['cap']}MW" if o["st"] == "bad" else "非公表"
+        up_text = {"ok": "空きあり", "bad": "空き無し"}.get(up, "不明")
+        nc = self.need_check(row) if cls == "upbad" else None
+        reason = f"変電所単体（当該設備）: {own_text}／上位系: {up_text}（{u['reason']}）"
+        if cls == "upbad":
+            reason += ("。" + "、".join(nc) + " → 実績で上位系0でも通った例（王子・由仁・曽根・引野）と同じ条件") if nc else "。接続検討で上位系の扱いを確認する価値あり"
+        r = {"cls": cls, "own": o, "up": up, "label": GS_LABEL[cls], "reason": reason}
         self._cache[key] = r
         return r
 
@@ -298,14 +330,16 @@ class GridStatus:
 def main():
     gs = GridStatus()
     from collections import Counter
-    c = Counter(gs.upper_status(r)["cls"] for r in gs.rows if gs.v(r, "lat") is not None)
-    print("座標あり行の上位系統の状態:", dict(c))
+    c = Counter(gs.grid_status(r)["cls"] for r in gs.rows if gs.v(r, "lat") is not None)
+    print("座標あり行の判定（変電所単体×上位系）:", dict(c))
+    c2 = Counter(gs.upper_status(r)["cls"] for r in gs.rows if gs.v(r, "lat") is not None)
+    print("座標あり行の上位系統の状態:", dict(c2))
     m = Counter()
     for r in gs.results:
         cls, est = gs.memo_upper(r)
         m[cls + ("(推定)" if est else "")] += 1
     print("実績の分類:", dict(m))
-    print("要接続検討:", sum(1 for r in gs.rows if gs.upper_status(r)["cls"] == "check"),
+    print("要接続検討（紫）:", sum(1 for r in gs.rows if gs.grid_status(r)["cls"] == "upbad"),
           "実績あり:", sum(1 for r in gs.rows if gs.memo_of(r)))
 
 
