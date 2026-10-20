@@ -5,9 +5,9 @@
 各送配電事業者の公表CSV（変圧器＋送電線）から作り、Web画面（substation.html）用の
 data/grid_topology.js を出力する。
 
-対象は、全国共通形式（OCCTOの系統空容量公表フォーマット）のCSVを公開している6社。
-  東北・北陸・関西・中国・四国・九州
-東京（403）・中部（403）・北海道（PDFのみ）・沖縄（403）は自動取得できないため対象外。
+対象は、全国共通形式（OCCTOの系統空容量公表フォーマット）のCSVを公開している6社と、同じ表をPDFで公表している北海道。
+  東北・北陸・関西・中国・四国・九州・北海道（PDFは hokkaido_capacity_pdf.py で読む。要 pdfplumber）
+東京（403）・中部（403）・沖縄（403）は自動取得できないため対象外。
 中部は公表マッピングのGeoJSON（chuden_cache/）から送電線の実形状を別途表示する（build_chuden_grid_web.py）。
 
   # ① 取得：変圧器CSVと送電線CSVを grid_cache/ に保存（要ネットワーク）
@@ -52,6 +52,8 @@ LINE_PATTERNS = {
     "中国": r"zip/csv_[a-z0-9]+\.zip",
     "四国": r"sys_capa_(?:kikan|local)\d+_(?:tr|line)_\d{6}_\d+\.csv",
     "九州": r"/var/rev0/[0-9/]+/td_[A-Za-z0-9]+\.zip",
+    # 北海道はCSVが無く、系統別PDF（混雑状況マップ・予想潮流等一覧表）に送電線と変電所の表が入っている
+    "北海道": r"pdf/map_forecast_tide_list(?:_\d+)?\.pdf",
 }
 
 # 端点・設備名として出てくるが変電所ではない語（文字のまま残す）
@@ -60,6 +62,8 @@ GENERIC = {"発電所", "需要家", "開閉所", "配電塔", "電源", "需要
 
 def kind_of(fname, member=None):
     s = (member or fname)
+    if s.lower().endswith(".pdf"):
+        return "pdf"
     if "送電線" in s or "_line_" in s or "line" in s.lower():
         return "line"
     if "変圧器" in s or "_tr_" in s or "trans" in s:
@@ -71,7 +75,9 @@ def cmd_fetch(args):
     os.makedirs(args.cache_dir, exist_ok=True)
     manifest = {"fetched": datetime.date.today().isoformat(), "areas": {}}
     for area, (page, _) in SOURCES.items():
-        pat = LINE_PATTERNS[area]
+        pat = LINE_PATTERNS.get(area)
+        if not pat:
+            continue
         try:
             html = decode(http_get(page))
         except Exception as e:  # noqa: BLE001
@@ -316,12 +322,16 @@ class Area:
             rest = re.sub(pat, " ", s)
             s = rest
         def find_line(no, kikan_only=False):
+            if not kikan_only and (tag, no) in self.line_by_no:
+                return ("L", self.line_by_no[(tag, no)])
             for (t2, n2), i in self.line_by_no.items():
                 if n2 == no and (not kikan_only or "kikan" in t2):
                     return ("L", i)
             return None
 
         def find_tr(no, kikan_only=False):
+            if not kikan_only and (tag, no) in self.tr_by_no:
+                return ("N", self.tr_by_no[(tag, no)])
             for (t2, n2), k in self.tr_by_no.items():
                 if n2 == no and (not kikan_only or "kikan" in t2):
                     return ("N", k)
@@ -375,6 +385,27 @@ def load_areas(cache_dir):
         for fi in info.get("files", []):
             path = os.path.join(cache_dir, fi["file"])
             if not os.path.exists(path):
+                continue
+            if path.lower().endswith(".pdf"):
+                # 北海道: 1つのPDFに送電線と変電所の表。系統番号（01〜24）をタグにし、187kV以上は kikan187
+                from hokkaido_capacity_pdf import parse_pdf_all
+                date, banks, lines = parse_pdf_all(path)
+                m = re.search(r"list_(\d+)\.pdf$", fi["file"])
+                tag = m.group(1) if m else "kikan187"
+                if date:
+                    A.dates.add(date)
+                A.files.append((tag, "tr", fi["file"], len(banks)))
+                A.files.append((tag, "line", fi["file"], len(lines)))
+                for b in banks:
+                    A.add_tr(tag, {
+                        "no": b.get("no", ""), "name": b["name"], "v1": b["v1"], "v2": b["v2"], "circ": b["units"],
+                        "cap": b["cap"], "opcap": b["opcap"], "factor": b.get("factor", ""), "flow": b["flow"],
+                        "cur": b["cur"], "up": b["up"], "n1": b["n1"], "n1amt": b.get("n1_amount"),
+                        "curtail": b["curtail"], "cur_eq": b.get("cur_eq", ""), "up_eq": b.get("up_eq", ""),
+                        "remark": b.get("remark", ""),
+                    })
+                for r in lines:
+                    A.add_line(tag, r)
                 continue
             date, kind, recs = parse_file(path)
             if kind is None:
