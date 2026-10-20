@@ -5,6 +5,8 @@
 
 data/substations.js（build_substation_web_data.py の生成物）を読むので、スコア・ランク・
 市区町村は Web版（substation.html）と同じ値になる。CSVの列も Web版の「CSVで保存」と同じ。
+上位系統の状態・要接続検討・実績の分類・上位側の送電線・上位系の制約設備（地図モードと同じ判定）は
+data/grid_topology.js を grid_status.py で読んで付ける（無ければ空欄）。
 出力は BOM付きUTF-8 なので Excel でそのまま開ける。
 
 使い方:
@@ -23,8 +25,12 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from grid_status import GridStatus, TOPO_JS  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_JS = os.path.join(ROOT, "data", "substations.js")
+GS = None  # 上位系統の判定（main で読み込む）
 ALL_RANKS = ["S", "A", "B", "C", "データ無", "除外"]
 
 
@@ -46,8 +52,18 @@ def load(path):
         # 実際の所在地と違う行がある（例: 上野変電所が「埼玉県」）。座標が無い行は元リストの値
         rec["prefAny"] = rec.get("gpref") or rec.get("pref") or ""
         rec["memo"] = " / ".join(memo.get(rec["area"] + str(rec["name"]).strip(), []))
+        rec["_row"] = row
         out.append(rec)
     return d["meta"], out
+
+
+def _gs(fn, default=""):
+    """上位系統の判定列。grid_status が読めないときは空欄にする。"""
+    def f(r):
+        if GS is None:
+            return default
+        return fn(GS, r["_row"])
+    return f
 
 
 def has_data(r):
@@ -84,6 +100,21 @@ COLUMNS = [
     ("緯度", lambda r: r["lat"]), ("経度", lambda r: r["lon"]), ("座標精度", lambda r: r["acc"]),
     ("所在地(参考)", lambda r: r["addr"]), ("接続検討の実績", lambda r: r["memo"]),
     ("Googleマップ", lambda r: f"https://www.google.com/maps?q={r['lat']},{r['lon']}" if r["lat"] is not None else ""),
+    # ── 地図モードと同じ判定（grid_status.py）──
+    ("上位系統の状態", _gs(lambda g, row: g.upper_status(row)["label"])),
+    ("上位系統の判定理由", _gs(lambda g, row: g.upper_status(row)["reason"])),
+    ("要接続検討", _gs(lambda g, row: "○" if g.upper_status(row)["cls"] == "check" else "")),
+    ("要接続検討の理由", _gs(lambda g, row: "、".join(g.need_check(row) or []))),
+    ("実績の分類", _gs(lambda g, row: g.memo_text(row))),
+    ("実績_対策なし", _gs(lambda g, row: g.memo_summary(row)["none"] or "")),
+    ("実績_バンク等の対策待ち", _gs(lambda g, row: g.memo_summary(row)["bank"] or "")),
+    ("実績_上位系対策あり", _gs(lambda g, row: g.memo_summary(row)["yes"] or "")),
+    ("実績_記載なし", _gs(lambda g, row: g.memo_summary(row)["unk"] or "")),
+    ("実績_うち変電所は推定", _gs(lambda g, row: g.memo_summary(row)["est"] or "")),
+    ("つながりデータ", _gs(lambda g, row: g.topo_available(row))),
+    ("つながる送電線の本数", _gs(lambda g, row: g.links_count(row))),
+    ("上位側の送電線（相手側・上位側の空き）", _gs(lambda g, row: g.up_lines_text(row))),
+    ("上位系の制約設備（▼＝空き0以下）", _gs(lambda g, row: g.upper_equipment_text(row))),
 ]
 
 
@@ -155,6 +186,11 @@ def by_pref(rows, meta, outdir):
         "各都道府県の全変電所（全ランク）を系統スコア順に並べたCSVです。Excelでそのまま開けます。"
         "「系統ランク」「上位系の確認」列でフィルタしてください。",
         "",
+        "地図モード（substation.html#map）と同じ判定の列も入っています：「上位系統の状態」（空きあり／ダメ／要接続検討／不明）と判定理由、"
+        "「要接続検討」（ゲート除外だが当該設備の空き≧6MW または実績で上位系対策なし）、「実績の分類」（対策なし／バンク等の対策待ち／"
+        "上位系対策あり／記載なし、うち変電所は推定）、「上位側の送電線（相手側・上位側の空き）」、「上位系の制約設備（▼＝空き0以下）」。"
+        "つながりの元は東北・北陸・関西・中国・四国・九州・北海道の公表物で、東京・中部・沖縄は「対象外エリア」になります。",
+        "",
         "| ファイル | 全件 | S/A | うち上位系確認済み |",
         "|---|---|---|---|",
     ]
@@ -191,6 +227,11 @@ def main():
     args = ap.parse_args()
 
     meta, rows = load(args.data)
+    global GS
+    if os.path.exists(TOPO_JS):
+        GS = GridStatus(args.data, TOPO_JS)
+    else:
+        print("※ data/grid_topology.js が無いため、上位系統の判定列は空欄になります", file=sys.stderr)
     if args.by_pref:
         by_pref(rows, meta, args.by_pref)
         return
