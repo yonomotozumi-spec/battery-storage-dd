@@ -1,0 +1,74 @@
+{
+  "values": {
+    "10": {
+      "value": "指定なし",
+      "comment": "reinfolib XKT002より自動判定"
+    },
+    "8": {
+      "value": "指定なし",
+      "comment": "reinfolib XKT001より自動判定（都市計画区域）"
+    },
+    "9": {
+      "value": "指定なし",
+      "comment": "reinfolib XKT001より自動判定（都市計画区域）"
+    },
+    "4": {
+      "value": "該当なし",
+      "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+    },
+    "5": {
+      "value": "該当なし",
+      "comment": "reinfolib XKT029より自動判定"
+    },
+    "6": {
+      "value": "液状化しにくい（丘陵・傾向5/6）",
+      "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+    },
+    "13": {
+      "value": "該当なし",
+      "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+    }
+  },
+  "permits": {},
+  "raw": {
+    "XKT002": [],
+    "XKT001": [
+      {
+        "_id": "hqXljJ8BHMJXDabwXxRL",
+        "_index": "bs010_urban_plan_area_202607231152",
+        "prefecture": "岐阜県",
+        "city_code": "21212",
+        "notice_number_s": "",
+        "decision_date": "",
+        "city_name": "土岐市",
+        "notice_number": "",
+        "decision_classification": "",
+        "decision_maker": "",
+        "kubun_id": 21,
+        "area_classification_ja": "都市計画区域",
+        "first_decision_date": ""
+      }
+    ],
+    "XKT026": [],
+    "XKT027": [],
+    "XKT028": [],
+    "XKT029": [],
+    "XKT025": [
+      {
+        "_id": "KVzgt5IBJx74NFADnK6L",
+        "_index": "bs028_liquefaction_tendency_map_202410231432",
+        "topographic_classification_name_ja": "丘陵",
+        "note": "液状化しにくい",
+        "topographic_classification_code": 3,
+        "mesh_code": "5237717322",
+        "liquefaction_tendency_level": 5
+      }
+    ],
+    "XKT019": [],
+    "XKT021": [],
+    "XKT022": [],
+    "XKT016": [],
+    "XKT020": []
+  },
+  "missing": []
+}
