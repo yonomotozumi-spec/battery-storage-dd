@@ -57,6 +57,8 @@ class GridStatus:
         s1 = d.get("params", {}).get("s1Steps") or []
         self.need_check_mw = s1[1][0] if len(s1) > 1 else 6
         self.grid_rank = d.get("params", {}).get("gridRank", {"S": 60, "A": 48, "B": 36})
+        # 最低必要容量（画面の MIN_MW と同じ）。これ未満の空容量は「空き無し」
+        self.min_mw = d.get("params", {}).get("minMw", 2)
         self.memo = {}
         self.result_index = {id(r): i for i, r in enumerate(self.results)}
         for r in self.results:
@@ -107,8 +109,11 @@ class GridStatus:
     def bank_cap(self, b):
         return b[self.BF["availUp"]] if b[self.BF["availUp"]] is not None else b[self.BF["availCur"]]
 
+    def no_room(self, v):
+        return v < self.min_mw
+
     def node_bad(self, ni):
-        return any(self.bank_cap(b) is not None and self.bank_cap(b) <= 0 for b in self.topo["nodes"][ni][3])
+        return any(self.bank_cap(b) is not None and self.no_room(self.bank_cap(b)) for b in self.topo["nodes"][ni][3])
 
     def node_links(self, ni):
         out, seen = [], {}
@@ -144,12 +149,12 @@ class GridStatus:
         if not caps:
             return {"st": "unk", "cap": None}
         m = max(caps)
-        return {"st": "bad" if m <= 0 else "ok", "cap": m}
+        return {"st": "bad" if self.no_room(m) else "ok", "cap": m}
 
     def line_up_status(self, l, from_ni):
         c = self.line_cap(l)
         if c is not None:
-            return {"st": "bad" if c <= 0 else "ok", "cap": c, "via": "送電線"}
+            return {"st": "bad" if self.no_room(c) else "ok", "cap": c, "via": "送電線"}
         kv = self.line_kv(l)
         ends = [e for e in (l[self.LF["from"]], l[self.LF["to"]]) if isinstance(e, int) and e != from_ni]
         if not ends:
@@ -231,11 +236,11 @@ class GridStatus:
 
         up = self.v(row, "availUp")
         ni = self.node_of(row)
-        if up is not None and up <= 0:
+        if up is not None and self.no_room(up):
             r = {"cls": "bad", "reason": f"この変電所の空容量(上位系考慮)が {up}MW" + (f"。上位側も空き無し: {'、'.join(map(desc, bad))}" if bad else "")}
         elif up is not None:
             r = {"cls": "ok", "reason": f"この変電所の空容量(上位系考慮)が {up}MW" + (
-                f"（ただし上位側に空き0の設備あり: {'、'.join(map(desc, bad))}）" if bad else (f"。上位側も空きあり: {'、'.join(map(desc, ok))}" if ok else ""))}
+                f"（ただし上位側に空き{fmt(self.min_mw)}MW未満の設備あり: {'、'.join(map(desc, bad))}）" if bad else (f"。上位側も空きあり: {'、'.join(map(desc, ok))}" if ok else ""))}
         elif bad and not ok:
             r = {"cls": "bad", "reason": f"上位側の変電所・送電線に空き無し: {'、'.join(map(desc, bad))}。この変電所の「空容量(上位系考慮)」は未公表"}
         elif bad and ok:
@@ -254,8 +259,8 @@ class GridStatus:
     def own_status(self, row):
         c, u = self.v(row, "availCur"), self.v(row, "availUp")
         if c is not None:
-            return {"st": "ok" if c > 0 else "bad", "cap": c}
-        if u is not None and u > 0:
+            return {"st": "bad" if self.no_room(c) else "ok", "cap": c}
+        if u is not None and not self.no_room(u):
             return {"st": "ok", "cap": u}
         return {"st": "unk", "cap": None}
 
@@ -305,7 +310,7 @@ class GridStatus:
                 if k == "L":
                     l = self.topo["lines"][v]
                     c = self.line_cap(l)
-                    t = f"{l[self.LF['name']]}({fmt(self.line_kv(l))}kV)" + ("▼" if c is not None and c <= 0 else "")
+                    t = f"{l[self.LF['name']]}({fmt(self.line_kv(l))}kV)" + ("▼" if c is not None and self.no_room(c) else "")
                 elif k == "N":
                     t = self.topo["nodes"][v][1] + ("▼" if self.node_bad(v) else "")
                 else:
@@ -330,7 +335,6 @@ class GridStatus:
             "A": f"A：系統スコア{g['A']}〜{g['S'] - 1}点（接続検討の候補）",
             "B": f"B：系統スコア{g['B']}〜{g['A'] - 1}点（近くにS・Aが無いときの次点）",
             "C": f"C：系統スコア{g['B'] - 1}点以下（見送り推奨）",
-            "除外": "ゲート除外：空容量(上位系考慮)が0以下かつN-1電制が「可」でない（上位系増強で長期化しやすい）",
             "データ無": "データ無：送配電事業者の空容量が未公表・未取得で採点できない",
         }.get(rk, "")
 

@@ -14,7 +14,7 @@ on:
       ranks:
         description: '系統ランク'
         type: choice
-        options: ['S,A', 'S', 'S,A,B', 'S,A,B,C', 'S,A,B,C,データ無,除外']
+        options: ['S,A', 'S', 'S,A,B', 'S,A,B,C', 'S,A,B,C,データ無']
         default: 'S,A'
       up:
         description: '上位系の確認（all=すべて / ok=上位系で判定したものだけ / ng=当該設備で代用したものだけ）'

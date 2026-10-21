@@ -28,7 +28,7 @@ import substation_scoring as S
 # rows の並び。substation.html の F.* と対応する
 FIELDS = ["no", "area", "name", "pref", "lat", "lon", "acc", "vmax", "vsec",
           "opcap", "flow", "availCur", "availUp", "n1", "curtail", "addr",
-          "s1", "s2", "s3", "s4", "s5", "s6", "grid", "rank", "muni", "gpref"]
+          "s1", "s2", "s3", "s4", "s5", "s6", "grid", "rank", "muni", "gpref", "gate"]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REVGEO_CACHE = os.path.join(ROOT, "geo_cache", "revgeo.json")
@@ -115,6 +115,8 @@ def main():
             sc["grid_score"], d_rank.idx(sc["rank"]),
             # 市区町村と、座標から引いた都道府県（元リストの都道府県が空の行の補完用）
             muni, gpref,
+            # ゲート（上位系0かつN-1不可）の警告。1=警告あり
+            1 if sc["gate"] else 0,
         ])
 
     payload = {
@@ -139,6 +141,8 @@ def main():
             "gridRank": {"S": S.P["rank_s"]["thr"], "A": S.P["rank_a"]["thr"], "B": S.P["rank_b"]["thr"]},
             # S1 空容量の段階 [(MW以上, 点)]。画面の「要接続検討」（ゲート除外だが当該設備に空き）の閾値にも使う
             "s1Steps": [[S.P["s1_t1"]["thr"], S.P["s1_t1"]["pts"]], [S.P["s1_t2"]["thr"], S.P["s1_t2"]["pts"]]],
+            # 最低必要容量（MW）。これ未満の空容量は画面でも「空き無し」と判定する
+            "minMw": S.MIN_MW,
         },
         "areaPoints": [list(a) for a in S.AREA_POINTS],
         "scoreDefs": [list(s) for s in S.SCORE_DEFS],

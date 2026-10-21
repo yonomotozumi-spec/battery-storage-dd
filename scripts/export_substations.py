@@ -31,7 +31,7 @@ from grid_status import GridStatus, TOPO_JS  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_JS = os.path.join(ROOT, "data", "substations.js")
 GS = None  # 上位系統の判定（main で読み込む）
-ALL_RANKS = ["S", "A", "B", "C", "データ無", "除外"]
+ALL_RANKS = ["S", "A", "B", "C", "データ無"]
 
 
 def load(path):
@@ -92,6 +92,7 @@ COLUMNS = [
     ("最大電圧kV", lambda r: r["vmax"]), ("二次電圧kV", lambda r: r["vsec"]),
     ("系統スコア(80)", lambda r: r["grid"]), ("系統ランク", lambda r: r["rank"]),
     ("系統ランクの意味", lambda r: GS.rank_meaning(r["rank"]) if GS else ""),
+    ("上位系0の警告", lambda r: "警告" if r.get("gate") else ""),
     # 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類
     ("カテゴリ（地図の色）", lambda r: GS.category_text(r["_row"]) if GS else ""),
     ("接続検討の実績（件数・分類）", lambda r: GS.memo_text(r["_row"]) if GS else ""),
@@ -201,7 +202,9 @@ def by_pref(rows, meta, outdir):
         "",
         "| ランク | 意味 |",
         "|---|---|",
-        *[f"| {k} | {GS.rank_meaning(k).split('：', 1)[1] if GS else ''} |" for k in ("S", "A", "B", "C", "除外", "データ無")],
+        *[f"| {k} | {GS.rank_meaning(k).split('：', 1)[1] if GS else ''} |" for k in ("S", "A", "B", "C", "データ無")],
+        "",
+        "「上位系0の警告」列の「警告」は、空容量(上位系考慮)が2MW未満かつN-1電制が「可」でない変電所です（ランクとは別。工期が長くなりやすい）。",
         "",
         "| ファイル | 全件 | S/A | うち上位系確認済み |",
         "|---|---|---|---|",

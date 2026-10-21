@@ -16,7 +16,7 @@
 
 スコア構成（系統スコア80点。土地確定後に近接性S7=20点を加えて100点満点）:
   S1 空容量(上位系考慮) 35 / S2 N-1電制 10 / S3 潮流余裕 15 / S4 出力制御 5 / S5 配変 10 / S6 エリア 5
-ゲート: 空容量(上位系考慮)≦0 かつ N-1電制≠可 → 除外（上位系増強リスク。実績: 喜多方=工期10年2ヶ月）
+ゲート: 空容量(上位系考慮)＜2MW かつ N-1電制≠可 → ⚠警告（ランクは通常算出。2026-10-20までは「除外」）
 ランク: S:60点以上 / A:48-59 / B:36-47 / C:35以下 / データ無:空容量未公表(OSMのみ等)
 
 配点・閾値・エリア点・実績DBの定義は substation_scoring.py に集約している
@@ -39,7 +39,7 @@ from substation_scoring import (
 HEADER_FILL = PatternFill("solid", fgColor="FCE4D6")
 PARAM_FILL = PatternFill("solid", fgColor="FFFF00")   # 変更可能なパラメータセル
 RANK_FILL = PatternFill("solid", fgColor="FFF2A8")    # ランクS/Aハイライト（黄色）
-GATE_FILL = PatternFill("solid", fgColor="E7E6E6")    # ゲート除外行（グレー）
+GATE_FILL = PatternFill("solid", fgColor="FFE0CC")    # ゲート該当（上位系0の警告）行（薄い橙）
 HDR_FONT = Font(bold=True, size=11)
 TITLE_FONT = Font(bold=True, size=14)
 SMALL = Font(size=10)
@@ -117,19 +117,20 @@ def build_base_sheet(ws):
     return params
 
 
-def add_rank_counts(ws, start_row, rank_col_range):
+def add_rank_counts(ws, start_row, rank_col_range, gate_col_range):
     defs = [
         ("S", "60点以上（最優先で周辺の土地を探す）"),
         ("A", "48〜59点（優先候補）"),
         ("B", "36〜47点"),
         ("C", "35点以下"),
-        ("除外", "ゲート該当（空容量≦0 かつ N-1電制≠可 → 上位系増強リスク）"),
         ("データ無", "空容量未公表(OSMのみ等)。スコア比較不能"),
+        ("警告", "ゲート該当（空容量＜2MW かつ N-1電制≠可）。ランクは通常算出（S1=0でB以下）。上位系の混雑・増強リスクに注意"),
     ]
     for i, (rank, note) in enumerate(defs):
         r = start_row + i
         ws.cell(r, 1, rank).border = BORDER
-        fc = ws.cell(r, 2, f'=COUNTIF({rank_col_range},"{rank}")')
+        rng = gate_col_range if rank == "警告" else rank_col_range
+        fc = ws.cell(r, 2, f'=COUNTIF({rng},"{rank}")')
         fc.border = BORDER; fc.alignment = CENTER
         ws.cell(r, 3, note).border = BORDER
     for col, w in [("A", 44), ("B", 14), ("C", 52), ("D", 52), ("E", 44)]:
@@ -206,7 +207,7 @@ def read_substations(path, sheet_name):
 
 
 def build_scoring_sheet(ws, rows, p, memo_range, key_range):
-    ws["A1"] = "全国変電所スコアリング（高圧2MW BESS）　黄色=ランクS/A ／ グレー=ゲート除外"
+    ws["A1"] = "全国変電所スコアリング（高圧2MW BESS）　黄色=ランクS/A ／ 橙=ゲート該当（上位系0かつN-1不可の警告。ランクは通常算出）"
     ws["A1"].font = TITLE_FONT
     headers = ["No.", "エリア", "変電所名", "都道府県", "最大電圧kV", "二次電圧kV", "緯度", "経度",
                "座標精度", "設備容量MW", "運用容量MW", "予想潮流MW", "空容量_当該MW", "空容量_上位系MW",
@@ -224,12 +225,12 @@ def build_scoring_sheet(ws, rows, p, memo_range, key_range):
         for c, v in enumerate(data, 1):
             ws.cell(r, c, v)
         f = {
-            # R ゲート: 空容量≦0 かつ N-1電制≠可 → 除外
-            18: f'=IF(COUNT($M{r}:$N{r})=0,"",IF(AND({eff(r)}<=0,$O{r}<>"可"),"除外",""))',
+            # R ゲート: 空容量＜最低必要容量(2MW) かつ N-1電制≠可 → 警告（ランクには影響させない）
+            18: f'=IF(COUNT($M{r}:$N{r})=0,"",IF(AND({eff(r)}<{p["s1_t3"]["thr"]},$O{r}<>"可"),"警告",""))',
             # S1 空容量(上位系考慮)
             19: f'=IF(COUNT($M{r}:$N{r})=0,0,IF({eff(r)}>={p["s1_t1"]["thr"]},{p["s1_t1"]["pts"]},'
                 f'IF({eff(r)}>={p["s1_t2"]["thr"]},{p["s1_t2"]["pts"]},'
-                f'IF({eff(r)}>0,{p["s1_t3"]["pts"]},0))))',
+                f'IF({eff(r)}>={p["s1_t3"]["thr"]},{p["s1_t3"]["pts"]},0))))',
             # S2 N-1電制
             20: f'=IF($O{r}="可",{p["s2"]["pts"]},0)',
             # S3 潮流余裕 |予想潮流|/運用容量
@@ -247,9 +248,9 @@ def build_scoring_sheet(ws, rows, p, memo_range, key_range):
             # 系統スコア(80)
             25: f'=SUM($S{r}:$X{r})',
             # ランク
-            26: f'=IF($R{r}="除外","除外",IF(COUNT($M{r}:$N{r})=0,"データ無",'
+            26: f'=IF(COUNT($M{r}:$N{r})=0,"データ無",'
                 f'IF($Y{r}>={p["rank_s"]["thr"]},"S",IF($Y{r}>={p["rank_a"]["thr"]},"A",'
-                f'IF($Y{r}>={p["rank_b"]["thr"]},"B","C")))))',
+                f'IF($Y{r}>={p["rank_b"]["thr"]},"B","C"))))',
             # 実績メモ（実績DBのエリア＋変電所名キーと一致すれば要約を表示）
             27: f'=IFERROR(INDEX({memo_range},MATCH($B{r}&$C{r},{key_range},0)),"")',
         }
@@ -260,7 +261,7 @@ def build_scoring_sheet(ws, rows, p, memo_range, key_range):
 
     last = 2 + len(rows)
     rng = f"A3:AA{last}"
-    ws.conditional_formatting.add(rng, FormulaRule(formula=['$Z3="除外"'], fill=GATE_FILL, stopIfTrue=True))
+    ws.conditional_formatting.add(rng, FormulaRule(formula=['$R3="警告"'], fill=GATE_FILL, stopIfTrue=True))
     ws.conditional_formatting.add(rng, FormulaRule(formula=['OR($Z3="S",$Z3="A")'], fill=RANK_FILL))
     ws.auto_filter.ref = f"A2:AA{last}"
     ws.freeze_panes = "D3"
@@ -272,7 +273,7 @@ def build_scoring_sheet(ws, rows, p, memo_range, key_range):
     for col in ("G", "H"):
         for r in range(3, last + 1):
             ws.cell(r, {"G": 7, "H": 8}[col]).number_format = "0.000000"
-    return f"スコアリング!$Z$3:$Z${last}"
+    return f"スコアリング!$Z$3:$Z${last}", f"スコアリング!$R$3:$R${last}"
 
 
 def main():
@@ -293,8 +294,8 @@ def main():
 
     params = build_base_sheet(ws_base)
     memo_range, key_range = build_results_sheet(ws_db)
-    rank_range = build_scoring_sheet(ws_score, rows, params, memo_range, key_range)
-    add_rank_counts(ws_base, params["rank_count_row"], rank_range)
+    rank_range, gate_range = build_scoring_sheet(ws_score, rows, params, memo_range, key_range)
+    add_rank_counts(ws_base, params["rank_count_row"], rank_range, gate_range)
 
     r = params["rank_count_row"] + 8
     ws_base.cell(r, 1, "前提・注意").font = HDR_FONT
