@@ -1,6 +1,6 @@
 {
  "description": "ランクS/A変電所（系統スコア上位＝実際に土地を探すエリア）の所在市区町村。条例リスク監視の優先対象。build_priority_munis.py で再生成。",
- "generated": "2026-10-20",
+ "generated": "2026-10-21",
  "source_ranks": [
   "S",
   "A"
