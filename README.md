@@ -688,7 +688,7 @@ PDFで公表している北海道の最新版を取得して本体リストを�
 | 中国 | ○ | `zip/csv_*.zip` 内の `*_tr_*.csv` |
 | 九州 | ○ | 開示ページの `td_*.zip` 内「変圧器CSV」 |
 | 北海道 | ○ | 系統情報ページ（bid_info.html）の PDF `map_forecast_tide_list[_01〜24].pdf`（混雑状況マップ＋予想潮流等一覧表）。`scripts/hokkaido_capacity_pdf.py` が変電所の表を読み取る（要 `pip install pdfplumber`） |
-| 中部 | △（手動） | 自動取得を403で拒否（本物のブラウザの自動操作でも拒否＝接続元IPの制限）。ブラウザで系統空容量マッピング → 「空容量および予想潮流などの一覧はこちら」→ 変電所一覧のCSV（県別7本＋500/275kV）を保存し、`python scripts/update_capacity.py add --area 中部 --cache-dir capacity_cache *.zip` で登録してから apply。CSVは「空容量」1列のみで**上位系考慮の列は無い**（2026-10-20確認） |
+| 中部 | △（手動） | 自動取得を403で拒否（本物のブラウザの自動操作でも拒否＝接続元IPの制限）。ブラウザで系統空容量マッピング → 「空容量および予想潮流などの一覧はこちら」→ 変電所一覧のCSV（県別6本＋500/275kVの計7本）を保存し、`python scripts/update_capacity.py add --area 中部 --cache-dir capacity_cache *.zip` で登録してから apply。CSVは「空容量」1列のみで**上位系考慮の列は無い**（2026-10-20確認） |
 | 東京・沖縄 | × | 自動取得を403で拒否。手作業で確認 |
 
 北海道のPDFについて（2026-10-20に追加）:
