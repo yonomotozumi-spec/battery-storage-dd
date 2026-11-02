@@ -1,0 +1,107 @@
+{
+  "values": {
+    "10": {
+      "value": "第１種中高層住居専用地域（建蔽率60% 容積率200%）",
+      "comment": "reinfolib XKT002より自動判定"
+    },
+    "8": {
+      "value": "指定あり",
+      "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+    },
+    "9": {
+      "value": "指定なし",
+      "comment": "reinfolib XKT001より自動判定（都市計画区域 / 市街化区域）"
+    },
+    "4": {
+      "value": "該当なし",
+      "comment": "reinfolib 洪水/高潮/津波 浸水想定区域より自動判定"
+    },
+    "5": {
+      "value": "該当なし",
+      "comment": "reinfolib XKT029より自動判定"
+    },
+    "6": {
+      "value": "液状化しにくい（丘陵・傾向5/6）",
+      "comment": "reinfolib XKT025（地形区分に基づく液状化発生傾向）より自動判定"
+    },
+    "13": {
+      "value": "該当なし",
+      "comment": "reinfolib XKT019（自然公園地域）より自動判定"
+    }
+  },
+  "permits": {},
+  "raw": {
+    "XKT002": [
+      {
+        "_id": "yZjejJ8B6FvOHK1GKkM5",
+        "_index": "bs001_use_area_202607231142",
+        "prefecture": "兵庫県",
+        "use_area_ja": "第１種中高層住居専用地域",
+        "city_code": "28100",
+        "notice_number_s": "",
+        "decision_date": "",
+        "city_name": "神戸市",
+        "u_floor_area_ratio_ja": "200%",
+        "u_building_coverage_ratio_ja": "60%",
+        "notice_number": "",
+        "decision_classification": "",
+        "decision_maker": "",
+        "first_decision_date": "",
+        "youto_id": 3
+      }
+    ],
+    "XKT001": [
+      {
+        "_id": "cKXljJ8BHMJXDabwxB_V",
+        "_index": "bs010_urban_plan_area_202607231152",
+        "prefecture": "兵庫県",
+        "city_code": "28100",
+        "notice_number_s": "",
+        "decision_date": "",
+        "city_name": "神戸市",
+        "notice_number": "",
+        "decision_classification": "",
+        "decision_maker": "",
+        "kubun_id": 21,
+        "area_classification_ja": "都市計画区域",
+        "first_decision_date": ""
+      },
+      {
+        "_id": "kKXyjJ8BHMJXDabw-b3c",
+        "_index": "bs022_area_classification_202607231206",
+        "prefecture": "兵庫県",
+        "city_code": "28100",
+        "notice_number_s": "",
+        "decision_date": "",
+        "city_name": "神戸市",
+        "notice_number": "",
+        "decision_classification": "",
+        "decision_maker": "",
+        "kubun_id": 22,
+        "area_classification_ja": "市街化区域",
+        "first_decision_date": ""
+      }
+    ],
+    "XKT026": [],
+    "XKT027": [],
+    "XKT028": [],
+    "XKT029": [],
+    "XKT025": [
+      {
+        "_id": "aXvkt5IBJx74NFAD-UhJ",
+        "_index": "bs028_liquefaction_tendency_map_202410231432",
+        "topographic_classification_name_ja": "丘陵",
+        "note": "液状化しにくい",
+        "topographic_classification_code": 3,
+        "mesh_code": "5235000412",
+        "liquefaction_tendency_level": 5
+      }
+    ],
+    "XKT019": [],
+    "XKT021": [],
+    "XKT022": [],
+    "XKT016": [],
+    "XKT020": []
+  },
+  "missing": []
+}
