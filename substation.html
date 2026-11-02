@@ -1044,7 +1044,7 @@ function detailHtml(h) {
   const gateHtml = gated(row)
     ? `<div class="detail-note" style="border-color:var(--fail);color:var(--fail)">
         <b>⚠上位系0（警告）</b>：空容量(上位系考慮)が最低必要容量2MW未満 かつ N-1電制が「可」でないため、上位系の混雑（ノンファーム接続・出力制御）や
-        増強が必要になるリスクがあります（実績: 喜多方は上位系増強で工期10年2ヶ月。一方、北海道の由仁は上位系0でも410万円・6ヶ月で連系）。
+        増強が必要になるリスクがあります。
         S1空容量が0点のためランクはB以下になります。2026-10-20までは「除外」として表に出していなかった区分です。接続検討で上位系の扱いを必ず確認してください。</div>` : '';
   const a = acc(row);
   // 座標精度ごとに注意の内容が変わる。'公表資料' は送配電事業者が公表している座標で
@@ -1411,8 +1411,10 @@ function renderStatic() {
       <td>${esc(r[5])}</td><td><span class="memo-cls ${u.cls}">${esc(MEMO_LABEL_SHORT[u.cls])}</span>${u.est ? '<span class="memo-est-tag">変電所は推定</span>' : ''}</td><td>${esc(r[6])}</td><td>${esc(r[7])}</td></tr>`;
   }).join('');
   const nImp = D.results.length - D.resultsManual;
-  $('rescount').textContent = `${D.results.length}件：手入力${D.resultsManual}件＝スコアの校正元／` +
-    `接続検討回答 検証一覧から取込${nImp}件＝AI読取値のため判断前に原本確認`;
+  $('rescount').textContent = D.results.length
+    ? `${D.results.length}件：手入力${D.resultsManual}件＝スコアの校正元／接続検討回答から取込${nImp}件＝AI読取値のため判断前に原本確認`
+    : '公開版には載せていません。社内版で確認してください';
+  if (!D.results.length) { const m = $('m-memo'); if (m && m.closest('label')) m.closest('label').style.display = 'none'; }
   $('analysislist').innerHTML = D.analysisNotes.map(n => `<li>${esc(n)}</li>`).join('');
 
   const noCoord = D.meta.total - D.meta.withCoords;
@@ -1601,7 +1603,7 @@ function memoSummary(row) {
 const memoPinClass = c => 'memo-std' + (c.est === c.n ? ' memo-est' : '');
 const MEMO_LABEL = { none: '上位系・バンク等の対策なし', bank: '上位系の対策なし（別途バンク逆潮流対策・変電設備工事待ち）', yes: '上位系対策あり', unk: '記載なし' };
 // 「要接続検討」: ゲート除外（上位系0かつN-1不可）だが、当該設備の空きがS1の第2段階（≧6MW）以上、または実績で上位系対策なしの回答がある。
-// 実績では上位系0でも当該設備に空きがあれば上位系対策なしで通った例（王子・由仁・曽根・引野）があるため、一律に隠さず別表示する
+// 実績では上位系0でも当該設備に空きがあれば上位系対策なしで通った例があるため、一律に隠さず別表示する
 const NEED_CHECK_MW = (D && D.params.s1Steps && D.params.s1Steps[1]) ? D.params.s1Steps[1][0] : 6;
 function needCheck(row) {
   const why = [];
@@ -1614,7 +1616,7 @@ function needCheck(row) {
 // ── 整理した判定：変電所単体（当該設備＝配電用バンク）の空き × 上位系の空き → 5区分 ──
 //  both   緑  変電所も上位系も空きあり
 //  upunk  黄  変電所は空きあり・上位系は不明（東北・北陸・四国・中部・沖縄に多い）
-//  upbad  紫  変電所は空きあり・上位系は空き無し → 要接続検討（実績: 王子・由仁・曽根・引野は上位系0でも通った）
+//  upbad  紫  変電所は空きあり・上位系は空き無し → 要接続検討
 //  ownbad 赤  変電所単体で空き無し（上位系がどうでも配電用バンクに空きが無い）
 //  none   灰  空容量データ無し
 const GS_COLOR = { both: '#0B9966', upunk: '#E3A600', upbad: '#8E24AA', ownbad: '#CC2A20', none: '#C9CFDC' };
@@ -1642,7 +1644,7 @@ function gridStatus(row) {
   const nc = cls === 'upbad' ? needCheck(row) : null;
   const r = { cls, own: o, up, upInfo: u, label: GS_LABEL[cls],
     reason: `変電所単体（当該設備）: ${ownText}／上位系: ${upText}（${u.reason}）` +
-      (cls === 'upbad' ? (nc ? `。${nc.join('、')} → 実績で上位系0でも通った例（王子・由仁・曽根・引野）と同じ条件` : '。接続検討で上位系の扱いを確認する価値あり') : '') };
+      (cls === 'upbad' ? (nc ? `。${nc.join('、')} → 実績で上位系0でも通った例と同じ条件` : '。接続検討で上位系の扱いを確認する価値あり') : '') };
   GS_CACHE.set(row, r);
   return r;
 }
@@ -2158,7 +2160,7 @@ function initMapControls() {
     ? `・丸をクリックすると、その変電所の系統データ・スコア内訳と<b>上位系統（つながっている送電線・相手側の変電所・上位系の制約設備）</b>を下に表示し、相手側までの模式線を引きます。相手側の名前をクリックすると、そこへ移ってさらに上位をたどれます。<br>` +
       `・つながりのデータは ${esc(areas)} の${TOPO.meta.areas.length}エリア（各社の公表CSV、北海道は公表PDF。変電所 ${TOPO.meta.linkedRows.toLocaleString()}件に付与、生成 ${esc(TOPO.meta.generated)}）。東京・中部・沖縄は公表物を自動取得できないため、空容量などの系統データのみです。<br>` +
       `・模式線は公表CSVの「潮流方向」の両端を直線で結んだもので、実際の送電線の経路ではありません。中部は「中部電力PG公表の送電線」で実形状を重ねられます。<br>` +
-      `・<b>丸の色（5色）</b>は「変電所単体（当該設備＝配電用バンク）の空き」と「上位系の空き」の組み合わせです。緑＝両方空きあり、黄＝変電所は空きあり・上位系は不明（上位系の値が未公表のエリア）、<b>紫＝変電所は空きあり・上位系は空き無し＝要接続検討</b>（実績では王子・由仁・曽根・引野が上位系0でも上位系対策なしで通った。当該設備の空きが${NEED_CHECK_MW}MW以上か実績で対策なしなら特に）、赤＝変電所単体で空き無し、灰＝データ無し。上位系の空きは「空容量(上位系考慮)」、未公表なら上位側の変電所の該当バンクで判定し、それも非公表なら「不明」。<br>` +
+      `・<b>丸の色（5色）</b>は「変電所単体（当該設備＝配電用バンク）の空き」と「上位系の空き」の組み合わせです。緑＝両方空きあり、黄＝変電所は空きあり・上位系は不明（上位系の値が未公表のエリア）、<b>紫＝変電所は空きあり・上位系は空き無し＝要接続検討</b>、赤＝変電所単体で空き無し、灰＝データ無し。上位系の空きは「空容量(上位系考慮)」、未公表なら上位側の変電所の該当バンクで判定し、それも非公表なら「不明」。<br>` +
       `・「実」の印は接続検討の実績がある変電所。回答の内容（上位系対策なし／バンク等の対策待ち／上位系対策あり）は内訳とCSVに出します。点線の「推」は回答書に変電所名が無く住所から推定した実績で、その変電所の回答とは限りません。<b>「上位系統対策なし」の回答は公表の空容量より優先してよい</b>（回答の有効期限内に契約申込まで進めること、出力制御の見込みは別途確認）。`
     : '・data/grid_topology.js を読み込めなかったため、つながりの表示はできません（空容量などの表示は可能です）。';
 }

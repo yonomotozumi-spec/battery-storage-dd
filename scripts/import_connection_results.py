@@ -4,7 +4,7 @@
 接続検討回答の検証一覧（xlsx）を、変電所スコアの実績DBに取り込むための JSON に変換する。
 
 入力: 「接続検討回答 検証一覧」xlsx の「回答一覧」シート（回答書1件=1行）
-出力: data/connection_results.json
+出力: <公開リポジトリの外>/connection_results.json
       substation_scoring.py が読み込み、手書きの実績DB（RESULTS_DB）の後ろに追加する。
       → score_substations.py（xlsx版）と build_substation_web_data.py（Web版）の両方に反映される。
 
@@ -19,14 +19,15 @@
 変電所名が回答書に書かれていない行（東北電力の高圧版回答書など）は、設置場所の住所を
 国土地理院のジオコーダで緯度経度に変換し、最寄りの変電所（同エリア・154kV未満・二次22kV以下または不明・5km以内）を
 「推定」として紐づける。推定であることは要約・教訓欄に明記する（確定は回答書の工事概要図で行う）。
-住所→座標の結果は geo_cache/connection_sites.json に保存し、再実行時はネットに出ない。
+住所→座標の結果は環境変数 BESS_GEO_CACHE のファイルに保存する（案件の住所なのでリポジトリに置かない）。
 
 使い方:
   python scripts/import_connection_results.py \
-    --in "data/接続検討回答_検証一覧.xlsx" \
+    --in "<公開リポジトリの外>/検証一覧.xlsx" \
     --list "data/全国変電所リスト_66kV以上_座標追加.xlsx" \
-    --out data/connection_results.json
+    --out <公開リポジトリの外>/connection_results.json
 """
+import tempfile
 import argparse
 import datetime
 import json
@@ -43,11 +44,9 @@ import openpyxl
 from score_substations import read_substations
 
 # 手書きの RESULTS_DB（substation_scoring.py）に既に載っている案件の行（回答一覧のNo）。
-# 11=伊勢市特高 / 40-42=熊本県南関町(西日本PE) / 75=喜多方市松山(No071)
 SKIP_NOS = {11, 40, 41, 42, 75}
 
-GEO_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "geo_cache",
-                         "connection_sites.json")
+GEO_CACHE = os.environ.get("BESS_GEO_CACHE") or os.path.join(tempfile.gettempdir(), "connection_sites.json")
 GSI_URL = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
 EST_MAX_KM = 5.0       # これより遠い変電所は推定に使わない
 EST_MAX_KV = 154       # 最大電圧がこれ以上の変電所（基幹系）は配電用ではないので除く
@@ -182,7 +181,7 @@ def main():
     ap.add_argument("--in", dest="src", required=True, help="接続検討回答 検証一覧のxlsx")
     ap.add_argument("--list", dest="lst", required=True, help="全国変電所リスト（66kV以上）のxlsx")
     ap.add_argument("--list-sheet", default="全国変電所リスト")
-    ap.add_argument("--out", required=True, help="出力JSON（例: data/connection_results.json）")
+    ap.add_argument("--out", required=True, help="出力JSON（例: <公開リポジトリの外>/connection_results.json）")
     args = ap.parse_args()
 
     area_names, area_coords = {}, {}
