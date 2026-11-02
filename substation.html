@@ -255,6 +255,19 @@ tr.row-detail > td { background:var(--bg); padding:0; }
 }
 .chip:hover { background:var(--surf2); border-color:var(--acc); }
 
+/* ── 地図: 変電所名で検索 ── */
+.search-row { display:flex; gap:8px; align-items:center; }
+.search-row input { flex:1; min-width:0; }
+.search-hits { display:flex; flex-wrap:wrap; gap:6px; padding-top:4px; }
+.search-hit {
+  display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--bdr); border-radius:14px;
+  font-size:12px; color:var(--txt); background:var(--surf); cursor:pointer; font-family:inherit; line-height:1.4;
+}
+.search-hit:hover { background:var(--surf2); border-color:var(--acc); }
+.search-hit.is-sel { border-color:var(--acc); box-shadow:0 0 0 2px rgba(27,85,204,.18); }
+.search-hit .sh-meta { font-size:10.5px; color:var(--txt3); }
+.search-hit .sh-nocoord { font-size:10px; color:var(--warn); border:1px dashed var(--warn); border-radius:4px; padding:0 4px; }
+
 /* ── Misc ── */
 .msg { padding:14px 16px; font-size:13px; color:var(--txt2); line-height:1.6; }
 .msg.warn { background:var(--warn-bg); color:var(--warn); }
@@ -588,6 +601,17 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <span class="sec-tag">Map</span>
     <span class="card-title">全国の変電所を地図で見る・上位系統をたどる</span>
     <span class="card-note" id="map-count"></span>
+  </div>
+  <div class="frow">
+    <div class="flabel">変電所名で検索<div class="fnote">名前の一部でもよく、「変電所」や会社名は省けます（例: 名谷、曽根、ニセコ）。同名の変電所が別エリアにもあるので、エリア・都道府県で見分けてください。候補を押すと地図がその変電所に移り、内訳・上位系統を下に表示します</div></div>
+    <div class="fcontrol">
+      <div class="search-row">
+        <input type="text" id="m-search" placeholder="例: 名谷 ／ 曽根 ／ 山田変電所" autocomplete="off" aria-label="変電所名で検索">
+        <button class="btn-sub" type="button" id="m-search-clear">消す</button>
+      </div>
+      <div class="fnote" id="m-search-note"></div>
+      <div class="search-hits" id="m-search-hits"></div>
+    </div>
   </div>
   <div class="frow">
     <div class="flabel">表示する変電所<div class="fnote">既定は座標のある全変電所。丸の色＝変電所単体の空き×上位系の空き（5色）、大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
@@ -1859,6 +1883,7 @@ function initMap() {
     site: L.layerGroup().addTo(MAP),
     links: L.layerGroup().addTo(MAP),
     markers: L.layerGroup().addTo(MAP),
+    found: L.layerGroup().addTo(MAP),   // 名前検索で選んだが絞り込みで丸が出ていない変電所の仮の丸
   };
   renderMarkers();
   renderLegend();
@@ -1913,6 +1938,7 @@ function markerTip(r) {
 function renderMarkers() {
   if (!MAP) return;
   MAP_LAYERS.markers.clearLayers();
+  MAP_LAYERS.found.clearLayers();
   MARKERS = {};
   const list = mapFilter();
   list.forEach(r => {
@@ -2130,7 +2156,93 @@ function toggleChuden() {
   });
 }
 
+// ── 地図: 変電所名で検索 ──
+const SEARCH_MAX = 40;
+// 表記ゆれを吸収する（全角英数・括弧→半角、空白除去、会社名の除去、カタカナ→ひらがな、小文字化）
+function normName(s) {
+  return String(s || '')
+    .replace(/[Ａ-Ｚａ-ｚ０-９（）]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[\s\u3000]+/g, '')
+    .replace(/.*?(\(株\)|㈱|株式会社)/, '')          // 「東北電力ネットワーク(株)」などの会社名を落とす
+    .replace(/[ヶヵ]/g, 'ケ')
+    .replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .toLowerCase();
+}
+function searchRows(q) {
+  const nq = normName(q);
+  if (!nq) return { hits: [], by: '' };
+  const strip = s => s.replace(/(変電所|変換所|開閉所|発電所)$/, '');
+  const score = r => {
+    const n = normName(val(r, 'name'));
+    if (n === nq || strip(n) === strip(nq)) return 0;
+    if (n.startsWith(nq)) return 1;
+    if (n.includes(nq)) return 2;
+    return -1;
+  };
+  const sortHits = arr => arr.sort((a, b) => a.s - b.s || val(b.r, 'grid') - val(a.r, 'grid') || val(a.r, 'area') - val(b.r, 'area'));
+  let hits = [];
+  D.rows.forEach(r => { const sc = score(r); if (sc >= 0) hits.push({ r, s: sc }); });
+  if (hits.length) return { hits: sortHits(hits).map(h => h.r), by: 'name' };
+  // 名前で見つからなければ所在地（都道府県・市区町村・住所）で探す
+  D.rows.forEach(r => {
+    if ([prefOf(r), muniOf(r), val(r, 'addr') || ''].some(h => normName(h).includes(nq))) hits.push({ r, s: 2 });
+  });
+  return { hits: sortHits(hits).map(h => h.r), by: hits.length ? 'place' : '' };
+}
+function renderSearch() {
+  const q = $('m-search').value;
+  const { hits, by } = searchRows(q);
+  const note = $('m-search-note'), box = $('m-search-hits');
+  if (!q.trim()) { note.textContent = ''; box.innerHTML = ''; return; }
+  if (!hits.length) { note.textContent = '見つかりませんでした。別の表記（旧字・ひらがな・一部だけ）で試してください'; box.innerHTML = ''; return; }
+  const noCoord = hits.filter(r => val(r, 'lat') == null).length;
+  note.textContent = `${by === 'place' ? '名前では見つからなかったため所在地で探しました。' : ''}一致 ${hits.length.toLocaleString()}件` +
+    (hits.length > SEARCH_MAX ? `（最初の${SEARCH_MAX}件を表示。もう少し絞ってください）` : '') +
+    (noCoord ? `　うち座標なし ${noCoord}件（地図には出ませんが内訳は見られます）` : '') + '　Enterで最初の候補を選びます';
+  box.innerHTML = hits.slice(0, SEARCH_MAX).map(r =>
+    `<button type="button" class="search-hit${SELECTED === r ? ' is-sel' : ''}" data-no="${esc(val(r, 'no'))}">` +
+    `<b>${esc(val(r, 'name'))}</b><span class="sh-meta">${esc(area(r))}${prefOf(r) ? ' / ' + esc(prefOf(r)) : ''}${muniOf(r) ? ' ' + esc(muniOf(r)) : ''}` +
+    `${val(r, 'vmax') != null ? '・' + val(r, 'vmax') + 'kV' : ''}</span>${rkBadge(rank(r))}` +
+    `${val(r, 'lat') == null ? '<span class="sh-nocoord">座標なし</span>' : ''}</button>`).join('');
+}
+function selectSearched(row) {
+  const go = () => {
+    selectRow(row, { pan: true });
+    MAP_LAYERS.found.clearLayers();
+    const shown = !!MARKERS[String(val(row, 'no'))];
+    if (!shown && val(row, 'lat') != null) {
+      // 今の絞り込みでは丸が出ていない変電所。仮の丸を置いて場所が分かるようにする
+      const m = L.circleMarker([val(row, 'lat'), val(row, 'lon')], Object.assign(markerStyle(row, true), { dashArray: '3 3' }));
+      m.bindTooltip(markerTip(row) + '<br><span style="color:#B45309">今の絞り込み条件では非表示の変電所（検索で選択）</span>', { direction: 'top', offset: [0, -6], opacity: .95 });
+      m.addTo(MAP_LAYERS.found);
+    }
+    const extra = val(row, 'lat') == null
+      ? '　選んだ変電所は座標が未取得のため地図には出ません（内訳は地図の下に表示しました）'
+      : !shown ? '　選んだ変電所は今の絞り込み条件では非表示です。点線の丸で場所を示しています（「全変電所」などで条件を広げると通常の丸に戻ります）' : '';
+    $('m-search-note').textContent = $('m-search-note').textContent.replace(/　選んだ変電所.*$/, '') + extra;
+    document.querySelectorAll('#m-search-hits .search-hit').forEach(b => b.classList.toggle('is-sel', b.dataset.no === String(val(row, 'no'))));
+  };
+  ensureMap().then(go).catch(() => {});
+}
+function initSearch() {
+  $('m-search').addEventListener('input', renderSearch);
+  $('m-search').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const { hits } = searchRows($('m-search').value);
+    if (hits.length) selectSearched(hits[0]);
+  });
+  $('m-search-clear').addEventListener('click', () => { $('m-search').value = ''; renderSearch(); $('m-search').focus(); });
+  $('m-search-hits').addEventListener('click', e => {
+    const b = e.target.closest('.search-hit');
+    if (!b) return;
+    const row = D.rows.find(r => String(val(r, 'no')) === b.dataset.no);
+    if (row) selectSearched(row);
+  });
+}
+
 function initMapControls() {
+  initSearch();
   // 既定は全変電所（上位系統の状態で色分けするため）。S/Aだけに絞るボタンを用意する
   $('m-ranks').innerHTML = `<button class="btn-sub" type="button" id="m-preset-all">全変電所</button>
     <button class="btn-sub" type="button" id="m-preset-sa">良い変電所（S・A）だけ</button>` +
