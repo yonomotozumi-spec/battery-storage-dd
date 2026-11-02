@@ -52,6 +52,7 @@ GSI_URL = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
 EST_MAX_KM = 5.0       # これより遠い変電所は推定に使わない
 EST_MAX_KV = 154       # 最大電圧がこれ以上の変電所（基幹系）は配電用ではないので除く
 EST_MAX_SEC_KV = 22    # 二次電圧がこれを超える変電所（66kV等へ送る二次変電所）も除く。不明は残す
+EST_MAX_KW = 10000     # 放電kWがこれを超える回答（特高）は配電用変電所に繋がないので推定しない
 
 COLS = ["No", "案件番号", "案件名", "回答種別", "電力会社", "回答日", "設置場所", "放電kW", "電圧", "変電所",
         "負担金(税込・万円)", "保証金(円)", "工期(月)", "工期の原文", "主な対策工事", "上位系統増強",
@@ -203,7 +204,8 @@ def main():
         if row["集計対象"] != "○" or int(row["No"]) in SKIP_NOS:
             continue
         est = None
-        if needs_estimate(row["変電所"]):
+        kw = row["放電kW"]
+        if needs_estimate(row["変電所"]) and not (isinstance(kw, (int, float)) and kw > EST_MAX_KW):
             hit = geocode(site_address(row["設置場所"]), cache)
             if hit:
                 est = nearest_substations(hit[0], hit[1], area_coords.get(row["電力会社"], [])) or None
