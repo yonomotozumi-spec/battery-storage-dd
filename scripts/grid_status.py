@@ -281,7 +281,7 @@ class GridStatus:
         nc = self.need_check(row) if cls == "upbad" else None
         reason = f"変電所単体（当該設備）: {own_text}／上位系: {up_text}（{u['reason']}）"
         if cls == "upbad":
-            reason += ("。" + "、".join(nc) + " → 実績で上位系0でも通った例（王子・由仁・曽根・引野）と同じ条件") if nc else "。接続検討で上位系の扱いを確認する価値あり"
+            reason += ("。" + "、".join(nc) + " → 実績で上位系0でも通った例と同じ条件") if nc else "。接続検討で上位系の扱いを確認する価値あり"
         r = {"cls": cls, "own": o, "up": up, "label": GS_LABEL[cls], "reason": reason}
         self._cache[key] = r
         return r
