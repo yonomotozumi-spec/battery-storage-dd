@@ -1,11 +1,11 @@
 {
  "description": "ランクS/A変電所（系統スコア上位＝実際に土地を探すエリア）の所在市区町村。条例リスク監視の優先対象。build_priority_munis.py で再生成。",
- "generated": "2026-10-21",
+ "generated": "2026-11-05",
  "source_ranks": [
   "S",
   "A"
  ],
- "substations_total": 1241,
+ "substations_total": 1240,
  "unresolved": 0,
  "munis": [
   {
@@ -430,14 +430,13 @@
    "pref": "福岡県",
    "muni": "福岡市",
    "S": 6,
-   "A": 15,
+   "A": 14,
    "substations": [
     "七隈変電所(A)",
     "中尾変電所(S)",
     "中洲変電所(A)",
     "九州電力 香椎変電所(A)",
     "今泉変電所(A)",
-    "壱岐変電所(A)",
     "多の津変電所(S)",
     "大濠変電所(A)",
     "天神変電所(A)",
