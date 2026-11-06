@@ -460,6 +460,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
         <div class="sum-sub" id="sum-sa-sub"></div>
       </div>
     </div>
+    <div class="detail-links" id="site-links" style="padding:8px 16px;border-top:1px solid var(--bdr)"></div>
     <div class="msg" id="sum-msg" style="border-top:1px solid var(--bdr)"></div>
   </div>
 
@@ -846,6 +847,14 @@ function rankLegendHtml(withTotal) {
 const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
 const fmtNum = v => v == null ? '—' : String(v);
 const gmaps = (la, lo) => `https://www.google.com/maps?q=${la},${lo}`;
+// 現場確認用の外部リンク（APIキー不要。新しいタブで開く）。ストリートビュー＝ペグマン、Google Earth＝3D・航空写真
+const gsv = (la, lo) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${la},${lo}`;
+const gearth = (la, lo) => `https://earth.google.com/web/@${la},${lo},0a,1200d,35y,0h,0t,0r`;
+const siteLinksHtml = (la, lo, label) => `
+  <a class="chip" href="${gmaps(la, lo)}" target="_blank" rel="noopener">📍 ${label}をGoogleマップで見る</a>
+  <a class="chip" href="${gsv(la, lo)}" target="_blank" rel="noopener">🚶 ストリートビュー（ペグマン）で${label}の現場を見る</a>
+  <a class="chip" href="${gearth(la, lo)}" target="_blank" rel="noopener">🌍 Google Earthで${label}を開く</a>
+  <a class="chip" href="https://maps.gsi.go.jp/#17/${la}/${lo}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>`;
 
 // ── 外部の参考DB（蓄電所ネット bess-net.jp）へのリンク ──
 // 系統連系診断は ?pref=都道府県&mw=出力&mwh=容量 で条件付きのURLを受け付ける
@@ -1030,6 +1039,7 @@ function render(hits, ctx) {
   $('res-coord').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}　/　` +
     (radius ? `半径${radius / 1000}km` : '全国');
   $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
+  $('site-links').innerHTML = `<span class="fnote" style="align-self:center">候補地の現場確認：</span>` + siteLinksHtml(lat, lon, '候補地');
 
   // この地点の判定（高圧2MW）。絞り込みに影響されないよう、座標のある全変電所から判定する
   const sj = judgeSite(lat, lon);
@@ -1212,8 +1222,7 @@ function detailHtml(h) {
       <div class="detail-links">
         ${memo ? `<a class="chip res-jump" href="#" data-res="${memo.map(m => D.results.indexOf(m)).join(',')}">📋 接続検討の実績（${memo.length}件）を実績DBで見る</a>` : ''}
         ${h.noMapChip ? '' : `<a class="chip topo-map" data-no="${val(row, 'no')}" href="#map">🗺 地図でこの変電所と系統のつながりを見る</a>`}
-        <a class="chip" href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">📍 変電所をGoogleマップで見る</a>
-        <a class="chip" href="https://maps.gsi.go.jp/#15/${val(row, 'lat')}/${val(row, 'lon')}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>
+        ${val(row, 'lat') != null ? siteLinksHtml(val(row, 'lat'), val(row, 'lon'), '変電所') : ''}
         <a class="chip" href="https://www.google.com/maps/dir/?api=1&origin=${$('lat').value},${$('lon').value}&destination=${val(row, 'lat')},${val(row, 'lon')}" target="_blank" rel="noopener">🚗 候補地からのルート</a>
         <a class="chip" href="${bessSearchUrl(val(row, 'name'))}" target="_blank" rel="noopener">🔎 蓄電所ネットで「${esc(bessShortName(val(row, 'name')))}」を検索</a>
         ${prefOf(row) ? `<a class="chip" href="${bessToolUrl(prefOf(row))}" target="_blank" rel="noopener">⚡ 蓄電所ネット 系統連系診断（${esc(prefOf(row))}・${extMw()}MW／${extMwh()}MWh）</a>` : ''}
@@ -2004,6 +2013,13 @@ function initMap() {
   renderLegend();
   updateSite();
   renderNet();
+  // 地図の何もない所をクリック → その地点をストリートビュー／Google Earth で開く、または候補地にする
+  MAP.on('click', e => {
+    const la = +e.latlng.lat.toFixed(6), lo = +e.latlng.lng.toFixed(6);
+    L.popup({ maxWidth: 320 }).setLatLng(e.latlng).setContent(
+      `<b>この地点</b> ${la}, ${lo}<div class="detail-links" style="margin-top:6px">${siteLinksHtml(la, lo, 'この地点')}` +
+      `<a class="chip site-pick" href="#" data-lat="${la}" data-lon="${lo}">🎯 この地点を候補地にして判定する</a></div>`).openOn(MAP);
+  });
 }
 
 // 地図の「表示する変電所」の絞り込み。候補変電所の表も同じ条件を使う（opts.ignoreRange で検索範囲の条件だけ外す）
@@ -2400,7 +2416,8 @@ function initMapControls() {
   ['lat', 'lon', 'radius'].forEach(id => $(id).addEventListener('change', showSiteOnMap));
   const areas = TOPO ? TOPO.meta.areas.join('・') : '';
   $('map-msg').innerHTML = TOPO
-    ? `・候補地の座標を入れて「判定・採点」すると、◎の候補地と検索範囲の円を地図に出し、下の「候補変電所」の表と同じ絞り込みで丸を表示します（「候補地の検索範囲内だけ地図に出す」で範囲外を消せます）。表の行をクリックすると地図でもその変電所を強調します。<br>` +
+    ? `・<b>現場の確認</b>：候補地や変電所の内訳にある「🚶 ストリートビュー（ペグマン）」「🌍 Google Earth」のリンクで、その地点を新しいタブで開けます（Googleの地図やEarthはこの画面に埋め込めないため、リンクで開く方式です）。地図の何もない所をクリックすると、その地点のリンクと「候補地にして判定する」が出ます。<br>` +
+      `・候補地の座標を入れて「判定・採点」すると、◎の候補地と検索範囲の円を地図に出し、下の「候補変電所」の表と同じ絞り込みで丸を表示します（「候補地の検索範囲内だけ地図に出す」で範囲外を消せます）。表の行をクリックすると地図でもその変電所を強調します。<br>` +
       `・丸をクリックすると、その変電所の系統データ・スコア内訳と<b>上位系統（つながっている送電線・相手側の変電所・上位系の制約設備）</b>を下に表示し、相手側までの模式線を引きます。相手側の名前をクリックすると、そこへ移ってさらに上位をたどれます。<br>` +
       `・つながりのデータは ${esc(areas)} の${TOPO.meta.areas.length}エリア（各社の公表CSV、北海道は公表PDF。変電所 ${TOPO.meta.linkedRows.toLocaleString()}件に付与、生成 ${esc(TOPO.meta.generated)}）。東京・中部・沖縄は公表物を自動取得できないため、空容量などの系統データのみです。<br>` +
       `・模式線は公表CSVの「潮流方向」の両端を直線で結んだもので、実際の送電線の経路ではありません。中部は「中部電力PG公表の送電線」で実形状を重ねられます。<br>` +
@@ -2430,6 +2447,8 @@ function init() {
   });
   // 内訳の「地図で系統のつながりを見る」／上位系統の表の相手側リンク
   document.addEventListener('click', e => {
+    const pick = e.target.closest('.site-pick');
+    if (pick) { e.preventDefault(); $('lat').value = pick.dataset.lat; $('lon').value = pick.dataset.lon; if (MAP) MAP.closePopup(); run(); return; }
     const rj = e.target.closest('.res-jump');
     if (rj) { e.preventDefault(); e.stopPropagation(); showResults(rj.dataset.res); return; }
     if (e.target.id === 'res-clear') { e.preventDefault(); showResults(''); return; }
