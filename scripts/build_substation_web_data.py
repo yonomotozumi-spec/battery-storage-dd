@@ -29,8 +29,10 @@ import substation_scoring as S
 FIELDS = ["no", "area", "name", "pref", "lat", "lon", "acc", "vmax", "vsec",
           "opcap", "flow", "availCur", "availUp", "n1", "curtail", "addr",
           "s1", "s2", "s3", "s4", "s5", "s6", "grid", "rank", "muni", "gpref", "gate",
-          # v2: S1の内訳（S1a 変電所単体＝当該設備・S1b 上位系）と接続検討の判定（dict.judge の添字）
-          "s1a", "s1b", "judge"]
+          # v2: S1の内訳（S1a 変電所単体＝当該設備・S1b 上位系）と接続検討の判定（dict.judge の添字。実績による格下げを反映した最終判定）
+          "s1a", "s1b", "judge",
+          # 実績による格下げ（2026-11-06）: 公表データだけの判定（dict.judge の添字）、実績NGの理由、上位系の実績警告の理由（無ければ ""）
+          "judgePub", "resultNg", "upperWarn"]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REVGEO_CACHE = os.path.join(ROOT, "geo_cache", "revgeo.json")
@@ -100,9 +102,14 @@ def main():
     with_coords = 0
     geo = load_geo()
     with_muni = 0
+    adj = S.result_adjuster()
+    n_result_ng = n_upper_warn = 0
     for (no, area, name, pref, vmax, vsec, lat, lon, acc, cap, opcap, flow,
          avail, avail_up, n1, curtail, addr) in src_rows:
         sc = S.score_row(area, vsec, opcap, flow, avail, avail_up, n1, curtail)
+        a = adj.adjust(area, name, no, sc["judge"])   # 実績による格下げ（実績DBが無ければ何もしない）
+        n_result_ng += 1 if a["resultNg"] else 0
+        n_upper_warn += 1 if a["upperWarn"] else 0
         la, lo = num(lat, 5), num(lon, 5)
         if la is not None and lo is not None:
             with_coords += 1
@@ -119,7 +126,8 @@ def main():
             muni, gpref,
             # ゲート（上位系0かつN-1不可）の警告。1=警告あり
             1 if sc["gate"] else 0,
-            sc["s1a"], sc["s1b"], d_judge.idx(sc["judge"]),
+            sc["s1a"], sc["s1b"], d_judge.idx(a["judge"]),
+            d_judge.idx(sc["judge"]), a["resultNg"], a["upperWarn"],
         ])
 
     payload = {
@@ -132,6 +140,10 @@ def main():
             "gridMax": S.GRID_MAX,
             "s7Max": S.S7_MAX,
             "totalMax": S.TOTAL_MAX,
+            # 実績による格下げの基準日（この日から RESULT_NG_WINDOW_DAYS 以内の回答を見る）と件数
+            "resultAsOf": adj.as_of.isoformat(),
+            "resultNgCount": n_result_ng,
+            "upperWarnCount": n_upper_warn,
         },
         "dict": {
             "area": d_area.values, "acc": d_acc.values,
@@ -153,6 +165,9 @@ def main():
             "judgeMeaning": S.JUDGE_MEANING,
             "siteOkM": S.SITE_OK_M, "siteRangeM": S.SITE_RANGE_M,
             "s5MaxKv": S.P["s5_1"]["thr"],
+            # 実績による格下げの閾値とラベル（画面の凡例・理由の文言に使う）
+            "resultNg": {"yenMan": S.RESULT_NG_YEN_MAN, "months": S.RESULT_NG_MONTHS, "windowDays": S.RESULT_NG_WINDOW_DAYS,
+                         "tag": S.RESULT_NG_TAG, "upperTag": S.UPPER_WARN_TAG, "meaning": S.RESULT_NG_MEANING},
         },
         "areaPoints": [list(a) for a in S.AREA_POINTS],
         "scoreDefs": [list(s) for s in S.SCORE_DEFS],
@@ -173,6 +188,7 @@ def main():
 
     size_kb = os.path.getsize(args.out) / 1024
     print(f"出力: {args.out}  {len(rows)}件（座標あり {with_coords}件・市区町村あり {with_muni}件） {size_kb:.0f}KB")
+    print(f"実績による格下げ: 実績NG {n_result_ng}件・⚠上位系に実績NG {n_upper_warn}件（基準日 {adj.as_of}・実績NGの回答 {len(adj.ngs)}件）")
 
 
 if __name__ == "__main__":
