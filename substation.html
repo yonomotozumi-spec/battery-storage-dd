@@ -140,7 +140,9 @@ select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(2
 .btn-run:disabled { background:var(--txt3); cursor:not-allowed; }
 
 /* ── Summary ── */
-.sum-grid { display:grid; grid-template-columns:repeat(3,1fr); background:var(--bdr); gap:1px; }
+.sum-grid { display:grid; grid-template-columns:repeat(4,1fr); background:var(--bdr); gap:1px; }
+.sum-judge { border-left:4px solid var(--bdr); }
+.sum-judge.sj-ok { border-left-color:var(--pass); } .sum-judge.sj-check { border-left-color:#8E24AA; } .sum-judge.sj-ng { border-left-color:var(--fail); }
 .sum-cell { background:var(--surf); padding:12px 16px; }
 .sum-label { font-size:11px; color:var(--txt3); margin-bottom:3px; }
 .sum-main { font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.25; }
@@ -158,6 +160,11 @@ select:focus, input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(2
 .rk-x { background:var(--fail-bg); color:var(--fail); }
 .rk-n { background:var(--surf2); color:var(--txt3); border:1px dashed var(--bdr); }
 .rk[title] { cursor:help; }
+/* 接続検討の判定（高圧2MW。substation_scoring.py の judge_row と同じ） */
+.jd { display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:4px; white-space:nowrap; cursor:help; }
+.jd-ok { background:var(--pass); color:#fff; } .jd-check { background:#8E24AA; color:#fff; }
+.jd-ng { background:var(--fail); color:#fff; } .jd-none { background:var(--surf2); color:var(--txt3); border:1px dashed var(--bdr); }
+.jd-big { font-size:17px; padding:3px 12px; }
 .rank-legend { display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; padding:8px 16px; font-size:11px; color:var(--txt2);
   background:var(--surf); border-bottom:1px solid var(--bdr); line-height:1.5; }
 .rank-legend .rl-item { display:inline-flex; gap:5px; align-items:center; white-space:nowrap; }
@@ -418,7 +425,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
         <option value="grid">系統スコア順（80点）</option>
       </select>
       <div class="opt-row">
-        <label class="chk"><input type="checkbox" id="f-gate" checked> ⚠上位系0（警告）の変電所も表示</label>
+        <label class="chk"><input type="checkbox" id="f-gate" checked> ⚠上位系0（警告・判定は要検討）の変電所も表示</label>
         <label class="chk"><input type="checkbox" id="f-nodata" checked> 空容量データ無し（OSM由来）も表示</label>
         <label class="chk"><input type="checkbox" id="f-uponly"> 上位系の空容量を確認できた変電所だけ表示</label>
       </div>
@@ -438,6 +445,11 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <span class="card-note" id="res-coord"></span>
     </div>
     <div class="sum-grid">
+      <div class="sum-cell sum-judge" id="sum-judge-cell">
+        <div class="sum-label">この地点の判定（高圧2MW・接続検討を出す価値）</div>
+        <div class="sum-main" id="sum-judge">—</div>
+        <div class="sum-sub" id="sum-judge-sub"></div>
+      </div>
       <div class="sum-cell">
         <div class="sum-label">最有力候補（総合スコア）</div>
         <div class="sum-main" id="sum-best">—</div>
@@ -470,7 +482,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
           <tr>
             <th>#</th><th>変電所</th><th class="num">距離</th>
             <th class="num">S7近接<br>(20)</th><th class="num">系統<br>(80)</th>
-            <th class="num">総合<br>(100)</th><th>系統ランク</th><th>地図</th>
+            <th class="num">総合<br>(100)</th><th>系統ランク</th><th>判定<br>(高圧2MW)</th><th>地図</th>
           </tr>
         </thead>
         <tbody id="rtbody"></tbody>
@@ -545,7 +557,19 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
   </div>
   <div class="frow">
-    <div class="flabel">上位系の確認<div class="fnote">中部・四国・東北・北陸・沖縄は上位系を単独で公表しておらず、当該設備の空容量で代用して採点しています</div></div>
+    <div class="flabel">判定（高圧2MW）<div class="fnote">接続検討OK＝変電所単体（配電用バンク）に空きがあり上位系も空きあり・未公表／要検討＝単体は空きありだが上位系の空き無し、または配電用変電所でない／接続検討NG＝単体の空き無し</div></div>
+    <div class="fcontrol">
+      <select id="l-judge">
+        <option value="all">すべて</option>
+        <option value="ok">接続検討OKだけ</option>
+        <option value="okcheck">接続検討OK＋要検討（NGとデータ無しを除く）</option>
+        <option value="check">要検討だけ</option>
+        <option value="ng">接続検討NGだけ</option>
+      </select>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">上位系の確認<div class="fnote">中部・四国・東北・北陸・沖縄は上位系を単独で公表しておらず、S1b（上位系）は確認済みと同点で採点しています（判定は「接続検討OK」に上位系未確認の印）</div></div>
     <div class="fcontrol">
       <select id="l-up">
         <option value="all">すべて</option>
@@ -588,7 +612,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <table class="rtbl">
       <thead>
         <tr><th>#</th><th>変電所</th><th class="num">空容量<br>上位系(MW)</th><th class="num">空容量<br>当該(MW)</th>
-          <th>N-1電制</th><th class="num">系統<br>(80)</th><th>系統ランク</th><th>カテゴリ（地図の色）</th><th>実績</th><th>地図</th></tr>
+          <th>N-1電制</th><th class="num">系統<br>(80)</th><th>系統ランク</th><th>判定<br>(高圧2MW)</th><th>カテゴリ（地図の色）</th><th>実績</th><th>地図</th></tr>
       </thead>
       <tbody id="ltbody"></tbody>
     </table>
@@ -740,16 +764,16 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <tbody>
         <tr><td>収録</td><td>6,071変電所（66kV以上・10社）</td><td>8,346変電所（10社・東京電力PGは2026年6月から収録）</td></tr>
         <tr><td>座標</td><td>5,329件（87.8%）。候補地からの直線距離で検索</td><td>1,082件（主に中部）。座標が無い変電所は同じ都道府県内をまとめて検索</td></tr>
-        <tr><td>空容量の見方</td><td>「上位系考慮」を優先。2MW未満（最低必要容量）は空き無し扱い。2MW未満かつN-1電制不可は<b>⚠上位系0の警告</b>（ランクは通常算出・S1=0でB以下）</td><td>「当該設備」の空容量÷出力の比率で加点（1.5倍+30／1.0倍+20／0.5倍+10）。上位系の制約・ゲートは無い</td></tr>
+        <tr><td>空容量の見方</td><td>S1a（25点）は「当該設備」（変電所単体＝配電用バンク）、S1b（10点）は「上位系考慮」。2MW未満（最低必要容量）は空き無し扱い。上位系が2MW未満かつN-1電制不可は<b>⚠上位系0の警告</b>（S1b=0・判定は要検討。v2・2026-11-06〜）</td><td>「当該設備」の空容量÷出力の比率で加点（1.5倍+30／1.0倍+20／0.5倍+10）。上位系の制約・ゲートは無い</td></tr>
         <tr><td>距離</td><td>S7 近接（20点）: 500m以下20〜5km以下4</td><td>5km未満+25／10km未満+15／20km未満+5（座標がある変電所のみ）。距離不明は同県+5</td></tr>
         <tr><td>N-1電制／出力制御／電圧</td><td>可+10／「なし」+5／二次≦7kV+10</td><td>可+15／リスク低+10／一次・二次とも明示+10</td></tr>
         <tr><td>前提規模</td><td>高圧2MW（配点は接続検討回答12件で校正）</td><td>入力した出力・容量（例: 12.5MW／50MWh）</td></tr>
-        <tr><td>判定</td><td>総合ランク S／A／B／C（上位系0は⚠警告付き）</td><td>≧70 連系可能性高／≧50 あり／≧30 困難／&lt;30 個別協議必須</td></tr>
+        <tr><td>判定</td><td>接続検討の判定 OK／要検討／NG（高圧2MW。変電所単体の空き×上位系の空き）＋総合ランク S／A／B／C</td><td>≧70 連系可能性高／≧50 あり／≧30 困難／&lt;30 個別協議必須</td></tr>
       </tbody>
     </table>
   </div>
   <ul class="plain-list">
-    <li><b>読み方</b>: 蓄電所ネットは当該設備の空容量だけで点数を付けるため、上位系の空きが0の変電所（例: 北海道の旭川中央は当該設備20MW・上位系考慮0MW・N-1不可）でも「連系可能性あり」と出ます。本ツールではS1が0点になり⚠上位系0の警告が付きます。蓄電所ネットの点数は必ず本ツールの「空容量(上位系考慮)」と併せて見てください。</li>
+    <li><b>読み方</b>: 蓄電所ネットは当該設備の空容量だけで点数を付けるため、上位系の空きが0の変電所（例: 北海道の旭川中央は当該設備20MW・上位系考慮0MW・N-1不可）でも「連系可能性あり」と出ます。本ツールでは判定「要検討」（S1b上位系=0点・⚠上位系0の警告）になります。蓄電所ネットの点数は必ず本ツールの判定と「空容量(上位系考慮)」と併せて見てください。</li>
     <li><b>秋田県・12.5MW／50MWhの例</b>（2026-10-13時点）: 蓄電所ネットのTop5は 横手・花輪・角館・牛島・御所野（いずれも45点「連系困難」、出力制御あり）。本ツールでは 花輪・角館・牛島＝A（系統48点）、横手＝B（43点）、御所野は154kVの行しかなく空容量未公表です。本ツールの秋田県上位は 南通・大川反（A・58点）で、蓄電所ネットが空容量≧出力×1.5（12.5MW×1.5＝18.75MW）の変電所を優先するため順位が入れ替わります。</li>
     <li><b>データ時点</b>: 蓄電所ネットの各変電所ページに「公表○年○月○日時点（当サイト取込○月○日）」が出ます（例: 東北は公表2026/07/03時点・取込2026/08/16）。本ツールの元データと公表時点が違えば空容量の値もずれるので、差があるときは送配電事業者の最新の公表値で確認してください。</li>
     <li>蓄電所ネットの診断結果も公表データに基づく参考情報で、連系可否・空容量は接続検討の申込で確定します。</li>
@@ -820,7 +844,11 @@ function rankLegendHtml(withTotal) {
   const ranks = ['S', 'A', 'B', 'C', 'データ無'];
   return `<span class="rl-head">系統ランク（80点満点）：</span>` +
     ranks.map(r => `<span class="rl-item"><span class="rk ${rkClass(r)}">${esc(r)}</span>${esc(rankMeaning(r).replace(/^[^：]+：/, ''))}</span>`).join('') +
-    `<span class="rl-item"><span class="up-tag rk-x">⚠上位系0</span>空容量(上位系考慮)が${MIN_MW}MW未満かつN-1電制が「可」でない（ランクとは別の警告。工期が長くなりやすい）</span>` +
+    `<span class="rl-item"><span class="up-tag rk-x">⚠上位系0</span>空容量(上位系考慮)が${MIN_MW}MW未満かつN-1電制が「可」でない（ランクとは別の警告。S1b=0・判定は要検討。工期が長くなりやすい）</span>` +
+    `<span class="rl-item"><span class="rl-head">判定（高圧2MW）：</span>` +
+    [['ok', 'jd-ok', '変電所単体（配電用バンク）も上位系も空きあり（上位系未公表を含む）'], ['check', 'jd-check', '単体は空きあり・上位系は空き無し／配電用でない → 人が判断'],
+      ['ng', 'jd-ng', '単体の空き無し'], ['nodata', 'jd-none', '空容量が未公表']].map(([k, c, t]) =>
+      `<span class="rl-item"><span class="jd ${c}" title="${esc(JUDGE_MEANING[JL[k]] || '')}">${esc(JUDGE_SHORT[JL[k]])}</span>${esc(t)}</span>`).join('') + `</span>` +
     (withTotal ? `<span class="rl-item"><span class="rl-head">総合（100点＝系統80＋近接20）：</span>${['S', 'A', 'B', 'C'].map(totalRankMeaning).join('／')}</span>` : '');
 }
 const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
@@ -894,6 +922,55 @@ const hasData = row => val(row, 'availUp') != null || val(row, 'availCur') != nu
 const effCap = row => val(row, 'availUp') != null ? val(row, 'availUp') : val(row, 'availCur');
 // ゲート（空容量(上位系考慮)＜2MW かつ N-1電制≠可）。2026-10-20までは「除外」として隠していたが、警告表示に変更
 const gated = row => !!val(row, 'gate');
+
+// ── 接続検討の判定（高圧2MW・v2 2026-11-06）。substation_scoring.py の judge_row / judge_site と同じルール ──
+//  判定そのものは substations.js に入っている（Python側で算出）。理由の文言はここで同じ順序で組み立てる
+const JL = D && D.params.judgeLabels ? D.params.judgeLabels : { ok: '接続検討OK', check: '要検討', ng: '接続検討NG', nodata: 'データ無' };
+const JUDGE_MEANING = D && D.params.judgeMeaning ? D.params.judgeMeaning : {};
+const JUDGE_SHORT = { [JL.ok]: 'OK', [JL.check]: '要検討', [JL.ng]: 'NG', [JL.nodata]: 'データ無' };
+const SITE_OK_M = D && D.params.siteOkM ? D.params.siteOkM : 2000;
+const SITE_RANGE_M = D && D.params.siteRangeM ? D.params.siteRangeM : 10000;
+const S5_MAX_KV = D && D.params.s5MaxKv != null ? D.params.s5MaxKv : 7;
+const S1A_STEPS = D && D.params.s1aSteps ? D.params.s1aSteps : [[20, 25], [6, 18], [2, 5]];
+const S1B_PTS = D && D.params.s1bPoints ? D.params.s1bPoints : { ok: 10, unk: 10, bad: 0 };
+const judge = row => (F.judge != null && D.dict.judge) ? D.dict.judge[row[F.judge]] : '';
+const judgeCls = j => j === JL.ok ? 'jd-ok' : j === JL.check ? 'jd-check' : j === JL.ng ? 'jd-ng' : 'jd-none';
+const fmtKm = m => m >= 1000 ? `${+(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
+// 変電所単体（当該設備）の空容量。未公表なら上位系考慮で代用
+const ownCap = row => val(row, 'availCur') != null ? val(row, 'availCur') : val(row, 'availUp');
+function judgeReason(row) {
+  const cur = val(row, 'availCur'), up = val(row, 'availUp'), own = ownCap(row), v = val(row, 'vsec');
+  if (own == null) return '空容量が未公表（OSM由来など）で判定できない。送配電事業者の公表資料か接続検討で確認';
+  const ownTxt = `${own}MW` + (cur != null ? '' : '（当該設備は未公表のため上位系考慮の値）');
+  if (own < MIN_MW) return `変電所単体（当該設備＝配電用バンク）の空容量 ${ownTxt} が最低必要容量${MIN_MW}MW未満で空き無し`;
+  if (v != null && v > S5_MAX_KV) return `二次電圧 ${v}kV で6.6kVの配電用変電所ではない。` +
+    (v <= 33 ? `高圧2MWの連系には${v}kV/6kV柱上変圧器の新設などが要る（中国エリアの22kV配電で実績あり）` : '高圧2MWの連系先（6.6kV配電線）の受け皿にならない可能性がある') +
+    `ため、近くの配電用変電所と比べて判断する（変電所単体の空容量 ${ownTxt}）`;
+  if (up != null && up < MIN_MW) return `変電所単体は空きあり ${ownTxt} だが上位系の空き無し（空容量(上位系考慮) ${up}MW）。高圧2MWは実績32件中31件が連系可だが工期中央値35ヶ月（非該当14ヶ月）・出力制御の見込み。工期を許容できるか人が判断` +
+    (own >= S1A_STEPS[1][0] ? `。当該設備≧${S1A_STEPS[1][0]}MWは実績で上位系0でも通った例（王子・由仁・曽根）と同じ条件` : '');
+  if (up == null) return `変電所単体に空きあり ${ownTxt}。上位系は未公表（上位系未確認）のため、接続検討で上位系の扱いを確認する`;
+  return `変電所単体に空きあり ${ownTxt}、上位系も空きあり（空容量(上位系考慮) ${up}MW）`;
+}
+const judgeBadge = (row, big) => { const j = judge(row); return `<span class="jd ${judgeCls(j)}${big ? ' jd-big' : ''}" title="${esc(JUDGE_MEANING[j] || j)}&#10;${esc(judgeReason(row))}">${esc(big ? j : JUDGE_SHORT[j] || j)}</span>`; };
+// 候補地（緯度経度）の判定。座標のある全変電所のうち SITE_RANGE_M 以内・データ有を材料にする（画面の絞り込みには影響されない）
+function judgeSite(lat, lon) {
+  const inrange = [];
+  for (const row of D.rows) {
+    const la = val(row, 'lat'), lo = val(row, 'lon');
+    if (la == null || lo == null || judge(row) === JL.nodata) continue;
+    const d = distanceM(lat, lon, la, lo);
+    if (d <= SITE_RANGE_M) inrange.push({ row, d, j: judge(row) });
+  }
+  inrange.sort((a, b) => a.d - b.d);
+  const oks = inrange.filter(x => x.j === JL.ok), checks = inrange.filter(x => x.j === JL.check);
+  const nm = x => `${val(x.row, 'name')}`;
+  if (oks.length && oks[0].d <= SITE_OK_M) return { judge: JL.ok, key: oks[0], reason: `${fmtKm(SITE_OK_M)}以内に接続検討OKの変電所あり（${nm(oks[0])}・${fmtKm(oks[0].d)}）。周辺の既設高圧配電線を確認して接続検討を申し込む` };
+  if (oks.length) return { judge: JL.check, key: oks[0], reason: `最も近い接続検討OKの変電所（${nm(oks[0])}）まで ${fmtKm(oks[0].d)} と${fmtKm(SITE_OK_M)}を超える。負担金は高圧線の亘長にほぼ比例するため、既設高圧配電線までの距離を確認するか、より近い候補地を探す` +
+    (checks.length && checks[0].d <= SITE_OK_M ? `。${fmtKm(SITE_OK_M)}以内には要検討の変電所あり（${nm(checks[0])}・${fmtKm(checks[0].d)}）` : '') };
+  if (checks.length) return { judge: JL.check, key: checks[0], reason: `${fmtKm(SITE_RANGE_M)}以内に接続検討OKの変電所が無く、最も近いのは要検討の ${nm(checks[0])}（${fmtKm(checks[0].d)}）。その変電所の理由（上位系の空き無し等）を見て人が判断` };
+  if (inrange.length) return { judge: JL.ng, key: inrange[0], reason: `${fmtKm(SITE_RANGE_M)}以内で空容量が公表されている変電所 ${inrange.length}件はすべて接続検討NG（変電所単体の空き無し。最寄りは ${nm(inrange[0])}・${fmtKm(inrange[0].d)}）` };
+  return { judge: JL.check, key: null, reason: `${fmtKm(SITE_RANGE_M)}以内に空容量が公表されている変電所が無く判定材料がない。送配電事業者の公表資料か接続検討で確認` };
+}
 const gateTag = row => gated(row)
   ? '<span class="up-tag rk-x" title="空容量(上位系考慮)が2MW未満 かつ N-1電制が可でない。上位系の混雑・増強リスクに注意">⚠上位系0</span>' : '';
 const upTag = row => (!hasData(row) ? ''
@@ -950,6 +1027,12 @@ function render(hits, ctx) {
     (radius ? `半径${radius / 1000}km` : '全国');
   $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
 
+  // この地点の判定（高圧2MW）。絞り込みに影響されないよう、座標のある全変電所から判定する
+  const sj = judgeSite(lat, lon);
+  $('sum-judge').innerHTML = `<span class="jd ${judgeCls(sj.judge)} jd-big">${esc(sj.judge)}</span>`;
+  $('sum-judge-sub').innerHTML = esc(sj.reason) + (sj.key ? `<br>決め手: ${esc(val(sj.key.row, 'name'))} ${judgeBadge(sj.key.row)} ${rkBadge(rank(sj.key.row))}${upTag(sj.key.row)}` : '');
+  $('sum-judge-cell').className = `sum-cell sum-judge ${judgeCls(sj.judge).replace('jd-', 'sj-')}`;
+
   // サマリー
   const scored = hits.filter(h => rank(h.row) !== 'データ無');
   const best = hits.length ? hits.reduce((a, b) => (b.total > a.total ? b : a)) : null;
@@ -988,6 +1071,9 @@ function render(hits, ctx) {
   if (hiddenNoData) notes.push(`範囲内に空容量が未公表の変電所が${hiddenNoData}件あります（表に出すにはチェックを入れてください）。`);
   if (best && best.s7 === 0) notes.push('最有力候補までの距離が5kmを超えており、近接スコアは0点です。負担金は高圧線の亘長にほぼ比例するため、より近い候補地を探すことを推奨します。');
   if (scored.length === 0 && hits.length) notes.push('範囲内の変電所はすべて空容量が未公表（OSM由来）です。系統の空きは送配電事業者の公表マップか接続検討で確認してください。');
+  notes.push(`<b>判定（高圧2MW）の見方</b>：<span class="jd jd-ok">OK</span>＝変電所単体（配電用バンク）に空きがあり上位系も空きあり・未公表 → 接続検討を申し込む／` +
+    `<span class="jd jd-check">要検討</span>＝単体は空きありだが上位系の空き無し（実績では32件中31件が連系可。ただし工期中央値35ヶ月・出力制御あり）、または配電用変電所でない → 人が判断／` +
+    `<span class="jd jd-ng">NG</span>＝単体の空き無し。地点の判定は、${fmtKm(SITE_OK_M)}以内にOKの変電所があればOK、${fmtKm(SITE_RANGE_M)}以内にOK・要検討しか無ければ要検討、すべてNGならNG（絞り込みの設定に影響されません）。`);
   notes.push('近接スコアは<b>変電所までの直線距離</b>で判定しています。実際の負担金は既設高圧配電線までの亘長と工事内容で決まるため、目安として扱ってください。');
   $('sum-msg').innerHTML = notes.map(n => '・' + n).join('<br>');
 
@@ -1013,11 +1099,12 @@ function render(hits, ctx) {
       <td class="num">${h.grid}</td>
       <td class="num total-cell">${h.total}</td>
       <td>${rkBadge(rk)}${upTag(row)}</td>
+      <td>${judgeBadge(row)}</td>
       <td class="tbl-links"><a href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">地図</a></td>`;
     const dtr = document.createElement('tr');
     dtr.className = 'row-detail';
     dtr.style.display = 'none';
-    dtr.innerHTML = `<td colspan="8">${detailHtml(h)}</td>`;
+    dtr.innerHTML = `<td colspan="9">${detailHtml(h)}</td>`;
     tr.addEventListener('click', () => {
       dtr.style.display = dtr.style.display === 'none' ? '' : 'none';
     });
@@ -1038,8 +1125,11 @@ function render(hits, ctx) {
 
 function detailHtml(h) {
   const row = h.row, memo = memoOf(row);
+  const s1aMax = S1A_STEPS[0][1], s1bMax = Math.max(S1B_PTS.ok, S1B_PTS.unk);
   const parts = [
-    ['S1 空容量', val(row, 's1'), 35], ['S2 N-1電制', val(row, 's2'), 10],
+    ['S1a 変電所単体の空容量', val(row, 's1a') != null ? val(row, 's1a') : val(row, 's1'), s1aMax],
+    ['S1b 上位系の空き', val(row, 's1b') != null ? val(row, 's1b') : 0, s1bMax],
+    ['S2 N-1電制', val(row, 's2'), 10],
     ['S3 潮流余裕', val(row, 's3'), 15], ['S4 出力制御', val(row, 's4'), 5],
     ['S5 配電用変電所', val(row, 's5'), 10], ['S6 エリア', val(row, 's6'), 5],
     ['S7 近接（距離）', h.s7, 20],
@@ -1065,11 +1155,16 @@ function detailHtml(h) {
 
   const memoHtml = memo ? memoCardHtml(row) : '';
 
+  const jd = judge(row);
+  const judgeHtml = `<div class="detail-note" style="border-color:${jd === JL.ok ? 'var(--pass)' : jd === JL.check ? '#8E24AA' : jd === JL.ng ? 'var(--fail)' : 'var(--bdr)'}">
+        <b>判定（高圧2MW）</b> ${judgeBadge(row, true)}<br>${esc(judgeReason(row))}<br>
+        <span style="color:var(--txt3)">${esc(JUDGE_MEANING[jd] || '')}</span></div>`;
+
   const gateHtml = gated(row)
     ? `<div class="detail-note" style="border-color:var(--fail);color:var(--fail)">
         <b>⚠上位系0（警告）</b>：空容量(上位系考慮)が最低必要容量2MW未満 かつ N-1電制が「可」でないため、上位系の混雑（ノンファーム接続・出力制御）や
         増強が必要になるリスクがあります（実績: 喜多方は上位系増強で工期10年2ヶ月。一方、北海道の由仁は上位系0でも410万円・6ヶ月で連系）。
-        S1空容量が0点のためランクはB以下になります。2026-10-20までは「除外」として表に出していなかった区分です。接続検討で上位系の扱いを必ず確認してください。</div>` : '';
+        S1b（上位系の空き）が0点になります。変電所単体（当該設備）の空きは S1a で加点します（2026-11-06のv2から。それまではS1全体が0点でランクC、2026-10-20までは「除外」）。判定は「要検討」です。接続検討で上位系の扱いを必ず確認してください。</div>` : '';
   const a = acc(row);
   // 座標精度ごとに注意の内容が変わる。'公表資料' は送配電事業者が公表している座標で
   // OSMより確度が高いため、推定座標と同じ注記を出さないこと。
@@ -1097,17 +1192,17 @@ function detailHtml(h) {
 
   const upHtml = hasData(row) && !upChecked(row) && !gated(row)
     ? `<div class="detail-note" style="border-color:var(--warn)">
-        <b>上位系が未確認</b>：この変電所は「空容量(上位系考慮)」が公表されていないため、「当該設備」の空容量で代用して採点しています。
-        上位系の空きが0でも警告が付かないため、ランクは実際より甘い可能性があります。上位系の制約は送配電事業者の公表資料か接続検討で確認してください。</div>` : '';
+        <b>上位系が未確認</b>：この変電所は「空容量(上位系考慮)」が公表されていないため、S1b（上位系の空き）は確認済みと同点で採点しています。
+        上位系の空きが0でも警告が付かず判定も「接続検討OK」になるため、実際より甘い可能性があります。上位系の制約は送配電事業者の公表資料か接続検討で確認してください。</div>` : '';
 
   const noDataHtml = rank(row) === 'データ無'
     ? `<div class="detail-note"><b>空容量データ無し</b>：この変電所はOSM由来で、送配電事業者の空容量・予想潮流が未取得です。
-        S1・S3が0点のため系統スコアは実力より低く出ます。送配電事業者の空き容量マップで確認してください。</div>` : '';
+        S1a・S1b・S3が0点のため系統スコアは実力より低く出ます。判定もできません。送配電事業者の空き容量マップで確認してください。</div>` : '';
 
   return `<div class="detail-in">
       <div><div class="dt-title">スコア内訳</div>${bars}</div>
       <div><div class="dt-title">系統データ</div>${kv}</div>
-      ${gateHtml}${upHtml}${noDataHtml}${accHtml}${memoHtml}
+      ${judgeHtml}${gateHtml}${upHtml}${noDataHtml}${accHtml}${memoHtml}
       ${topologyHtml(row)}
       <div class="detail-links">
         ${memo ? `<a class="chip res-jump" href="#" data-res="${memo.map(m => D.results.indexOf(m)).join(',')}">📋 接続検討の実績（${memo.length}件）を実績DBで見る</a>` : ''}
@@ -1138,7 +1233,7 @@ function renderNoCoord(areaName, pref) {
       <td class="num">${fmtNum(val(r, 'availUp') != null ? val(r, 'availUp') : val(r, 'availCur'))}</td>
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
-      <td>${rkBadge(rank(r))}${upTag(r)}</td>
+      <td>${rkBadge(rank(r))}${upTag(r)} ${judgeBadge(r)}</td>
     </tr>`).join('');
   $('nocoord-note').textContent = `${areaName}エリア ${list.length}件中 上位${Math.min(20, list.length)}件`;
   card.style.display = '';
@@ -1150,6 +1245,8 @@ const CSV_COLS = [
   ['都道府県', r => prefOf(r)], ['市区町村', r => muniOf(r)],
   ['元リストの都道府県', r => val(r, 'pref')], ['最大電圧kV', r => val(r, 'vmax')], ['二次電圧kV', r => val(r, 'vsec')],
   ['系統スコア(80)', r => val(r, 'grid')], ['系統ランク', r => rank(r)], ['系統ランクの意味', r => rankMeaning(rank(r))],
+  // v2: 接続検討の判定（高圧2MW）と理由（scripts/export_substations.py と同じ列）
+  ['判定(高圧2MW)', r => judge(r)], ['判定の理由', r => judgeReason(r)],
   ['上位系0の警告', r => gated(r) ? '警告' : ''],
   // 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類（scripts/grid_status.py と同じ）
   ['カテゴリ（地図の色）', r => catText(r)],
@@ -1158,7 +1255,7 @@ const CSV_COLS = [
   ['空容量_上位系MW', r => val(r, 'availUp')], ['空容量_当該MW', r => val(r, 'availCur')],
   ['N-1電制', r => n1(r)], ['出力制御', r => curtail(r)],
   ['運用容量MW', r => val(r, 'opcap')], ['予想潮流MW', r => val(r, 'flow')],
-  ['S1空容量', r => val(r, 's1')], ['S2 N-1', r => val(r, 's2')], ['S3潮流', r => val(r, 's3')],
+  ['S1a単体空容量', r => val(r, 's1a')], ['S1b上位系', r => val(r, 's1b')], ['S2 N-1', r => val(r, 's2')], ['S3潮流', r => val(r, 's3')],
   ['S4出制', r => val(r, 's4')], ['S5配変', r => val(r, 's5')], ['S6エリア', r => val(r, 's6')],
   ['緯度', r => val(r, 'lat')], ['経度', r => val(r, 'lon')], ['座標精度', r => acc(r)],
   ['所在地(参考)', r => val(r, 'addr')],
@@ -1249,10 +1346,12 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function csvNear() {
   if (!lastResults.length) return;
-  const header = ['順位', '距離km', 'S7近接(20)', '総合(100)', '総合ランク', '総合ランクの意味', ...CSV_COLS.map(c => c[0])];
+  const latN = parseFloat($('lat').value), lonN = parseFloat($('lon').value);
+  const sj = judgeSite(latN, lonN);
+  const header = ['順位', '距離km', 'S7近接(20)', '総合(100)', '総合ランク', '総合ランクの意味', '地点の判定(高圧2MW)', '地点の判定の理由', ...CSV_COLS.map(c => c[0])];
   const lines = lastResults.map((h, i) => [i + 1, (h.dist / 1000).toFixed(2), h.s7, h.total,
-    totalRank(h.total), totalRankMeaning(totalRank(h.total)), ...CSV_COLS.map(c => c[1](h.row))]);
-  const lat = parseFloat($('lat').value).toFixed(4), lon = parseFloat($('lon').value).toFixed(4);
+    totalRank(h.total), totalRankMeaning(totalRank(h.total)), sj.judge, sj.reason, ...CSV_COLS.map(c => c[1](h.row))]);
+  const lat = latN.toFixed(4), lon = lonN.toFixed(4);
   // ファイル名は半角のみ。日本語名はブラウザによって「download」に化けるため
   downloadCsv(`substations_near_${lat}_${lon}_${today()}.csv`, header, lines);
 }
@@ -1269,7 +1368,7 @@ const selectedPrefs = () => [...document.querySelectorAll('#l-prefs input[data-p
 
 // 条件で絞り込み（座標不要）
 function listFilter() {
-  const pset = new Set(selectedPrefs()), mu = $('l-muni').value, up = $('l-up').value;
+  const pset = new Set(selectedPrefs()), mu = $('l-muni').value, up = $('l-up').value, jf = $('l-judge').value;
   const words = $('l-word').value.split(/[,、，\s]+/).map(w => w.trim()).filter(Boolean);
   const ranks = [...document.querySelectorAll('#l-ranks input:checked')].map(i => i.value);
   const minCap = parseFloat($('l-mincap').value);
@@ -1281,6 +1380,13 @@ function listFilter() {
     if (!ranks.includes(rank(r))) return false;
     if (up === 'ok' && !upChecked(r)) return false;
     if (up === 'ng' && (upChecked(r) || !hasData(r))) return false;
+    if (jf !== 'all') {
+      const j = judge(r);
+      if (jf === 'ok' && j !== JL.ok) return false;
+      if (jf === 'okcheck' && j !== JL.ok && j !== JL.check) return false;
+      if (jf === 'check' && j !== JL.check) return false;
+      if (jf === 'ng' && j !== JL.ng) return false;
+    }
     if (isFinite(minCap) && !(effCap(r) >= minCap)) return false;
     if ($('l-n1').checked && n1(r) !== '可') return false;
     if ($('l-curtail').checked && curtail(r) !== 'なし') return false;
@@ -1298,7 +1404,9 @@ function listFilter() {
 
 function listCountText(list) {
   const ok = list.filter(upChecked).length, ng = list.filter(r => hasData(r) && !upChecked(r)).length;
-  return `該当 ${list.length.toLocaleString()}件（上位系確認済み ${ok.toLocaleString()}件／未確認 ${ng.toLocaleString()}件）`;
+  const jc = k => list.filter(r => judge(r) === JL[k]).length;
+  return `該当 ${list.length.toLocaleString()}件（上位系確認済み ${ok.toLocaleString()}件／未確認 ${ng.toLocaleString()}件。` +
+    `判定: 接続検討OK ${jc('ok').toLocaleString()}・要検討 ${jc('check').toLocaleString()}・NG ${jc('ng').toLocaleString()}・データ無 ${jc('nodata').toLocaleString()}）`;
 }
 
 function showList() {
@@ -1315,6 +1423,7 @@ function showList() {
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
       <td>${rkBadge(rank(r))}${upTag(r)}</td>
+      <td>${judgeBadge(r)}</td>
       <td>${gsBadge(r)}</td>
       <td>${memoOf(r) ? `<a href="#" class="res-jump" data-res="${memoOf(r).map(m => D.results.indexOf(m)).join(',')}">${esc(memoText(r))}</a>` : '—'}</td>
       <td class="tbl-links">${val(r, 'lat') != null
@@ -1330,7 +1439,8 @@ function csvList() {
   const ranks = [...document.querySelectorAll('#l-ranks input:checked')].map(i => i.value)
     .map(r => ({ 'データ無': 'nodata' }[r] || r)).join('');
   const np = selectedPrefs().length;
-  const label = [np ? `${np}pref` : 'all', ranks, { all: '', ok: 'upOK', ng: 'upNG' }[$('l-up').value]]
+  const label = [np ? `${np}pref` : 'all', ranks, { all: '', ok: 'upOK', ng: 'upNG' }[$('l-up').value],
+    { all: '', ok: 'jOK', okcheck: 'jOKcheck', check: 'jCheck', ng: 'jNG' }[$('l-judge').value]]
     .filter(Boolean).join('_');
   downloadCsv(`substations_${label}_${today()}.csv`, CSV_COLS.map(c => c[0]),
     list.map(r => CSV_COLS.map(c => c[1](r))));
@@ -2112,14 +2222,14 @@ function selectRow(row, opts = {}) {
       <span class="ss-name">${esc(val(row, 'name'))}</span>
       <span class="ss-meta">${esc(area(row))}${prefOf(row) ? ' / ' + esc(prefOf(row)) : ''}${muniOf(row) ? ' ' + esc(muniOf(row)) : ''}
         ${val(row, 'vmax') != null ? ' ・ ' + val(row, 'vmax') + 'kV' : ''}${val(row, 'vsec') != null ? '→' + val(row, 'vsec') + 'kV' : ''}</span>
-      ${rkBadge(rk)}${upTag(row)} ${ustBadge(row)}
+      ${rkBadge(rk)}${upTag(row)} ${judgeBadge(row)} ${ustBadge(row)}
       <span class="ss-meta">系統スコア ${val(row, 'grid')}/80${dist != null ? `　候補地から ${fmtDist(dist)}（S7 ${s7}点・総合 ${val(row, 'grid') + s7}）` : ''}</span>
       ${val(row, 'lat') == null ? '<span class="up-tag up-ng">座標なし（地図に出ません）</span>' : ''}
     </div>
     ${detailHtml({ row, s7, dist, noMapChip: true })}`;
   drawLinks(row);
   if (opts.pan && val(row, 'lat') != null) MAP.setView([val(row, 'lat'), val(row, 'lon')], Math.max(MAP.getZoom(), 11));
-  if (m) m.bindPopup(`<b>${esc(val(row, 'name'))}</b> ${rkBadge(rk)}<br>` +
+  if (m) m.bindPopup(`<b>${esc(val(row, 'name'))}</b> ${rkBadge(rk)} ${judgeBadge(row)}<br>` +
     `空容量 上位系 ${fmtNum(val(row, 'availUp'))}／当該 ${fmtNum(val(row, 'availCur'))} MW<br>` +
     `<span style="color:var(--txt3)">内訳・上位系統は地図の下に表示しています</span>`, { closeButton: false, autoPan: false }).openPopup();
   const mc = opts.focusMemo && $('map-panel').querySelector('#memo-card');
