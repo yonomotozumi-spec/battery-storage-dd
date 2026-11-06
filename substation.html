@@ -500,6 +500,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <div class="coord-row list-row">
         <div><div class="coord-label">丸の色</div>
           <select id="m-color">
+            <option value="judge">判定（高圧2MW）：OK／要検討／NG／データ無</option>
             <option value="status">変電所単体の空き × 上位系の空き（5色）</option>
             <option value="rank">系統ランク（S〜C）</option>
           </select></div>
@@ -581,20 +582,20 @@ details.foldable[open] > summary::before { content:'▾ '; }
   <div class="card" id="card-nocoord" style="display:none">
     <div class="card-head">
       <span class="sec-tag">補足</span>
-      <span class="card-title">同エリアの高スコア変電所（座標未取得のため距離判定できず）</span>
+      <span class="card-title">周辺の都道府県で座標が未取得の変電所（地図・表に出ない。距離判定できず）</span>
       <span class="card-note" id="nocoord-note"></span>
     </div>
     <div class="tbl-scroll">
       <table class="rtbl">
         <thead>
-          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>系統ランク</th></tr>
+          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>当該(MW)</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>系統ランク</th><th>判定<br>(高圧2MW)</th></tr>
         </thead>
         <tbody id="nctbody"></tbody>
       </table>
     </div>
     <div class="msg" style="border-top:1px solid var(--bdr);font-size:11.5px">
-      これらは送配電事業者の公表データに載っているが座標が未取得の変電所です。距離が計算できないため上のランキングには出てきません。
-      所在地から候補地の近くにありそうなものは、地図で位置を確認してください。
+      これらは送配電事業者の公表データに載っているが座標が未取得の変電所です。距離が計算できないため地図にも上の表にも出ず、候補地の判定にも使われていません。
+      名前や所在地から候補地の近くにありそうなものは、Googleマップなどで位置を確認してください（座標が分かれば「座標未取得リスト」に記入して反映できます）。
     </div>
   </div>
 
@@ -965,12 +966,12 @@ function judgeSite(lat, lon) {
   inrange.sort((a, b) => a.d - b.d);
   const oks = inrange.filter(x => x.j === JL.ok), checks = inrange.filter(x => x.j === JL.check);
   const nm = x => `${val(x.row, 'name')}`;
-  if (oks.length && oks[0].d <= SITE_OK_M) return { judge: JL.ok, key: oks[0], reason: `${fmtKm(SITE_OK_M)}以内に接続検討OKの変電所あり（${nm(oks[0])}・${fmtKm(oks[0].d)}）。周辺の既設高圧配電線を確認して接続検討を申し込む` };
-  if (oks.length) return { judge: JL.check, key: oks[0], reason: `最も近い接続検討OKの変電所（${nm(oks[0])}）まで ${fmtKm(oks[0].d)} と${fmtKm(SITE_OK_M)}を超える。負担金は高圧線の亘長にほぼ比例するため、既設高圧配電線までの距離を確認するか、より近い候補地を探す` +
+  if (oks.length && oks[0].d <= SITE_OK_M) return { judge: JL.ok, key: oks[0], cause: `${fmtKm(SITE_OK_M)}以内にOKの変電所`, reason: `${fmtKm(SITE_OK_M)}以内に接続検討OKの変電所あり（${nm(oks[0])}・${fmtKm(oks[0].d)}）。周辺の既設高圧配電線を確認して接続検討を申し込む` };
+  if (oks.length) return { judge: JL.check, key: oks[0], cause: `OKの変電所が${fmtKm(SITE_OK_M)}より遠い（${fmtKm(oks[0].d)}）`, reason: `最も近い接続検討OKの変電所（${nm(oks[0])}）まで ${fmtKm(oks[0].d)} と${fmtKm(SITE_OK_M)}を超える。負担金は高圧線の亘長にほぼ比例するため、既設高圧配電線までの距離を確認するか、より近い候補地を探す` +
     (checks.length && checks[0].d <= SITE_OK_M ? `。${fmtKm(SITE_OK_M)}以内には要検討の変電所あり（${nm(checks[0])}・${fmtKm(checks[0].d)}）` : '') };
-  if (checks.length) return { judge: JL.check, key: checks[0], reason: `${fmtKm(SITE_RANGE_M)}以内に接続検討OKの変電所が無く、最も近いのは要検討の ${nm(checks[0])}（${fmtKm(checks[0].d)}）。その変電所の理由（上位系の空き無し等）を見て人が判断` };
-  if (inrange.length) return { judge: JL.ng, key: inrange[0], reason: `${fmtKm(SITE_RANGE_M)}以内で空容量が公表されている変電所 ${inrange.length}件はすべて接続検討NG（変電所単体の空き無し。最寄りは ${nm(inrange[0])}・${fmtKm(inrange[0].d)}）` };
-  return { judge: JL.check, key: null, reason: `${fmtKm(SITE_RANGE_M)}以内に空容量が公表されている変電所が無く判定材料がない。送配電事業者の公表資料か接続検討で確認` };
+  if (checks.length) return { judge: JL.check, key: checks[0], cause: 'OKの変電所が無く要検討のみ', reason: `${fmtKm(SITE_RANGE_M)}以内に接続検討OKの変電所が無く、最も近いのは要検討の ${nm(checks[0])}（${fmtKm(checks[0].d)}）。その変電所の理由（上位系の空き無し等）を見て人が判断` };
+  if (inrange.length) return { judge: JL.ng, key: inrange[0], cause: '周辺の変電所がすべて空き無し', reason: `${fmtKm(SITE_RANGE_M)}以内で空容量が公表されている変電所 ${inrange.length}件はすべて接続検討NG（変電所単体の空き無し。最寄りは ${nm(inrange[0])}・${fmtKm(inrange[0].d)}）` };
+  return { judge: JL.check, key: null, cause: '判定材料なし', reason: `${fmtKm(SITE_RANGE_M)}以内に空容量が公表されている変電所が無く判定材料がない。送配電事業者の公表資料か接続検討で確認` };
 }
 const gateTag = row => gated(row)
   ? '<span class="up-tag rk-x" title="空容量(上位系考慮)が2MW未満 かつ N-1電制が可でない。上位系の混雑・増強リスクに注意">⚠上位系0</span>' : '';
@@ -996,11 +997,13 @@ function run(opts = {}) {
 
   const hits = [];
   let nearestAny = null, hidden = 0, inRange = 0;
+  const nearPrefs = new Set(), nearAreas = new Set();   // 座標未取得の変電所の補足に使う周辺の都道府県・エリア
   for (const row of D.rows) {
     const la = val(row, 'lat'), lo = val(row, 'lon');
     if (la == null || lo == null) continue;
     const d = distanceM(lat, lon, la, lo);
     if (!nearestAny || d < nearestAny.dist) nearestAny = { row, dist: d };
+    if (d <= Math.max(radius || 0, 20000)) { if (prefOf(row)) nearPrefs.add(prefOf(row)); if (val(row, 'pref')) nearPrefs.add(val(row, 'pref')); nearAreas.add(area(row)); }
     if (radius && d > radius) continue;
     inRange++;
     // 絞り込みで非表示にした分も件数だけは数える。候補地の近くに上位系0やNGの変電所しか無いことが
@@ -1015,7 +1018,7 @@ function run(opts = {}) {
   else hits.sort((a, b) => b.total - a.total || a.dist - b.dist);
 
   lastResults = hits;
-  render(hits, { lat, lon, radius, nearestAny, hidden, inRange });
+  render(hits, { lat, lon, radius, nearestAny, hidden, inRange, nearPrefs, nearAreas });
   $('result').classList.add('show');
   $('result2').classList.add('show');
   if (!opts.quiet) {
@@ -1035,7 +1038,7 @@ function run(opts = {}) {
 }
 
 function render(hits, ctx) {
-  const { lat, lon, radius, nearestAny, hidden, inRange } = ctx;
+  const { lat, lon, radius, nearestAny, hidden, inRange, nearPrefs, nearAreas } = ctx;
   $('res-coord').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}　/　` +
     (radius ? `半径${radius / 1000}km` : '全国');
   $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
@@ -1043,7 +1046,7 @@ function render(hits, ctx) {
 
   // この地点の判定（高圧2MW）。絞り込みに影響されないよう、座標のある全変電所から判定する
   const sj = judgeSite(lat, lon);
-  $('sum-judge').innerHTML = `<span class="jd ${judgeCls(sj.judge)} jd-big">${esc(sj.judge)}</span>`;
+  $('sum-judge').innerHTML = `<span class="jd ${judgeCls(sj.judge)} jd-big">${esc(sj.judge)}</span> <span class="up-tag ${sj.judge === JL.ok ? 'up-ok' : 'up-ng'}" style="font-size:11px">${esc(sj.cause)}</span>`;
   $('sum-judge-sub').innerHTML = esc(sj.reason) + (sj.key ? `<br>決め手: ${esc(val(sj.key.row, 'name'))} ${judgeBadge(sj.key.row)} ${rkBadge(rank(sj.key.row))}${upTag(sj.key.row)}` : '');
   $('sum-judge-cell').className = `sum-cell sum-judge ${judgeCls(sj.judge).replace('jd-', 'sj-')}`;
 
@@ -1133,7 +1136,7 @@ function render(hits, ctx) {
   $('btn-csv-near').disabled = !hits.length;
   $('tbl-empty').textContent = '該当する変電所がありません。検索範囲を広げるか、フィルタを外してください。';
 
-  renderNoCoord(near ? area(near.row) : null, near ? prefOf(near.row) : null);
+  renderNoCoord(nearPrefs, nearAreas);
   // 外部参照（蓄電所ネット）の診断条件を最寄り変電所の都道府県に合わせる
   if (near) setExtPref(prefOf(near.row));
 }
@@ -1231,25 +1234,31 @@ function detailHtml(h) {
 }
 
 // ── 座標未取得の高スコア変電所（同エリア）──
-function renderNoCoord(areaName, pref) {
+// 座標が未取得で地図・表に出ない変電所の補足。候補地の周辺（20km以内）の変電所が属する都道府県（元リストの都道府県＝管轄区分と、座標から引いた所在地の両方）
+// に入っている、空容量データのある変電所を全ランク出す。候補地のすぐ近くの変電所が座標未取得で見えていないことに気づけるようにするため
+function renderNoCoord(prefs, areas) {
   const card = $('card-nocoord'), tb = $('nctbody');
-  if (!areaName) { card.style.display = 'none'; return; }
+  if (!prefs || !prefs.size) { card.style.display = 'none'; return; }
   const list = D.rows.filter(r =>
-    val(r, 'lat') == null && area(r) === areaName && ['S', 'A'].includes(rank(r)));
+    val(r, 'lat') == null && hasData(r) && areas.has(area(r)) && (prefs.has(val(r, 'pref')) || prefs.has(val(r, 'gpref'))));
   if (!list.length) { card.style.display = 'none'; return; }
-  // 同じ都道府県を先に、そのあと系統スコア降順
-  list.sort((a, b) => (val(b, 'pref') === pref) - (val(a, 'pref') === pref) || val(b, 'grid') - val(a, 'grid'));
-  tb.innerHTML = list.slice(0, 20).map(r => `
+  // 判定（OK→要検討→NG）、そのあと系統スコア降順
+  const jo = { [JL.ok]: 0, [JL.check]: 1, [JL.ng]: 2 };
+  list.sort((a, b) => (jo[judge(a)] ?? 3) - (jo[judge(b)] ?? 3) || val(b, 'grid') - val(a, 'grid'));
+  const MAXN = 40;
+  tb.innerHTML = list.slice(0, MAXN).map(r => `
     <tr>
       <td><span class="ss-name">${esc(val(r, 'name'))}</span>
-        <div class="ss-meta">${esc(val(r, 'addr') || '所在地不明')}</div></td>
+        <div class="ss-meta">${esc(area(r))}${val(r, 'vmax') != null ? ' ・ ' + val(r, 'vmax') + 'kV' : ''}${val(r, 'vsec') != null ? '→' + val(r, 'vsec') + 'kV' : ''}　${esc(val(r, 'addr') || '所在地不明')}</div></td>
       <td>${esc(val(r, 'pref') || '—')}</td>
-      <td class="num">${fmtNum(val(r, 'availUp') != null ? val(r, 'availUp') : val(r, 'availCur'))}</td>
+      <td class="num">${fmtNum(val(r, 'availCur'))}</td>
+      <td class="num">${fmtNum(val(r, 'availUp'))}</td>
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
-      <td>${rkBadge(rank(r))}${upTag(r)} ${judgeBadge(r)}</td>
+      <td>${rkBadge(rank(r))}${upTag(r)}</td>
+      <td>${judgeBadge(r)}</td>
     </tr>`).join('');
-  $('nocoord-note').textContent = `${areaName}エリア ${list.length}件中 上位${Math.min(20, list.length)}件`;
+  $('nocoord-note').textContent = `${[...prefs].join('・')} ${list.length}件` + (list.length > MAXN ? `中 ${MAXN}件を表示` : '');
   card.style.display = '';
 }
 
@@ -2048,13 +2057,15 @@ function mapFilter(opts = {}) {
   });
 }
 
+const JUDGE_COLOR = { [JL.ok]: '#0B9966', [JL.check]: '#8E24AA', [JL.ng]: '#CC2A20', [JL.nodata]: '#C9CFDC' };
 function markerStyle(r, selected) {
   const rk = rank(r), big = val(r, 'vmax') >= 154;
-  const byStatus = $('m-color').value === 'status';
-  const fill = byStatus ? GS_COLOR[gridStatus(r).cls] : (RANK_COLOR[rk] || '#999');
+  const mode = $('m-color').value;
+  const fill = mode === 'judge' ? (JUDGE_COLOR[judge(r)] || '#999') : mode === 'status' ? GS_COLOR[gridStatus(r).cls] : (RANK_COLOR[rk] || '#999');
+  const faint = mode === 'judge' ? judge(r) === JL.nodata : mode === 'status' ? gridStatus(r).cls === 'none' : rk === 'データ無';
   return {
     radius: (big ? 7 : 4.5) + (selected ? 3 : 0),
-    fillColor: fill, fillOpacity: (byStatus ? gridStatus(r).cls === 'none' : rk === 'データ無') ? .6 : .9,
+    fillColor: fill, fillOpacity: faint ? .6 : .9,
     color: selected ? '#16213D' : '#334155',
     weight: selected ? 3 : 1,
     opacity: 1,
@@ -2065,7 +2076,7 @@ function markerTip(r) {
   return `<b>${esc(val(r, 'name'))}</b>（${esc(area(r))}${prefOf(r) ? ' / ' + esc(prefOf(r)) : ''}）<br>` +
     `系統ランク ${esc(rank(r))}・${val(r, 'grid')}点　${val(r, 'vmax') != null ? val(r, 'vmax') + 'kV' : ''}${val(r, 'vsec') != null ? '→' + val(r, 'vsec') + 'kV' : ''}<br>` +
     `空容量 上位系 ${fmtNum(val(r, 'availUp'))}／当該 ${fmtNum(val(r, 'availCur'))} MW　N-1 ${esc(n1(r))}<br>` +
-    `判定: <b style="color:${GS_COLOR[gridStatus(r).cls]}">${esc(gridStatus(r).label)}</b>` +
+    `判定(高圧2MW): <b style="color:${JUDGE_COLOR[judge(r)] || '#999'}">${esc(judge(r))}</b>　カテゴリ: <b style="color:${GS_COLOR[gridStatus(r).cls]}">${esc(gridStatus(r).label)}</b>` +
     (nodeOf(r) != null ? `　つながる送電線 ${nodeLinks(nodeOf(r)).length}本` : '') +
     (memoOf(r) ? `<br>接続検討の実績 ${memoSummary(r).n}件（対策なし ${memoSummary(r).none}・バンク等の対策待ち ${memoSummary(r).bank}・上位系対策あり ${memoSummary(r).yes}・記載なし ${memoSummary(r).unk}${memoSummary(r).est ? `・うち変電所は推定 ${memoSummary(r).est}` : ''}）` : '');
 }
@@ -2104,8 +2115,11 @@ function renderMarkers() {
 
 function renderLegend() {
   const dot = (c, extra = '') => `<span class="lg-dot ${extra}" style="background:${c}"></span>`;
-  const byStatus = $('m-color').value === 'status';
-  const dots = byStatus
+  const mode = $('m-color').value;
+  const dots = mode === 'judge'
+    ? `<span><b>丸の色＝判定（高圧2MW・変電所ごと）：</b></span>` + ['ok', 'check', 'ng', 'nodata'].map(k => `<span title="${esc(JUDGE_MEANING[JL[k]] || '')}">${dot(JUDGE_COLOR[JL[k]])}${esc(JL[k])}</span>`).join('') +
+      `<span>※候補地の判定（画面上部）は「2km以内にOKの変電所があるか」で決めるため、近くの丸がOK（緑）でも2kmより遠ければ候補地は要検討になります</span>`
+    : mode === 'status'
     ? `<span><b>丸の色＝変電所単体の空き × 上位系の空き：</b></span>` + ['both', 'upunk', 'upbad', 'ownbad', 'none'].map(k => `<span>${dot(GS_COLOR[k])}${GS_LABEL[k]}</span>`).join('')
     : `<span><b>丸の色＝系統ランク（80点満点）：</b></span>` + Object.entries(RANK_COLOR).map(([k, c]) => `<span title="${esc(rankMeaning(k))}">${dot(c)}${esc(rankMeaning(k))}</span>`).join('');
   $('map-legend').innerHTML = dots +
