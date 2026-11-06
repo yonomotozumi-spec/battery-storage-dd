@@ -291,8 +291,8 @@ details.foldable[open] > summary::before { content:'▾ '; }
 .def-tbl th, .def-tbl td { padding:6px 10px; border-bottom:1px solid var(--bdr); font-size:11.5px; text-align:left; vertical-align:top; }
 .def-tbl th { color:var(--txt3); font-weight:600; background:var(--surf2); }
 .disclaimer { font-size:11px; color:var(--txt3); line-height:1.65; margin-top:14px; }
-#result { display:none; }
-#result.show { display:block; }
+#result, #result2 { display:none; }
+#result.show, #result2.show { display:block; }
 
 /* ── 地図モード ── */
 #map { height:620px; background:var(--surf2); border-top:1px solid var(--bdr); }
@@ -363,12 +363,10 @@ details.foldable[open] > summary::before { content:'▾ '; }
 
 <!-- ── 使い方の切り替え ── -->
 <div class="mode-tabs" role="tablist">
-  <button class="mode-tab" role="tab" id="tab-loc" aria-selected="true">📍 場所から検索
-    <small>候補地の緯度経度から、近くの変電所を総合スコア順に</small></button>
+  <button class="mode-tab" role="tab" id="tab-loc" aria-selected="true">📍 場所から検索・地図で見る
+    <small>候補地の緯度経度から判定と近くの変電所の採点。同じ画面の地図で位置・上位系統のつながりを確認</small></button>
   <button class="mode-tab" role="tab" id="tab-pref" aria-selected="false">🗾 都道府県から一覧・CSV
     <small>都道府県を選んで（複数可）、S/Aなど良い変電所や全変電所をCSVに</small></button>
-  <button class="mode-tab" role="tab" id="tab-map" aria-selected="false">🗺 地図で見る・上位系統をたどる
-    <small>全国の変電所を地図に。クリックで系統情報と、つながる送電線・上位側の変電所</small></button>
 </div>
 
 <!-- ── 入力 ── -->
@@ -416,23 +414,19 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
   </div>
 
+  <button class="btn-run" id="btn-run">この座標で判定・採点し、地図に表示する</button>
+
   <div class="frow">
-    <div class="flabel">並び順・表示</div>
+    <div class="flabel">変電所名で検索<div class="fnote">名前の一部でもよく、「変電所」や会社名は省けます（例: 名谷、曽根、ニセコ）。同名の変電所が別エリアにもあるので、エリア・都道府県で見分けてください。候補地の座標が無くても使えます。候補を押すと下の地図がその変電所に移り、内訳・上位系統を地図の下に表示します</div></div>
     <div class="fcontrol">
-      <select id="sortby">
-        <option value="total" selected>総合スコア順（100点）</option>
-        <option value="dist">距離が近い順</option>
-        <option value="grid">系統スコア順（80点）</option>
-      </select>
-      <div class="opt-row">
-        <label class="chk"><input type="checkbox" id="f-gate" checked> ⚠上位系0（警告・判定は要検討）の変電所も表示</label>
-        <label class="chk"><input type="checkbox" id="f-nodata" checked> 空容量データ無し（OSM由来）も表示</label>
-        <label class="chk"><input type="checkbox" id="f-uponly"> 上位系の空容量を確認できた変電所だけ表示</label>
+      <div class="search-row">
+        <input type="text" id="m-search" placeholder="例: 名谷 ／ 曽根 ／ 山田変電所" autocomplete="off" aria-label="変電所名で検索">
+        <button class="btn-sub" type="button" id="m-search-clear">消す</button>
       </div>
+      <div class="fnote" id="m-search-note"></div>
+      <div class="search-hits" id="m-search-hits"></div>
     </div>
   </div>
-
-  <button class="btn-run" id="btn-run">この座標でスコアを算出する</button>
 </div>
 
 <!-- ── 結果 ── -->
@@ -469,11 +463,98 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <div class="msg" id="sum-msg" style="border-top:1px solid var(--bdr)"></div>
   </div>
 
+</div><!-- /result -->
+
+<!-- ── 地図（場所から検索と同じ画面。候補地・検索範囲・判定の色・上位系統のつながり）── -->
+<div class="card" id="map-card">
+  <div class="card-head">
+    <span class="sec-tag">Map</span>
+    <span class="card-title">地図で見る・上位系統をたどる</span>
+    <span class="card-note" id="map-count"></span>
+  </div>
+  <div class="frow">
+    <div class="flabel">表示する変電所<div class="fnote">地図と下の候補変電所の表に共通の絞り込みです。既定は座標のある全変電所。丸の色＝変電所単体の空き×上位系の空き（5色）、大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
+    <div class="fcontrol">
+      <div class="opt-row" id="m-ranks"></div>
+      <div class="coord-row list-row">
+        <div><div class="coord-label">上位系の確認</div>
+          <select id="m-up">
+            <option value="all">すべて</option>
+            <option value="ownok">変電所単体で空きあり（緑＋黄＋紫）</option>
+            <option value="both">緑：変電所も上位系も空きあり</option>
+            <option value="upbad">紫：変電所は空きあり・上位系は空き無し（要接続検討）</option>
+            <option value="upunk">黄：変電所は空きあり・上位系は不明</option>
+            <option value="ownbad">赤：変電所単体で空き無し</option>
+            <option value="ok">上位系の値を公表している変電所だけ</option>
+            <option value="ng">上位系の値が未公表（当該設備で代用）の変電所だけ</option>
+          </select></div>
+        <div><div class="coord-label">空容量の下限 (MW)</div><input type="number" id="m-mincap" placeholder="例: 6" step="0.1" min="0"></div>
+        <div><div class="coord-label">電圧階級</div>
+          <select id="m-kv">
+            <option value="all">すべて</option>
+            <option value="hi">154kV以上（上位系側の変電所）</option>
+            <option value="lo">66〜132kV（配電側の変電所）</option>
+          </select></div>
+      </div>
+      <div class="coord-row list-row">
+        <div><div class="coord-label">丸の色</div>
+          <select id="m-color">
+            <option value="status">変電所単体の空き × 上位系の空き（5色）</option>
+            <option value="rank">系統ランク（S〜C）</option>
+          </select></div>
+      </div>
+      <div class="opt-row">
+        <label class="chk"><input type="checkbox" id="m-n1"> N-1電制「可」だけ</label>
+        <label class="chk"><input type="checkbox" id="m-curtail"> 出力制御「なし」だけ</label>
+        <label class="chk"><input type="checkbox" id="m-topo"> つながり（送電線）のデータがある変電所だけ</label>
+        <label class="chk"><input type="checkbox" id="m-memo"> 接続検討の実績がある変電所だけ</label>
+        <label class="chk"><input type="checkbox" id="m-inrange"> 候補地の検索範囲内だけ地図に出す</label>
+      </div>
+    </div>
+  </div>
+  <div class="frow">
+    <div class="flabel">重ねて表示<div class="fnote">つながりの線は、公表CSVの「潮流方向」の両端を直線で結んだ模式表示です。実際の送電線の経路ではありません</div></div>
+    <div class="fcontrol">
+      <div class="opt-row">
+        <label class="chk"><input type="checkbox" id="m-links" checked> 選んだ変電所のつながり（模式線）</label>
+        <label class="chk"><input type="checkbox" id="m-hop2"> 2段先まで</label>
+        <label class="chk"><input type="checkbox" id="m-net"> 上位系統の送電線を描く（7エリア・模式線）</label>
+        <label class="chk">電圧
+          <select id="m-net-kv" style="width:auto;padding:3px 8px">
+            <option value="154">154kV以上</option>
+            <option value="187">187kV以上（基幹）</option>
+            <option value="66">66kV以上すべて</option>
+          </select></label>
+        <label class="chk"><input type="checkbox" id="m-chuden"> 中部電力PG公表の送電線・変電所（実形状）</label>
+        <label class="chk"><input type="checkbox" id="m-site" checked> 候補地と検索範囲</label>
+        <label class="chk">背景
+          <select id="m-base" style="width:auto;padding:3px 8px">
+            <option value="pale">地理院 淡色</option>
+            <option value="std">地理院 標準</option>
+            <option value="photo">地理院 航空写真</option>
+          </select></label>
+      </div>
+      <div class="fnote" id="m-net-note"></div>
+      <div class="fnote" id="m-chuden-note"></div>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div class="map-legend" id="map-legend"></div>
+  <div class="msg" id="map-msg" style="border-top:1px solid var(--bdr)"></div>
+  <div id="map-panel" style="display:none"></div>
+</div>
+
+<div id="result2">
   <div class="card">
     <div class="card-head">
       <span class="sec-tag">Ranking</span>
-      <span class="card-title">候補変電所</span>
-      <span class="card-note" id="tbl-note">行をクリックすると内訳を表示</span>
+      <span class="card-title">候補変電所（検索範囲内・絞り込み後）</span>
+      <select id="sortby" style="width:auto;padding:3px 8px;margin-left:8px">
+        <option value="total" selected>総合スコア順（100点）</option>
+        <option value="dist">距離が近い順</option>
+        <option value="grid">系統スコア順（80点）</option>
+      </select>
+      <span class="card-note" id="tbl-note">行をクリックすると内訳を表示し、地図でも強調します</span>
     </div>
     <div class="rank-legend" id="rank-legend-loc"></div>
     <div class="tbl-scroll">
@@ -490,9 +571,9 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
     <div class="msg" id="tbl-empty" style="display:none"></div>
     <div class="res-tools">
-      <button class="btn-sub" id="btn-map-near">🗺 この範囲を地図で見る</button>
+      <button class="btn-sub" id="btn-map-near">🗺 上の地図をこの範囲に合わせる</button>
       <button class="btn-sub" id="btn-csv-near">この検索結果をCSVで保存（全件）</button>
-      <span class="fnote">表の上位50件に限らず、該当した全件を距離・総合スコア付きで保存します（Excelでそのまま開けます）</span>
+      <span class="fnote">表の上位50件に限らず、該当した全件を距離・総合スコア・地点の判定付きで保存します（Excelでそのまま開けます）。絞り込みは上の地図の「表示する変電所」と共通です</span>
     </div>
   </div>
 
@@ -516,7 +597,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
   </div>
 
-</div><!-- /result -->
+</div><!-- /result2 -->
 
 <!-- ── 条件で一覧・CSV出力（座標なしで使える）── -->
 <div class="card" id="list-card">
@@ -617,95 +698,6 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <tbody id="ltbody"></tbody>
     </table>
   </div>
-</div>
-
-<!-- ── 地図モード ── -->
-<div class="card" id="map-card" style="display:none">
-  <div class="card-head">
-    <span class="sec-tag">Map</span>
-    <span class="card-title">全国の変電所を地図で見る・上位系統をたどる</span>
-    <span class="card-note" id="map-count"></span>
-  </div>
-  <div class="frow">
-    <div class="flabel">変電所名で検索<div class="fnote">名前の一部でもよく、「変電所」や会社名は省けます（例: 名谷、曽根、ニセコ）。同名の変電所が別エリアにもあるので、エリア・都道府県で見分けてください。候補を押すと地図がその変電所に移り、内訳・上位系統を下に表示します</div></div>
-    <div class="fcontrol">
-      <div class="search-row">
-        <input type="text" id="m-search" placeholder="例: 名谷 ／ 曽根 ／ 山田変電所" autocomplete="off" aria-label="変電所名で検索">
-        <button class="btn-sub" type="button" id="m-search-clear">消す</button>
-      </div>
-      <div class="fnote" id="m-search-note"></div>
-      <div class="search-hits" id="m-search-hits"></div>
-    </div>
-  </div>
-  <div class="frow">
-    <div class="flabel">表示する変電所<div class="fnote">既定は座標のある全変電所。丸の色＝変電所単体の空き×上位系の空き（5色）、大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
-    <div class="fcontrol">
-      <div class="opt-row" id="m-ranks"></div>
-      <div class="coord-row list-row">
-        <div><div class="coord-label">上位系の確認</div>
-          <select id="m-up">
-            <option value="all">すべて</option>
-            <option value="ownok">変電所単体で空きあり（緑＋黄＋紫）</option>
-            <option value="both">緑：変電所も上位系も空きあり</option>
-            <option value="upbad">紫：変電所は空きあり・上位系は空き無し（要接続検討）</option>
-            <option value="upunk">黄：変電所は空きあり・上位系は不明</option>
-            <option value="ownbad">赤：変電所単体で空き無し</option>
-            <option value="ok">上位系の値を公表している変電所だけ</option>
-            <option value="ng">上位系の値が未公表（当該設備で代用）の変電所だけ</option>
-          </select></div>
-        <div><div class="coord-label">空容量の下限 (MW)</div><input type="number" id="m-mincap" placeholder="例: 6" step="0.1" min="0"></div>
-        <div><div class="coord-label">電圧階級</div>
-          <select id="m-kv">
-            <option value="all">すべて</option>
-            <option value="hi">154kV以上（上位系側の変電所）</option>
-            <option value="lo">66〜132kV（配電側の変電所）</option>
-          </select></div>
-      </div>
-      <div class="coord-row list-row">
-        <div><div class="coord-label">丸の色</div>
-          <select id="m-color">
-            <option value="status">変電所単体の空き × 上位系の空き（5色）</option>
-            <option value="rank">系統ランク（S〜C）</option>
-          </select></div>
-      </div>
-      <div class="opt-row">
-        <label class="chk"><input type="checkbox" id="m-n1"> N-1電制「可」だけ</label>
-        <label class="chk"><input type="checkbox" id="m-curtail"> 出力制御「なし」だけ</label>
-        <label class="chk"><input type="checkbox" id="m-topo"> つながり（送電線）のデータがある変電所だけ</label>
-        <label class="chk"><input type="checkbox" id="m-memo"> 接続検討の実績がある変電所だけ</label>
-      </div>
-    </div>
-  </div>
-  <div class="frow">
-    <div class="flabel">重ねて表示<div class="fnote">つながりの線は、公表CSVの「潮流方向」の両端を直線で結んだ模式表示です。実際の送電線の経路ではありません</div></div>
-    <div class="fcontrol">
-      <div class="opt-row">
-        <label class="chk"><input type="checkbox" id="m-links" checked> 選んだ変電所のつながり（模式線）</label>
-        <label class="chk"><input type="checkbox" id="m-hop2"> 2段先まで</label>
-        <label class="chk"><input type="checkbox" id="m-net"> 上位系統の送電線を描く（7エリア・模式線）</label>
-        <label class="chk">電圧
-          <select id="m-net-kv" style="width:auto;padding:3px 8px">
-            <option value="154">154kV以上</option>
-            <option value="187">187kV以上（基幹）</option>
-            <option value="66">66kV以上すべて</option>
-          </select></label>
-        <label class="chk"><input type="checkbox" id="m-chuden"> 中部電力PG公表の送電線・変電所（実形状）</label>
-        <label class="chk"><input type="checkbox" id="m-site" checked> 候補地と検索範囲</label>
-        <label class="chk">背景
-          <select id="m-base" style="width:auto;padding:3px 8px">
-            <option value="pale">地理院 淡色</option>
-            <option value="std">地理院 標準</option>
-            <option value="photo">地理院 航空写真</option>
-          </select></label>
-      </div>
-      <div class="fnote" id="m-net-note"></div>
-      <div class="fnote" id="m-chuden-note"></div>
-    </div>
-  </div>
-  <div id="map"></div>
-  <div class="map-legend" id="map-legend"></div>
-  <div class="msg" id="map-msg" style="border-top:1px solid var(--bdr)"></div>
-  <div id="map-panel" style="display:none"></div>
 </div>
 
 <!-- ── スコア定義 ── -->
@@ -979,34 +971,32 @@ const upTag = row => (!hasData(row) ? ''
 
 let lastResults = [];
 
-// ── 算出 ──
-function run() {
+// ── 算出（候補地の判定・候補変電所の表・地図を同時に更新）──
+//  opts.quiet: 絞り込み・並び順の変更による再計算（画面をスクロールしない・地図の範囲も動かさない）
+function run(opts = {}) {
   const lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
   if (!isFinite(lat) || !isFinite(lon)) {
-    alert('緯度・経度を入力してください（10進法）。');
+    if (!opts.quiet) alert('緯度・経度を入力してください（10進法）。');
     return;
   }
   setMode('loc');
   const radius = parseInt($('radius').value, 10);
-  const showGate = $('f-gate').checked;
-  const showNoData = $('f-nodata').checked;
-  const upOnly = $('f-uponly').checked;
   const sortBy = $('sortby').value;
+  // 地図の「表示する変電所」と同じ絞り込みを表にも使う（1か所で絞る）
+  const shown = new Set(mapFilter({ ignoreRange: true }));
 
   const hits = [];
-  let nearestAny = null, hiddenGate = 0, hiddenNoData = 0, hiddenUp = 0;
+  let nearestAny = null, hidden = 0, inRange = 0;
   for (const row of D.rows) {
     const la = val(row, 'lat'), lo = val(row, 'lon');
     if (la == null || lo == null) continue;
     const d = distanceM(lat, lon, la, lo);
     if (!nearestAny || d < nearestAny.dist) nearestAny = { row, dist: d };
     if (radius && d > radius) continue;
-    const rk = rank(row);
-    // 非表示にした分も件数だけは数える。候補地の近くに上位系0の変電所しか無いことが
+    inRange++;
+    // 絞り込みで非表示にした分も件数だけは数える。候補地の近くに上位系0やNGの変電所しか無いことが
     // 分かればその候補地の判断材料になるため、存在自体は隠さない。
-    if (!showGate && gated(row)) { hiddenGate++; continue; }
-    if (!showNoData && rk === 'データ無') { hiddenNoData++; continue; }
-    if (upOnly && !upChecked(row)) { hiddenUp++; continue; }
+    if (!shown.has(row)) { hidden++; continue; }
     const s7 = s7Points(d);
     hits.push({ row, dist: d, s7, grid: val(row, 'grid'), total: val(row, 'grid') + s7 });
   }
@@ -1016,13 +1006,27 @@ function run() {
   else hits.sort((a, b) => b.total - a.total || a.dist - b.dist);
 
   lastResults = hits;
-  render(hits, { lat, lon, radius, nearestAny, hiddenGate, hiddenNoData, hiddenUp });
+  render(hits, { lat, lon, radius, nearestAny, hidden, inRange });
   $('result').classList.add('show');
-  $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('result2').classList.add('show');
+  if (!opts.quiet) {
+    $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 地図も候補地と検索範囲に合わせる（地図が読めない環境では表だけ）
+    ensureMap().then(() => {
+      updateSite();
+      if ($('m-inrange').checked) renderMarkers();
+      const b = siteBounds();
+      if (b) MAP.fitBounds(b, { padding: [20, 20] });
+    }).catch(() => {});
+  } else if ($('m-inrange').checked) {
+    ensureMap().then(() => { updateSite(); renderMarkers(); }).catch(() => {});
+  } else {
+    ensureMap().then(updateSite).catch(() => {});
+  }
 }
 
 function render(hits, ctx) {
-  const { lat, lon, radius, nearestAny, hiddenGate, hiddenNoData, hiddenUp } = ctx;
+  const { lat, lon, radius, nearestAny, hidden, inRange } = ctx;
   $('res-coord').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}　/　` +
     (radius ? `半径${radius / 1000}km` : '全国');
   $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
@@ -1062,13 +1066,11 @@ function render(hits, ctx) {
     `／範囲内${hits.length}件のうち空容量データあり${scored.length}件`;
 
   const notes = [];
-  if (!hits.length) notes.push('指定範囲に変電所が見つかりませんでした。検索範囲を広げてください。');
-  // 上位系0の変電所を隠したときも件数は必ず知らせる。近くにそれしか無いことが
+  if (!hits.length) notes.push(inRange ? '指定範囲の変電所はすべて絞り込みで非表示です。地図の「表示する変電所」の条件を広げてください。' : '指定範囲に変電所が見つかりませんでした。検索範囲を広げてください。');
+  // 絞り込みで隠した分も件数は必ず知らせる。近くにそれしか無いことが
   // 分かれば判断材料になるため、「該当なし」と区別できないと判断を誤る。
-  if (hiddenGate) notes.push(`範囲内に<b>⚠上位系0（警告）の変電所が${hiddenGate}件</b>あります（表に出すには「⚠上位系0（警告）の変電所も表示」にチェック）。` +
-    (hits.length ? '' : '<b>この範囲にある変電所はこれだけです。</b>上位系の混雑・増強リスクを接続検討で確認してください。'));
-  if (hiddenUp) notes.push(`上位系の空容量が未公表の変電所${hiddenUp}件を非表示にしています（当該設備の空容量で代用して採点しているもの・空容量データ無しを含む）。`);
-  if (hiddenNoData) notes.push(`範囲内に空容量が未公表の変電所が${hiddenNoData}件あります（表に出すにはチェックを入れてください）。`);
+  if (hidden) notes.push(`範囲内の変電所${inRange}件のうち<b>${hidden}件は地図の「表示する変電所」の絞り込みで非表示</b>です（「全変電所」を押すとすべて出ます）。` +
+    (hits.length ? '' : '<b>この範囲にある変電所はこれだけです。</b>'));
   if (best && best.s7 === 0) notes.push('最有力候補までの距離が5kmを超えており、近接スコアは0点です。負担金は高圧線の亘長にほぼ比例するため、より近い候補地を探すことを推奨します。');
   if (scored.length === 0 && hits.length) notes.push('範囲内の変電所はすべて空容量が未公表（OSM由来）です。系統の空きは送配電事業者の公表マップか接続検討で確認してください。');
   notes.push(`<b>判定（高圧2MW）の見方</b>：<span class="jd jd-ok">OK</span>＝変電所単体（配電用バンク）に空きがあり上位系も空きあり・未公表 → 接続検討を申し込む／` +
@@ -1106,7 +1108,10 @@ function render(hits, ctx) {
     dtr.style.display = 'none';
     dtr.innerHTML = `<td colspan="9">${detailHtml(h)}</td>`;
     tr.addEventListener('click', () => {
-      dtr.style.display = dtr.style.display === 'none' ? '' : 'none';
+      const open = dtr.style.display === 'none';
+      dtr.style.display = open ? '' : 'none';
+      // 地図でも同じ変電所を強調し、つながりの模式線を引く（内訳は表の中に出すので地図の下のパネルは触らない）
+      if (open && MAP) selectRow(row, { pan: false, panel: false });
     });
     tb.appendChild(tr);
     tb.appendChild(dtr);
@@ -1206,7 +1211,7 @@ function detailHtml(h) {
       ${topologyHtml(row)}
       <div class="detail-links">
         ${memo ? `<a class="chip res-jump" href="#" data-res="${memo.map(m => D.results.indexOf(m)).join(',')}">📋 接続検討の実績（${memo.length}件）を実績DBで見る</a>` : ''}
-        ${h.noMapChip ? '' : `<a class="chip topo-map" data-no="${val(row, 'no')}" href="#map">🗺 地図で系統のつながりを見る</a>`}
+        ${h.noMapChip ? '' : `<a class="chip topo-map" data-no="${val(row, 'no')}" href="#map">🗺 地図でこの変電所と系統のつながりを見る</a>`}
         <a class="chip" href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">📍 変電所をGoogleマップで見る</a>
         <a class="chip" href="https://maps.gsi.go.jp/#15/${val(row, 'lat')}/${val(row, 'lon')}/&base=ort&disp=1" target="_blank" rel="noopener">🛰 地理院 航空写真</a>
         <a class="chip" href="https://www.google.com/maps/dir/?api=1&origin=${$('lat').value},${$('lon').value}&destination=${val(row, 'lat')},${val(row, 'lon')}" target="_blank" rel="noopener">🚗 候補地からのルート</a>
@@ -1516,17 +1521,17 @@ function initList() {
 }
 
 // ── 使い方の切り替え（場所から検索 / 都道府県から一覧）──
+// 画面は2つ：「場所から検索・地図で見る」（候補地の入力→判定・地図・候補変電所の表が1画面）と「都道府県から一覧・CSV」。
+// 旧来の 'map'（#map）は場所から検索と同じ画面になった（2026-11-06に統合）ので、地図の位置まで送るだけ
 function setMode(mode) {
-  const pref = mode === 'pref', map = mode === 'map';
-  $('tab-loc').setAttribute('aria-selected', String(!pref && !map));
+  const pref = mode === 'pref';
+  $('tab-loc').setAttribute('aria-selected', String(!pref));
   $('tab-pref').setAttribute('aria-selected', String(pref));
-  $('tab-map').setAttribute('aria-selected', String(map));
-  $('loc-card').style.display = pref || map ? 'none' : '';
-  $('result').style.display = pref || map ? 'none' : '';
+  ['loc-card', 'result', 'map-card', 'result2'].forEach(id => { $(id).style.display = pref ? 'none' : ''; });
   $('list-card').style.display = pref ? '' : 'none';
-  $('map-card').style.display = map ? '' : 'none';
-  try { history.replaceState(null, '', pref ? '#pref' : map ? '#map' : location.pathname + location.search); } catch (e) { /* file:// 等 */ }
-  if (map) ensureMap().then(() => { MAP.invalidateSize(); updateSite(); }).catch(() => {});
+  try { history.replaceState(null, '', pref ? '#pref' : location.pathname + location.search); } catch (e) { /* file:// 等 */ }
+  if (!pref) ensureMap().then(() => { MAP.invalidateSize(); updateSite(); }).catch(() => {});
+  if (mode === 'map') $('map-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── 定義・実績DBの描画 ──
@@ -2001,11 +2006,15 @@ function initMap() {
   renderNet();
 }
 
-function mapFilter() {
+// 地図の「表示する変電所」の絞り込み。候補変電所の表も同じ条件を使う（opts.ignoreRange で検索範囲の条件だけ外す）
+function mapFilter(opts = {}) {
   const ranks = [...document.querySelectorAll('#m-ranks input:checked')].map(i => i.value);
   const up = $('m-up').value, kvSel = $('m-kv').value, minCap = parseFloat($('m-mincap').value);
+  const c = !opts.ignoreRange && $('m-inrange').checked ? siteCoords() : null;
+  const radius = c ? parseInt($('radius').value, 10) : 0;
   return D.rows.filter(r => {
     if (val(r, 'lat') == null) return false;
+    if (c && radius > 0 && distanceM(c[0], c[1], val(r, 'lat'), val(r, 'lon')) > radius) return false;
     if (!ranks.includes(rank(r))) return false;
     if (up === 'ok' && !upChecked(r)) return false;
     if (up === 'ng' && (upChecked(r) || !hasData(r))) return false;
@@ -2153,6 +2162,16 @@ function siteBounds() {
   const r = parseInt($('radius').value, 10) || 10000;
   return L.latLng(c).toBounds(r * 2);
 }
+// 候補地を地図に出して、その検索範囲に地図を合わせる（座標が未入力なら何もしない）
+function showSiteOnMap() {
+  if (!siteCoords()) return;
+  ensureMap().then(() => {
+    updateSite();
+    if ($('m-inrange').checked) renderMarkers();
+    const b = siteBounds();
+    if (b) MAP.fitBounds(b, { padding: [20, 20] });
+  }).catch(() => {});
+}
 function updateSite() {
   if (!MAP) return;
   MAP_LAYERS.site.clearLayers();
@@ -2212,6 +2231,7 @@ function selectRow(row, opts = {}) {
   if (prev && MARKERS[String(val(prev, 'no'))]) MARKERS[String(val(prev, 'no'))].setStyle(markerStyle(prev, false));
   const m = MARKERS[String(val(row, 'no'))];
   if (m) { m.setStyle(markerStyle(row, true)); m.bringToFront(); }
+  if (opts.panel === false) { drawLinks(row); if (m) m.closePopup(); return; }
   const c = siteCoords();
   const dist = c && val(row, 'lat') != null ? distanceM(c[0], c[1], val(row, 'lat'), val(row, 'lon')) : null;
   const s7 = dist != null ? s7Points(dist) : 0;
@@ -2358,12 +2378,14 @@ function initMapControls() {
     <button class="btn-sub" type="button" id="m-preset-sa">良い変電所（S・A）だけ</button>` +
     ['S', 'A', 'B', 'C', 'データ無'].map(r =>
     `<label class="chk" title="${esc(rankMeaning(r))}"><input type="checkbox" value="${r}" checked> ${r === 'データ無' ? '空容量データ無し' : r}</label>`).join('');
-  const setMapRanks = keep => { document.querySelectorAll('#m-ranks input').forEach(i => { i.checked = keep.includes(i.value); }); renderMarkers(); };
+  // 絞り込みを変えたら地図と候補変電所の表を両方更新する（表は座標検索済みのときだけ）
+  const refresh = () => { renderMarkers(); if ($('result').classList.contains('show')) run({ quiet: true }); };
+  const setMapRanks = keep => { document.querySelectorAll('#m-ranks input').forEach(i => { i.checked = keep.includes(i.value); }); refresh(); };
   $('m-preset-all').addEventListener('click', () => setMapRanks(['S', 'A', 'B', 'C', 'データ無']));
   $('m-preset-sa').addEventListener('click', () => setMapRanks(['S', 'A']));
-  ['m-ranks', 'm-up', 'm-mincap', 'm-kv', 'm-n1', 'm-curtail', 'm-topo', 'm-memo'].forEach(id =>
-    $(id).addEventListener('change', () => { renderMarkers(); }));
-  $('m-mincap').addEventListener('input', () => { renderMarkers(); });
+  ['m-ranks', 'm-up', 'm-mincap', 'm-kv', 'm-n1', 'm-curtail', 'm-topo', 'm-memo', 'm-inrange'].forEach(id =>
+    $(id).addEventListener('change', refresh));
+  $('m-mincap').addEventListener('input', refresh);
   ['m-links', 'm-hop2'].forEach(id => $(id).addEventListener('change', () => { if (SELECTED) drawLinks(SELECTED); }));
   $('m-color').addEventListener('change', () => { renderMarkers(); renderLegend(); });
   ['m-net', 'm-net-kv'].forEach(id => $(id).addEventListener('change', renderNet));
@@ -2374,10 +2396,12 @@ function initMapControls() {
     Object.values(MAP_BASE).forEach(l => MAP.removeLayer(l));
     MAP_BASE[$('m-base').value].addTo(MAP);
   });
-  ['lat', 'lon', 'radius'].forEach(id => $(id).addEventListener('change', updateSite));
+  // 緯度経度や検索範囲を入れた時点で（ボタンを押す前でも）候補地◎と円を地図に置き、地図をその範囲に合わせる
+  ['lat', 'lon', 'radius'].forEach(id => $(id).addEventListener('change', showSiteOnMap));
   const areas = TOPO ? TOPO.meta.areas.join('・') : '';
   $('map-msg').innerHTML = TOPO
-    ? `・丸をクリックすると、その変電所の系統データ・スコア内訳と<b>上位系統（つながっている送電線・相手側の変電所・上位系の制約設備）</b>を下に表示し、相手側までの模式線を引きます。相手側の名前をクリックすると、そこへ移ってさらに上位をたどれます。<br>` +
+    ? `・候補地の座標を入れて「判定・採点」すると、◎の候補地と検索範囲の円を地図に出し、下の「候補変電所」の表と同じ絞り込みで丸を表示します（「候補地の検索範囲内だけ地図に出す」で範囲外を消せます）。表の行をクリックすると地図でもその変電所を強調します。<br>` +
+      `・丸をクリックすると、その変電所の系統データ・スコア内訳と<b>上位系統（つながっている送電線・相手側の変電所・上位系の制約設備）</b>を下に表示し、相手側までの模式線を引きます。相手側の名前をクリックすると、そこへ移ってさらに上位をたどれます。<br>` +
       `・つながりのデータは ${esc(areas)} の${TOPO.meta.areas.length}エリア（各社の公表CSV、北海道は公表PDF。変電所 ${TOPO.meta.linkedRows.toLocaleString()}件に付与、生成 ${esc(TOPO.meta.generated)}）。東京・中部・沖縄は公表物を自動取得できないため、空容量などの系統データのみです。<br>` +
       `・模式線は公表CSVの「潮流方向」の両端を直線で結んだもので、実際の送電線の経路ではありません。中部は「中部電力PG公表の送電線」で実形状を重ねられます。<br>` +
       `・<b>丸の色（5色）</b>は「変電所単体（当該設備＝配電用バンク）の空き」と「上位系の空き」の組み合わせです。緑＝両方空きあり、黄＝変電所は空きあり・上位系は不明（上位系の値が未公表のエリア）、<b>紫＝変電所は空きあり・上位系は空き無し＝要接続検討</b>（実績では王子・由仁・曽根・引野が上位系0でも上位系対策なしで通った。当該設備の空きが${NEED_CHECK_MW}MW以上か実績で対策なしなら特に）、赤＝変電所単体で空き無し、灰＝データ無し。上位系の空きは「空容量(上位系考慮)」、未公表なら上位側の変電所の該当バンクで判定し、それも非公表なら「不明」。<br>` +
@@ -2397,12 +2421,11 @@ function init() {
   initList();
   $('tab-loc').addEventListener('click', () => setMode('loc'));
   $('tab-pref').addEventListener('click', () => setMode('pref'));
-  $('tab-map').addEventListener('click', () => setMode('map'));
   initMapControls();
   setMode(location.hash === '#pref' ? 'pref' : location.hash.startsWith('#map') ? 'map' : 'loc');
   $('btn-csv-near').addEventListener('click', csvNear);
   $('btn-map-near').addEventListener('click', () => {
-    setMode('map');
+    $('map-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     ensureMap().then(() => { updateSite(); const b = siteBounds(); if (b) MAP.fitBounds(b, { padding: [20, 20] }); }).catch(() => {});
   });
   // 内訳の「地図で系統のつながりを見る」／上位系統の表の相手側リンク
@@ -2414,14 +2437,14 @@ function init() {
     if (chip) {
       e.preventDefault();
       const row = ROW_BY_NO[chip.dataset.no];
-      if (row) { setMode('map'); ensureMap().then(() => selectRow(row, { pan: true })).catch(() => {}); }
+      if (row) { setMode('loc'); ensureMap().then(() => selectRow(row, { pan: true })).catch(() => {}); }
       return;
     }
     const link = e.target.closest('.topo-link[data-node]');
     if (link) {
       e.preventDefault();
       const row = nodeBestRow(parseInt(link.dataset.node, 10));
-      if (row) { setMode('map'); ensureMap().then(() => selectRow(row, { pan: true })).catch(() => {}); }
+      if (row) { setMode('loc'); ensureMap().then(() => selectRow(row, { pan: true })).catch(() => {}); }
     }
   });
 
@@ -2430,7 +2453,8 @@ function init() {
     const c = parseCoords(e.target.value);
     if (c) {
       $('lat').value = c.lat; $('lon').value = c.lon;
-      $('paste-msg').textContent = `→ 緯度 ${c.lat} / 経度 ${c.lon} を反映しました`;
+      $('paste-msg').textContent = `→ 緯度 ${c.lat} / 経度 ${c.lon} を反映しました（地図にも候補地を表示）`;
+      showSiteOnMap();
     } else if (e.target.value.trim()) {
       $('paste-msg').textContent = '座標を読み取れませんでした';
     } else {
@@ -2440,8 +2464,8 @@ function init() {
   ['lat', 'lon'].forEach(id => $(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') run();
   }));
-  ['radius', 'sortby', 'f-gate', 'f-nodata', 'f-uponly'].forEach(id => $(id).addEventListener('change', () => {
-    if ($('result').classList.contains('show')) run();
+  ['radius', 'sortby'].forEach(id => $(id).addEventListener('change', () => {
+    if ($('result').classList.contains('show')) run({ quiet: id === 'sortby' });
   }));
   ['ext-pref', 'ext-mw', 'ext-mwh'].forEach(id => $(id).addEventListener('input', updateExtLink));
 
