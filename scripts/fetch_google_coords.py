@@ -13,7 +13,7 @@ Google Maps Places API (New) の Text Search から変電所座標を取得す�
   笹部変電所   → 笹賀変電所（5.1km）      関ヶ原変電所 → 関ヶ原開閉所（5.3km）
 
 都道府県では弾けない（クエリに県を含めるため住所は496/496が県一致した）。
-fetch_substation_coords.py の normalize_name で**Google側の表示名も正規化**して
+fetch_substation_coords.py の match_key で**Google側の表示名も正規化**（かな表記ゆれも吸収）して
 一致したものだけを採用する。事業者名プレフィックスは吸収され、施設種別は区別される。
 
 【名称一致だけでは足りない】名称が完全に一致していても、別地方の同名変電所を掴むことがある。
@@ -58,7 +58,7 @@ import urllib.request
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
-from fetch_substation_coords import (NEIGHBOR_MAX_KM, NEIGHBOR_PREFS, haversine_km, normalize_name,
+from fetch_substation_coords import (NEIGHBOR_MAX_KM, NEIGHBOR_PREFS, haversine_km, match_key,
                                      pref_points, read_rows)
 
 URL = "https://places.googleapis.com/v1/places:searchText"
@@ -92,12 +92,12 @@ def search(name, pref, key):
     places = res.get("places") or []
     if not places:
         return None, "該当なし"
-    want = normalize_name(name)
+    want = match_key(name)
     if not want:
         return None, "正規化して固有名が残らない名前"
     for p in places:
         got = p.get("displayName", {}).get("text", "")
-        if normalize_name(got) == want:
+        if match_key(got) == want:
             return (p["location"]["latitude"], p["location"]["longitude"],
                     got, p.get("formattedAddress", "")), "採用"
     return None, f"名称が一致しない（Google側は「{places[0].get('displayName',{}).get('text','')}」）"

@@ -1,6 +1,6 @@
 # 変電所座標の定期精度向上（月1回）
 # OSM（OpenStreetMap）は日々更新されるため、毎月取り直して
-#   ・座標が未取得の変電所に新しく登録された座標を付与
+#   ・座標が未取得の変電所に新しく登録された座標を付与（Overpass＋OSMの名前検索 Nominatim）
 #   ・市町村レベルの「推定」座標をOSM実測に格上げ
 # する。変更が普段どおりの件数なら main に直接反映し、多すぎるときは別ブランチに置いて確認を求める
 # （どちらの場合も結果を Issue で知らせる）。
@@ -49,6 +49,29 @@ jobs:
             --upgrade-acc 推定 --report coord_report.csv --summary-json apply_summary.json
           cat apply_summary.json
 
+      - name: OSMの名前検索（Nominatim）で、Overpassに無い「変電所」の建物・敷地を探す
+        run: |
+          python3 scripts/list_missing_coords.py --in "$LIST" --out missing.xlsx \
+            --ranks "S,A,B,C,データ無" --include-gated
+          python3 scripts/fetch_nominatim_coords.py fill --in "$LIST" --list missing.xlsx \
+            --sheets 優先S_A --report nominatim_fill_report.csv --max-age-days 25
+          if python3 -c "import openpyxl,sys;ws=openpyxl.load_workbook('missing.xlsx',data_only=True)['優先S_A'];sys.exit(0 if any(ws.cell(r,16).value is not None for r in range(3,ws.max_row+1)) else 1)"; then
+            python3 scripts/merge_coords.py --in "$LIST" --filled missing.xlsx --out "$LIST" \
+              --filled-sheets 優先S_A --acc "OSM実測(名称一致)" --report nominatim_merge_report.csv
+          else
+            echo "Nominatimで新しく見つかった変電所はありません。"
+          fi
+          python3 - <<'PY'
+          import csv, json, os
+          n = 0
+          if os.path.exists("nominatim_merge_report.csv"):
+              n = sum(1 for r in csv.DictReader(open("nominatim_merge_report.csv", encoding="utf-8-sig")) if r["判定"] == "採用")
+          s = json.load(open("apply_summary.json"))
+          s["nominatim"] = n
+          json.dump(s, open("apply_summary.json", "w"), ensure_ascii=False)
+          print(f"Nominatimで付与: {n}件")
+          PY
+
       - name: スコア・Web用データ・精度レポートを再生成
         run: |
           python3 scripts/score_substations.py --in "$LIST" --out "docs/変電所スコアリング_全国66kV以上_v1.xlsx"
@@ -67,7 +90,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          read FILLED UPGRADED < <(python3 -c "import json;s=json.load(open('apply_summary.json'));print(s['filled'],s['upgraded'])")
+          read FILLED UPGRADED NOMI < <(python3 -c "import json;s=json.load(open('apply_summary.json'));print(s['filled'],s['upgraded'],s.get('nominatim',0))")
+          FILLED=$((FILLED + NOMI))
           if [ "$FILLED" = "0" ] && [ "$UPGRADED" = "0" ]; then
             echo "座標の変更なし。"
             exit 0
@@ -78,6 +102,7 @@ jobs:
           FILES=("$LIST" osm_cache coord_report.csv data/substations.js \
                  "docs/変電所スコアリング_全国66kV以上_v1.xlsx" "docs/変電所座標_精度レポート.md" \
                  data/coord_quality_history.csv geo_cache data/priority_munis.json exports)
+          for f in nominatim_fill_report.csv nominatim_merge_report.csv; do [ -f "$f" ] && FILES+=("$f"); done
           MSG="変電所座標の定期更新: 新規${FILLED}件・推定→実測${UPGRADED}件 ($(date +%F))"
           # 初回の実行で新規14件・格上げ58件。桁違いに多いときは照合の不具合を疑って止める
           if [ $((FILLED + UPGRADED)) -le 300 ]; then
@@ -99,10 +124,10 @@ jobs:
           {
             echo "$HEAD"
             echo ""
-            echo "- 座標を新しく付与: **${FILLED}件**"
+            echo "- 座標を新しく付与: **${FILLED}件**（うちOSMの名前検索〔Nominatim〕で見つけたもの ${NOMI}件）"
             echo "- 推定座標をOSM実測に格上げ: **${UPGRADED}件**"
             echo ""
-            echo "行ごとの結果は \`coord_report.csv\`（「移動距離(km)」が大きい行は地図で確認を推奨）。"
+            echo "行ごとの結果は \`coord_report.csv\`（「移動距離(km)」が大きい行は地図で確認を推奨）と \`nominatim_fill_report.csv\`。"
             echo ""
             cat "docs/変電所座標_精度レポート.md"
           } > issue_body.md
