@@ -28,7 +28,9 @@ import substation_scoring as S
 # rows の並び。substation.html の F.* と対応する
 FIELDS = ["no", "area", "name", "pref", "lat", "lon", "acc", "vmax", "vsec",
           "opcap", "flow", "availCur", "availUp", "n1", "curtail", "addr",
-          "s1", "s2", "s3", "s4", "s5", "s6", "grid", "rank", "muni", "gpref", "gate"]
+          "s1", "s2", "s3", "s4", "s5", "s6", "grid", "rank", "muni", "gpref", "gate",
+          # v2: S1の内訳（S1a 変電所単体＝当該設備・S1b 上位系）と接続検討の判定（dict.judge の添字）
+          "s1a", "s1b", "judge"]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REVGEO_CACHE = os.path.join(ROOT, "geo_cache", "revgeo.json")
@@ -93,7 +95,7 @@ def main():
 
     src_rows = read_substations(args.src, args.list_sheet)
 
-    d_area, d_acc, d_n1, d_curtail, d_rank = Dict_(), Dict_(), Dict_(), Dict_(), Dict_()
+    d_area, d_acc, d_n1, d_curtail, d_rank, d_judge = Dict_(), Dict_(), Dict_(), Dict_(), Dict_(), Dict_()
     rows = []
     with_coords = 0
     geo = load_geo()
@@ -117,6 +119,7 @@ def main():
             muni, gpref,
             # ゲート（上位系0かつN-1不可）の警告。1=警告あり
             1 if sc["gate"] else 0,
+            sc["s1a"], sc["s1b"], d_judge.idx(sc["judge"]),
         ])
 
     payload = {
@@ -132,7 +135,7 @@ def main():
         },
         "dict": {
             "area": d_area.values, "acc": d_acc.values,
-            "n1": d_n1.values, "curtail": d_curtail.values, "rank": d_rank.values,
+            "n1": d_n1.values, "curtail": d_curtail.values, "rank": d_rank.values, "judge": d_judge.values,
         },
         "fields": FIELDS,
         "params": {
@@ -143,6 +146,13 @@ def main():
             "s1Steps": [[S.P["s1_t1"]["thr"], S.P["s1_t1"]["pts"]], [S.P["s1_t2"]["thr"], S.P["s1_t2"]["pts"]]],
             # 最低必要容量（MW）。これ未満の空容量は画面でも「空き無し」と判定する
             "minMw": S.MIN_MW,
+            # v2: S1a（変電所単体）の段階と S1b（上位系）の点、判定のラベル・意味、候補地の判定に使う距離（m）
+            "s1aSteps": [[S.P[k]["thr"], S.P[k]["pts"]] for k in ("s1_t1", "s1_t2", "s1_t3")],
+            "s1bPoints": {"ok": S.P["s1b_ok"]["pts"], "unk": S.P["s1b_unk"]["pts"], "bad": 0},
+            "judgeLabels": {"ok": S.JUDGE_OK, "check": S.JUDGE_CHECK, "ng": S.JUDGE_NG, "nodata": S.JUDGE_NODATA},
+            "judgeMeaning": S.JUDGE_MEANING,
+            "siteOkM": S.SITE_OK_M, "siteRangeM": S.SITE_RANGE_M,
+            "s5MaxKv": S.P["s5_1"]["thr"],
         },
         "areaPoints": [list(a) for a in S.AREA_POINTS],
         "scoreDefs": [list(s) for s in S.SCORE_DEFS],

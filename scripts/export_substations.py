@@ -27,6 +27,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from grid_status import GridStatus, TOPO_JS  # noqa: E402
+import substation_scoring as SC  # noqa: E402  判定の理由・意味の文言（substation.html と同じ定義）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_JS = os.path.join(ROOT, "data", "substations.js")
@@ -46,8 +47,11 @@ def load(path):
     for row in d["rows"]:
         g = lambda k: row[f[k]] if k in f else None  # noqa: E731
         rec = {k: g(k) for k in d["fields"]}
-        for k in ("area", "acc", "n1", "curtail", "rank"):
-            rec[k] = d["dict"][k][row[f[k]]]
+        for k in ("area", "acc", "n1", "curtail", "rank", "judge"):
+            if k in f:
+                rec[k] = d["dict"][k][row[f[k]]]
+        # 判定の理由（substation_scoring.judge_row。画面の judgeOf と同じ文言）
+        rec["judgeReason"] = SC.judge_row(rec.get("vsec"), rec.get("availCur"), rec.get("availUp"))["reason"]
         # 所在地の都道府県は座標から引いたものを優先する。元リストの都道府県は管轄の区分らしく、
         # 実際の所在地と違う行がある（例: 上野変電所が「埼玉県」）。座標が無い行は元リストの値
         rec["prefAny"] = rec.get("gpref") or rec.get("pref") or ""
@@ -92,6 +96,9 @@ COLUMNS = [
     ("最大電圧kV", lambda r: r["vmax"]), ("二次電圧kV", lambda r: r["vsec"]),
     ("系統スコア(80)", lambda r: r["grid"]), ("系統ランク", lambda r: r["rank"]),
     ("系統ランクの意味", lambda r: GS.rank_meaning(r["rank"]) if GS else ""),
+    # v2: 接続検討の判定（高圧2MW）。OK／要検討／NG／データ無 と理由
+    ("判定(高圧2MW)", lambda r: r.get("judge", "")),
+    ("判定の理由", lambda r: r.get("judgeReason", "")),
     ("上位系0の警告", lambda r: "警告" if r.get("gate") else ""),
     # 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類
     ("カテゴリ（地図の色）", lambda r: GS.category_text(r["_row"]) if GS else ""),
@@ -100,7 +107,8 @@ COLUMNS = [
     ("空容量_上位系MW", lambda r: r["availUp"]), ("空容量_当該MW", lambda r: r["availCur"]),
     ("N-1電制", lambda r: r["n1"]), ("出力制御", lambda r: r["curtail"]),
     ("運用容量MW", lambda r: r["opcap"]), ("予想潮流MW", lambda r: r["flow"]),
-    ("S1空容量", lambda r: r["s1"]), ("S2 N-1", lambda r: r["s2"]), ("S3潮流", lambda r: r["s3"]),
+    ("S1a単体空容量", lambda r: r.get("s1a")), ("S1b上位系", lambda r: r.get("s1b")),
+    ("S2 N-1", lambda r: r["s2"]), ("S3潮流", lambda r: r["s3"]),
     ("S4出制", lambda r: r["s4"]), ("S5配変", lambda r: r["s5"]), ("S6エリア", lambda r: r["s6"]),
     ("緯度", lambda r: r["lat"]), ("経度", lambda r: r["lon"]), ("座標精度", lambda r: r["acc"]),
     ("所在地(参考)", lambda r: r["addr"]), ("接続検討の実績", lambda r: r["memo"]),
@@ -174,7 +182,9 @@ def write_csv(path, rows):
 
 def counts(rows):
     sa = [r for r in rows if r["rank"] in ("S", "A")]
-    return len(rows), len(sa), sum(1 for r in sa if r["availUp"] is not None)
+    j = lambda label: sum(1 for r in rows if r.get("judge") == label)  # noqa: E731
+    return (len(rows), len(sa), sum(1 for r in sa if r["availUp"] is not None),
+            j(SC.JUDGE_OK), j(SC.JUDGE_CHECK), j(SC.JUDGE_NG))
 
 
 def by_pref(rows, meta, outdir):
@@ -206,19 +216,25 @@ def by_pref(rows, meta, outdir):
         "",
         "「上位系0の警告」列の「警告」は、空容量(上位系考慮)が2MW未満かつN-1電制が「可」でない変電所です（ランクとは別。工期が長くなりやすい）。",
         "",
-        "| ファイル | 全件 | S/A | うち上位系確認済み |",
-        "|---|---|---|---|",
+        "**判定(高圧2MW)の凡例**（v2・2026-11-06〜。CSVの「判定の理由」列に変電所ごとの根拠）",
+        "",
+        "| 判定 | 意味 |",
+        "|---|---|",
+        *[f"| {k} | {v.split('：', 1)[1]} |" for k, v in SC.JUDGE_MEANING.items()],
+        "",
+        "| ファイル | 全件 | S/A | うち上位系確認済み | 接続検討OK | 要検討 | 接続検討NG |",
+        "|---|---|---|---|---|---|---|",
     ]
     sa_all = sorted([r for r in rows if r["rank"] in ("S", "A")], key=key)
     write_csv(os.path.join(outdir, "全国_SA.csv"), sa_all)
-    n, s, u = counts(sa_all)
-    lines.append(f"| [全国_SA.csv](全国_SA.csv) | {n:,} | {s:,} | {u:,} |")
+    n, s, u, ok, ck, ng = counts(sa_all)
+    lines.append(f"| [全国_SA.csv](全国_SA.csv) | {n:,} | {s:,} | {u:,} | {ok:,} | {ck:,} | {ng:,} |")
     order = sorted(prefs, key=lambda p: (p == "都道府県不明", p))
     for p in order:
         rs = sorted(prefs[p], key=key)
         write_csv(os.path.join(outdir, f"{p}.csv"), rs)
-        n, s, u = counts(rs)
-        lines.append(f"| [{p}.csv]({p}.csv) | {n:,} | {s:,} | {u:,} |")
+        n, s, u, ok, ck, ng = counts(rs)
+        lines.append(f"| [{p}.csv]({p}.csv) | {n:,} | {s:,} | {u:,} | {ok:,} | {ck:,} | {ng:,} |")
     lines.append("")
     with open(os.path.join(outdir, "README.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
