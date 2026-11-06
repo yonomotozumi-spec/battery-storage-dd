@@ -2162,6 +2162,16 @@ function siteBounds() {
   const r = parseInt($('radius').value, 10) || 10000;
   return L.latLng(c).toBounds(r * 2);
 }
+// 候補地を地図に出して、その検索範囲に地図を合わせる（座標が未入力なら何もしない）
+function showSiteOnMap() {
+  if (!siteCoords()) return;
+  ensureMap().then(() => {
+    updateSite();
+    if ($('m-inrange').checked) renderMarkers();
+    const b = siteBounds();
+    if (b) MAP.fitBounds(b, { padding: [20, 20] });
+  }).catch(() => {});
+}
 function updateSite() {
   if (!MAP) return;
   MAP_LAYERS.site.clearLayers();
@@ -2386,7 +2396,8 @@ function initMapControls() {
     Object.values(MAP_BASE).forEach(l => MAP.removeLayer(l));
     MAP_BASE[$('m-base').value].addTo(MAP);
   });
-  ['lat', 'lon', 'radius'].forEach(id => $(id).addEventListener('change', () => { updateSite(); if ($('m-inrange').checked) renderMarkers(); }));
+  // 緯度経度や検索範囲を入れた時点で（ボタンを押す前でも）候補地◎と円を地図に置き、地図をその範囲に合わせる
+  ['lat', 'lon', 'radius'].forEach(id => $(id).addEventListener('change', showSiteOnMap));
   const areas = TOPO ? TOPO.meta.areas.join('・') : '';
   $('map-msg').innerHTML = TOPO
     ? `・候補地の座標を入れて「判定・採点」すると、◎の候補地と検索範囲の円を地図に出し、下の「候補変電所」の表と同じ絞り込みで丸を表示します（「候補地の検索範囲内だけ地図に出す」で範囲外を消せます）。表の行をクリックすると地図でもその変電所を強調します。<br>` +
@@ -2442,7 +2453,8 @@ function init() {
     const c = parseCoords(e.target.value);
     if (c) {
       $('lat').value = c.lat; $('lon').value = c.lon;
-      $('paste-msg').textContent = `→ 緯度 ${c.lat} / 経度 ${c.lon} を反映しました`;
+      $('paste-msg').textContent = `→ 緯度 ${c.lat} / 経度 ${c.lon} を反映しました（地図にも候補地を表示）`;
+      showSiteOnMap();
     } else if (e.target.value.trim()) {
       $('paste-msg').textContent = '座標を読み取れませんでした';
     } else {
