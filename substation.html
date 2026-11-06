@@ -640,7 +640,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
   </div>
   <div class="frow">
-    <div class="flabel">判定（高圧2MW）<div class="fnote">接続検討OK＝変電所単体（配電用バンク）に空きがあり上位系も空きあり・未公表／要検討＝単体は空きありだが上位系の空き無し、または配電用変電所でない／接続検討NG＝単体の空き無し</div></div>
+    <div class="flabel">判定（高圧2MW）<div class="fnote">接続検討OK＝変電所単体（配電用バンク）に空きがあり上位系も空きあり・未公表／要検討＝単体は空きありだが上位系の空き無し、または配電用変電所でない／接続検討NG＝単体の空き無し。直近1年の接続検討で連系不可・負担金4,000万円以上・工期24ヶ月以上の実績（実績NG）があればNG、実績NGが名指しした上位系の設備を持つ変電所はOK→要検討（⚠上位系に実績NG）</div></div>
     <div class="fcontrol">
       <select id="l-judge">
         <option value="all">すべて</option>
@@ -841,8 +841,10 @@ function rankLegendHtml(withTotal) {
     `<span class="rl-item"><span class="up-tag rk-x">⚠上位系0</span>空容量(上位系考慮)が${MIN_MW}MW未満かつN-1電制が「可」でない（ランクとは別の警告。S1b=0・判定は要検討。工期が長くなりやすい）</span>` +
     `<span class="rl-item"><span class="rl-head">判定（高圧2MW）：</span>` +
     [['ok', 'jd-ok', '変電所単体（配電用バンク）も上位系も空きあり（上位系未公表を含む）'], ['check', 'jd-check', '単体は空きあり・上位系は空き無し／配電用でない → 人が判断'],
-      ['ng', 'jd-ng', '単体の空き無し'], ['nodata', 'jd-none', '空容量が未公表']].map(([k, c, t]) =>
+      ['ng', 'jd-ng', '単体の空き無し、または実績NG'], ['nodata', 'jd-none', '空容量が未公表']].map(([k, c, t]) =>
       `<span class="rl-item"><span class="jd ${c}" title="${esc(JUDGE_MEANING[JL[k]] || '')}">${esc(JUDGE_SHORT[JL[k]])}</span>${esc(t)}</span>`).join('') + `</span>` +
+    `<span class="rl-item"><span class="up-tag rk-x" title="${esc(RN.meaning[RN.tag] || '')}">${esc(RN.tag)}</span>直近${Math.round(RN.windowDays / 365)}年以内の接続検討の回答が 連系不可／負担金${(RN.yenMan / 10000).toLocaleString()}億円以上／工期${RN.months}ヶ月以上 → 空容量が空きありでも判定NG（変電所名が確定した実績のみ）</span>` +
+    `<span class="rl-item"><span class="up-tag rk-x" title="${esc(RN.meaning[RN.upperTag] || '')}">${esc(RN.upperTag)}</span>実績NGが名指しした上位系の設備（上位変電所の変圧器など）を制約設備に持つ → OKは要検討に格下げ</span>` +
     (withTotal ? `<span class="rl-item"><span class="rl-head">総合（100点＝系統80＋近接20）：</span>${['S', 'A', 'B', 'C'].map(totalRankMeaning).join('／')}</span>` : '');
 }
 const fmtDist = m => m < 1000 ? Math.round(m) + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
@@ -936,11 +938,24 @@ const S5_MAX_KV = D && D.params.s5MaxKv != null ? D.params.s5MaxKv : 7;
 const S1A_STEPS = D && D.params.s1aSteps ? D.params.s1aSteps : [[20, 25], [6, 18], [2, 5]];
 const S1B_PTS = D && D.params.s1bPoints ? D.params.s1bPoints : { ok: 10, unk: 10, bad: 0 };
 const judge = row => (F.judge != null && D.dict.judge) ? D.dict.judge[row[F.judge]] : '';
+// 実績による格下げ（2026-11-06）: judge は格下げ後の最終判定。公表データだけの判定と理由は substations.js の judgePub / resultNg / upperWarn
+const RN = D && D.params.resultNg ? D.params.resultNg : { yenMan: 4000, months: 24, windowDays: 365, tag: '実績NG', upperTag: '⚠上位系に実績NG', meaning: {} };
+const judgePub = row => (F.judgePub != null && D.dict.judge) ? D.dict.judge[row[F.judgePub]] : judge(row);
+const resultNg = row => (F.resultNg != null ? row[F.resultNg] : '') || '';
+const upperWarn = row => (F.upperWarn != null ? row[F.upperWarn] : '') || '';
 const judgeCls = j => j === JL.ok ? 'jd-ok' : j === JL.check ? 'jd-check' : j === JL.ng ? 'jd-ng' : 'jd-none';
 const fmtKm = m => m >= 1000 ? `${+(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
 // 変電所単体（当該設備）の空容量。未公表なら上位系考慮で代用
 const ownCap = row => val(row, 'availCur') != null ? val(row, 'availCur') : val(row, 'availUp');
+// 判定の理由（最終判定）。実績による格下げがあればその理由を先に、公表データの判定と理由を後ろに付ける
 function judgeReason(row) {
+  const pub = judgeReasonPub(row), rn = resultNg(row), uw = upperWarn(row);
+  if (rn) return `${rn}。公表データだけの判定は「${judgePub(row)}」（${pub}）` + (uw ? `。${uw}` : '');
+  if (uw) return `${pub}。${uw}`;
+  return pub;
+}
+// 公表データだけの判定の理由（substation_scoring.py の judge_row と同じ順序）
+function judgeReasonPub(row) {
   const cur = val(row, 'availCur'), up = val(row, 'availUp'), own = ownCap(row), v = val(row, 'vsec');
   if (own == null) return '空容量が未公表（OSM由来など）で判定できない。送配電事業者の公表資料か接続検討で確認';
   const ownTxt = `${own}MW` + (cur != null ? '' : '（当該設備は未公表のため上位系考慮の値）');
@@ -953,7 +968,8 @@ function judgeReason(row) {
   if (up == null) return `変電所単体に空きあり ${ownTxt}。上位系は未公表（上位系未確認）のため、接続検討で上位系の扱いを確認する`;
   return `変電所単体に空きあり ${ownTxt}、上位系も空きあり（空容量(上位系考慮) ${up}MW）`;
 }
-const judgeBadge = (row, big) => { const j = judge(row); return `<span class="jd ${judgeCls(j)}${big ? ' jd-big' : ''}" title="${esc(JUDGE_MEANING[j] || j)}&#10;${esc(judgeReason(row))}">${esc(big ? j : JUDGE_SHORT[j] || j)}</span>`; };
+// 実績による格下げがある変電所は判定の後ろに「※」（マウスを乗せると理由）
+const judgeBadge = (row, big) => { const j = judge(row), mark = (resultNg(row) || upperWarn(row)) ? '※' : ''; return `<span class="jd ${judgeCls(j)}${big ? ' jd-big' : ''}" title="${esc(JUDGE_MEANING[j] || j)}&#10;${esc(judgeReason(row))}">${esc(big ? j : JUDGE_SHORT[j] || j)}${mark}</span>`; };
 // 候補地（緯度経度）の判定。座標のある全変電所のうち SITE_RANGE_M 以内・データ有を材料にする（画面の絞り込みには影響されない）
 function judgeSite(lat, lon) {
   const inrange = [];
@@ -1175,8 +1191,10 @@ function detailHtml(h) {
 
   const jd = judge(row);
   const judgeHtml = `<div class="detail-note" style="border-color:${jd === JL.ok ? 'var(--pass)' : jd === JL.check ? '#8E24AA' : jd === JL.ng ? 'var(--fail)' : 'var(--bdr)'}">
-        <b>判定（高圧2MW）</b> ${judgeBadge(row, true)}<br>${esc(judgeReason(row))}<br>
-        <span style="color:var(--txt3)">${esc(JUDGE_MEANING[jd] || '')}</span></div>`;
+        <b>判定（高圧2MW）</b> ${judgeBadge(row, true)}${resultNg(row) ? ` <span class="up-tag rk-x">${esc(RN.tag)}</span>` : ''}${upperWarn(row) ? ` <span class="up-tag rk-x">${esc(RN.upperTag)}</span>` : ''}<br>${esc(judgeReasonPub(row))}<br>
+        <span style="color:var(--txt3)">${esc(JUDGE_MEANING[jd] || '')}</span>
+        ${resultNg(row) ? `<div style="margin-top:6px;color:var(--fail)"><b>${esc(RN.tag)}</b>（公表データだけなら「${esc(judgePub(row))}」）：${esc(resultNg(row))}</div>` : ''}
+        ${upperWarn(row) ? `<div style="margin-top:6px;color:#8E24AA"><b>${esc(RN.upperTag)}</b>：${esc(upperWarn(row))}</div>` : ''}</div>`;
 
   const gateHtml = gated(row)
     ? `<div class="detail-note" style="border-color:var(--fail);color:var(--fail)">
@@ -1270,6 +1288,8 @@ const CSV_COLS = [
   ['系統スコア(80)', r => val(r, 'grid')], ['系統ランク', r => rank(r)], ['系統ランクの意味', r => rankMeaning(rank(r))],
   // v2: 接続検討の判定（高圧2MW）と理由（scripts/export_substations.py と同じ列）
   ['判定(高圧2MW)', r => judge(r)], ['判定の理由', r => judgeReason(r)],
+  // 実績による格下げ（2026-11-06）。判定(高圧2MW)は格下げ後の最終判定
+  ['判定(公表データのみ)', r => judgePub(r)], ['実績NG(1年以内)', r => resultNg(r)], ['上位系の実績警告', r => upperWarn(r)],
   ['上位系0の警告', r => gated(r) ? '警告' : ''],
   // 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類（scripts/grid_status.py と同じ）
   ['カテゴリ（地図の色）', r => catText(r)],
