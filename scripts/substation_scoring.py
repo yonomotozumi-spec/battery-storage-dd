@@ -244,28 +244,28 @@ def judge_site(cands):
       要検討: SITE_RANGE_M 以内に空容量データありの変電所が無い（判定材料なし）
     """
     inrange = sorted([c for c in cands if c[1] is not None and c[1] <= SITE_RANGE_M and c[0] != JUDGE_NODATA], key=lambda c: c[1])
-    km = lambda m: f"{m / 1000:g}km" if m >= 1000 else f"{m:.0f}m"
+    km = lambda m: f"{round(m / 1000, 1):g}km" if m >= 1000 else f"{m:.0f}m"
     oks = [c for c in inrange if c[0] == JUDGE_OK]
     checks = [c for c in inrange if c[0] == JUDGE_CHECK]
     if oks and oks[0][1] <= SITE_OK_M:
         j, d, n = oks[0]
-        return {"judge": JUDGE_OK, "key": n,
+        return {"judge": JUDGE_OK, "key": n, "cause": f"{km(SITE_OK_M)}以内にOKの変電所",
                 "reason": f"{km(SITE_OK_M)}以内に接続検討OKの変電所あり（{n}・{km(d)}）。周辺の既設高圧配電線を確認して接続検討を申し込む"}
     if oks:
         j, d, n = oks[0]
-        return {"judge": JUDGE_CHECK, "key": n,
+        return {"judge": JUDGE_CHECK, "key": n, "cause": f"OKの変電所が{km(SITE_OK_M)}より遠い（{km(d)}）",
                 "reason": f"最も近い接続検討OKの変電所（{n}）まで {km(d)} と{km(SITE_OK_M)}を超える。負担金は高圧線の亘長にほぼ比例するため、"
                           f"既設高圧配電線までの距離を確認するか、より近い候補地を探す"
                           + (f"。{km(SITE_OK_M)}以内には要検討の変電所あり（{checks[0][2]}・{km(checks[0][1])}）" if checks and checks[0][1] <= SITE_OK_M else "")}
     if checks:
         j, d, n = checks[0]
-        return {"judge": JUDGE_CHECK, "key": n,
+        return {"judge": JUDGE_CHECK, "key": n, "cause": "OKの変電所が無く要検討のみ",
                 "reason": f"{km(SITE_RANGE_M)}以内に接続検討OKの変電所が無く、最も近いのは要検討の {n}（{km(d)}）。その変電所の理由（上位系の空き無し等）を見て人が判断"}
     if inrange:
         j, d, n = inrange[0]
-        return {"judge": JUDGE_NG, "key": n,
+        return {"judge": JUDGE_NG, "key": n, "cause": "周辺の変電所がすべて空き無し",
                 "reason": f"{km(SITE_RANGE_M)}以内で空容量が公表されている変電所 {len(inrange)}件はすべて接続検討NG（変電所単体の空き無し。最寄りは {n}・{km(d)}）"}
-    return {"judge": JUDGE_CHECK, "key": None,
+    return {"judge": JUDGE_CHECK, "key": None, "cause": "判定材料なし",
             "reason": f"{km(SITE_RANGE_M)}以内に空容量が公表されている変電所が無く判定材料がない。送配電事業者の公表資料か接続検討で確認"}
 
 
