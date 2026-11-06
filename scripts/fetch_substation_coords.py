@@ -75,6 +75,10 @@ OPERATOR_PREFIXES = [
     "中国電力", "四国電力", "九州電力", "電源開発", "ＪＲ", "JR",
 ]
 SUFFIXES = ["変電所", "開閉所", "変換所", "電力所", "S/S", "SS"]
+# 座標照合でだけ吸収する表記ゆれ（match_key）。小書き「ッ」と「ツ」、「ヶ・ヵ・が」と「ケ」、「之・の」と「ノ」
+# （二ッ橋／二ツ橋、吉ケ瀬／吉ヶ瀬、堀の内／堀ノ内）。normalize_name / loose_name は空容量CSVや
+# 系統トポロジーの名寄せにも使われているので変えず、座標の照合キーだけを緩める
+KANA_FOLD = str.maketrans({"ッ": "ツ", "ヶ": "ケ", "ヵ": "ケ", "が": "ケ", "之": "ノ", "の": "ノ"})
 
 # 隣接する都道府県（陸続き＋橋・近接海峡）。元リストの「都道府県」は所在地ではなく管轄の区分らしく、
 # 座標から引いた所在地と食い違う行が隣県で170件（OSM実測の6.3%）ある（例: 上野変電所が「埼玉県」、
@@ -165,6 +169,19 @@ def loose_name(name):
     return normalize_name(name).split("@")[0]
 
 
+def match_key(name):
+    """座標照合用のキー。normalize_name に加えて、名前の中の括弧書き（九州の「伊倉(6kV)変電所」）を
+    落とし、かな・送り字の表記ゆれ（KANA_FOLD）を吸収する。OSM・Google 側の表記が元リストと
+    違うだけで取りこぼしていたため。両側に同じ変換を掛けるので照合は対称になる。"""
+    s = re.sub(r"[（(][^）)]*[）)]", "", unicodedata.normalize("NFKC", str(name or "")))
+    return normalize_name(s).translate(KANA_FOLD)
+
+
+def loose_match_key(name):
+    """match_key の施設種別を落とした版。"""
+    return match_key(name).split("@")[0]
+
+
 def overpass_query_pref(pref):
     """都道府県名(admin_level=4)のエリア内にある変電所をすべて取得するクエリ。"""
     return (
@@ -241,13 +258,13 @@ def parse_elements(payload):
         volt = 0
         for v in re.findall(r"\d+", str(tags.get("voltage", "")) or "0"):
             volt = max(volt, int(v))
-        key = normalize_name(name)
+        key = match_key(name)
         if not key:
             continue
         cand = {"name": name, "lat": round(float(lat), 6), "lon": round(float(lon), 6),
                 "voltage": volt / 1000.0 if volt else 0}   # OSMはV単位 → kV
         strict.setdefault(key, []).append(cand)
-        lkey = loose_name(name)
+        lkey = loose_match_key(name)
         if lkey:
             loose.setdefault(lkey, []).append(cand)
     return strict, loose
@@ -491,9 +508,9 @@ def match_row(r, by_pref, japan, box, pts=None):
         scope = r["pref"]
 
     # ① 施設種別まで一致するキーで照合 → ② 見つからなければ種別を外した緩いキー
-    best, how = resolve(strict.get(normalize_name(r["name"]), []), r["vmax"])
+    best, how = resolve(strict.get(match_key(r["name"]), []), r["vmax"])
     if best is None:
-        l_cands = loose.get(loose_name(r["name"]), [])
+        l_cands = loose.get(loose_match_key(r["name"]), [])
         if len(l_cands) == 1:
             best, how = l_cands[0], "一致(種別ゆれ)"
         elif l_cands:
@@ -505,7 +522,7 @@ def match_row(r, by_pref, japan, box, pts=None):
         cands = {}
         for nb in NEIGHBOR_PREFS.get(scope, []):
             if nb in by_pref:
-                for c in by_pref[nb][0].get(normalize_name(r["name"]), []):
+                for c in by_pref[nb][0].get(match_key(r["name"]), []):
                     cands[(round(c["lat"], 4), round(c["lon"], 4))] = (nb, c)
         if cands:
             nb_best, nb_how = resolve([c for _, c in cands.values()], r["vmax"])
