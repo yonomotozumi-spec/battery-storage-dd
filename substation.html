@@ -301,6 +301,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
 .lg-dot { display:inline-block; width:11px; height:11px; border-radius:50%; border:1.5px solid #4a5568; vertical-align:middle; margin-right:4px; }
 .lg-dot.big { width:15px; height:15px; }
 .lg-dot.up-ng { border-color:#E08A00; border-width:2.5px; }
+.lg-dot.ok-unk { border-color:#0B9966; border-style:dashed; border-width:2px; }
 .lg-line { display:inline-block; width:22px; height:0; border-top:3px solid; vertical-align:middle; margin-right:4px; }
 .map-sel { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 16px; background:var(--surf2); border-top:1px solid var(--bdr); border-bottom:1px solid var(--bdr); }
 .map-sel .ss-name { font-size:14px; }
@@ -474,7 +475,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <span class="card-note" id="map-count"></span>
   </div>
   <div class="frow">
-    <div class="flabel">表示する変電所<div class="fnote">地図と下の候補変電所の表に共通の絞り込みです。既定は座標のある全変電所。丸の色＝変電所単体の空き×上位系の空き（5色）、大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
+    <div class="flabel">表示する変電所<div class="fnote">地図と下の候補変電所の表に共通の絞り込みです。既定は座標のある全変電所。丸の色は下の「丸の色」で選べます（既定＝判定。薄い緑＋点線＝OKだが上位系が未公表）。大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
     <div class="fcontrol">
       <div class="opt-row" id="m-ranks"></div>
       <div class="coord-row list-row">
@@ -500,7 +501,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <div class="coord-row list-row">
         <div><div class="coord-label">丸の色</div>
           <select id="m-color">
-            <option value="judge">判定（高圧2MW）：OK／要検討／NG／データ無</option>
+            <option value="judge">判定（高圧2MW）：OK（濃い緑＝上位系も空きあり／薄い緑＝上位系が未公表）／要検討／NG／データ無</option>
             <option value="status">変電所単体の空き × 上位系の空き（5色）</option>
             <option value="rank">系統ランク（S〜C）</option>
           </select></div>
@@ -2058,16 +2059,23 @@ function mapFilter(opts = {}) {
 }
 
 const JUDGE_COLOR = { [JL.ok]: '#0B9966', [JL.check]: '#8E24AA', [JL.ng]: '#CC2A20', [JL.nodata]: '#C9CFDC' };
+// 判定OKのうち「空容量(上位系考慮)が未公表」の変電所（東北・中部・四国・北陸・沖縄）は、上位系が良いのではなく
+// 「空き無しと判定できないのでOKになっている」だけなので、地図では薄い緑＋点線の縁取りにして濃い緑と見分ける（2026-11-13）
+const JUDGE_OK_UNK_COLOR = '#7FD4AE';
+const okUnverified = r => judge(r) === JL.ok && hasData(r) && !upChecked(r);
 function markerStyle(r, selected) {
   const rk = rank(r), big = val(r, 'vmax') >= 154;
   const mode = $('m-color').value;
-  const fill = mode === 'judge' ? (JUDGE_COLOR[judge(r)] || '#999') : mode === 'status' ? GS_COLOR[gridStatus(r).cls] : (RANK_COLOR[rk] || '#999');
+  const okUnk = mode === 'judge' && okUnverified(r);
+  const fill = okUnk ? JUDGE_OK_UNK_COLOR
+    : mode === 'judge' ? (JUDGE_COLOR[judge(r)] || '#999') : mode === 'status' ? GS_COLOR[gridStatus(r).cls] : (RANK_COLOR[rk] || '#999');
   const faint = mode === 'judge' ? judge(r) === JL.nodata : mode === 'status' ? gridStatus(r).cls === 'none' : rk === 'データ無';
   return {
     radius: (big ? 7 : 4.5) + (selected ? 3 : 0),
     fillColor: fill, fillOpacity: faint ? .6 : .9,
-    color: selected ? '#16213D' : '#334155',
-    weight: selected ? 3 : 1,
+    color: selected ? '#16213D' : okUnk ? '#0B9966' : '#334155',
+    weight: selected ? 3 : okUnk ? 2 : 1,
+    dashArray: okUnk && !selected ? '3,3' : null,
     opacity: 1,
   };
 }
@@ -2076,7 +2084,7 @@ function markerTip(r) {
   return `<b>${esc(val(r, 'name'))}</b>（${esc(area(r))}${prefOf(r) ? ' / ' + esc(prefOf(r)) : ''}）<br>` +
     `系統ランク ${esc(rank(r))}・${val(r, 'grid')}点　${val(r, 'vmax') != null ? val(r, 'vmax') + 'kV' : ''}${val(r, 'vsec') != null ? '→' + val(r, 'vsec') + 'kV' : ''}<br>` +
     `空容量 上位系 ${fmtNum(val(r, 'availUp'))}／当該 ${fmtNum(val(r, 'availCur'))} MW　N-1 ${esc(n1(r))}<br>` +
-    `判定(高圧2MW): <b style="color:${JUDGE_COLOR[judge(r)] || '#999'}">${esc(judge(r))}</b>　カテゴリ: <b style="color:${GS_COLOR[gridStatus(r).cls]}">${esc(gridStatus(r).label)}</b>` +
+    `判定(高圧2MW): <b style="color:${JUDGE_COLOR[judge(r)] || '#999'}">${esc(judge(r))}</b>${okUnverified(r) ? '<span style="color:#B06A00">（上位系未確認）</span>' : ''}　カテゴリ: <b style="color:${GS_COLOR[gridStatus(r).cls]}">${esc(gridStatus(r).label)}</b>` +
     (nodeOf(r) != null ? `　つながる送電線 ${nodeLinks(nodeOf(r)).length}本` : '') +
     (memoOf(r) ? `<br>接続検討の実績 ${memoSummary(r).n}件（対策なし ${memoSummary(r).none}・バンク等の対策待ち ${memoSummary(r).bank}・上位系対策あり ${memoSummary(r).yes}・記載なし ${memoSummary(r).unk}${memoSummary(r).est ? `・うち変電所は推定 ${memoSummary(r).est}` : ''}）` : '');
 }
@@ -2107,8 +2115,10 @@ function renderMarkers() {
   });
   const sa = list.filter(r => ['S', 'A'].includes(rank(r))).length;
   const cnt = k => list.filter(r => gridStatus(r).cls === k).length, nMemo = list.filter(r => memoOf(r)).length;
+  const jc = j => list.filter(r => judge(r) === j).length, okUnkN = list.filter(r => okUnverified(r)).length;
   const noCoord = D.meta.total - D.meta.withCoords;
   $('map-count').innerHTML = `表示 ${list.length.toLocaleString()}件／座標あり ${D.meta.withCoords.toLocaleString()}件（S/A ${sa.toLocaleString()}）` +
+    `<br>判定: OK ${jc(JL.ok).toLocaleString()}（うち上位系が未公表 ${okUnkN.toLocaleString()}）・要検討 ${jc(JL.check).toLocaleString()}・NG ${jc(JL.ng).toLocaleString()}・データ無 ${jc(JL.nodata).toLocaleString()}` +
     `<br>緑 ${cnt('both').toLocaleString()}・黄 ${cnt('upunk').toLocaleString()}・紫 ${cnt('upbad').toLocaleString()}・赤 ${cnt('ownbad').toLocaleString()}・灰 ${cnt('none').toLocaleString()}・実績あり ${nMemo}` +
     `<br>座標が未取得の ${noCoord.toLocaleString()}件は地図に出ません`;
 }
@@ -2117,7 +2127,11 @@ function renderLegend() {
   const dot = (c, extra = '') => `<span class="lg-dot ${extra}" style="background:${c}"></span>`;
   const mode = $('m-color').value;
   const dots = mode === 'judge'
-    ? `<span><b>丸の色＝判定（高圧2MW・変電所ごと）：</b></span>` + ['ok', 'check', 'ng', 'nodata'].map(k => `<span title="${esc(JUDGE_MEANING[JL[k]] || '')}">${dot(JUDGE_COLOR[JL[k]])}${esc(JL[k])}</span>`).join('') +
+    ? `<span><b>丸の色＝判定（高圧2MW・変電所ごと）：</b></span>` +
+      `<span title="${esc(JUDGE_MEANING[JL.ok] || '')}">${dot(JUDGE_COLOR[JL.ok])}${esc(JL.ok)}（上位系も空きあり）</span>` +
+      `<span title="空容量(上位系考慮)が未公表のため「上位系の空き無し」と判定できずOKになっている変電所。東北・中部・四国・北陸・沖縄に多い">${dot(JUDGE_OK_UNK_COLOR, 'ok-unk')}${esc(JL.ok)}（上位系が未公表）</span>` +
+      ['check', 'ng', 'nodata'].map(k => `<span title="${esc(JUDGE_MEANING[JL[k]] || '')}">${dot(JUDGE_COLOR[JL[k]])}${esc(JL[k])}</span>`).join('') +
+      `<span>※薄い緑＋点線は「上位系に余裕がある」ではなく「上位系が分からない」という意味です（東北・中部・四国・北陸・沖縄は送配電事業者が空容量(上位系考慮)を公表していません）。とくに東北は上位変圧器・154kV送電線が逼迫しており、接続検討でしか分かりません</span>` +
       `<span>※候補地の判定（画面上部）は「2km以内にOKの変電所があるか」で決めるため、近くの丸がOK（緑）でも2kmより遠ければ候補地は要検討になります</span>`
     : mode === 'status'
     ? `<span><b>丸の色＝変電所単体の空き × 上位系の空き：</b></span>` + ['both', 'upunk', 'upbad', 'ownbad', 'none'].map(k => `<span>${dot(GS_COLOR[k])}${GS_LABEL[k]}</span>`).join('')
