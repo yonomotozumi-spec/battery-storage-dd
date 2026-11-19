@@ -59,6 +59,12 @@ jobs:
           python3 scripts/build_priority_munis.py
           python3 scripts/export_substations.py --by-pref exports
 
+      - name: エリアごとのデータの新しさを集計（手作業エリアの確認を促す）
+        run: |
+          python3 scripts/data_freshness.py --in "$LIST" \
+            --out freshness.md --summary-json freshness.json
+          cat freshness.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: 結果の確認（照合率・ランクの変化）
         id: check
         run: |
@@ -95,11 +101,10 @@ jobs:
           PY
           cat check.md "docs/スコア元データ_更新レポート.md" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 反映（問題なければ main、問題があれば別ブランチ＋Issue）
+      - name: 反映（問題なければ main、問題があれば別ブランチ）
+        id: apply
         if: steps.check.outputs.changed != '0' || steps.topo.outputs.changed == '1'
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -108,22 +113,38 @@ jobs:
                  grid_cache data/grid_topology.js "docs/系統トポロジー_照合レポート.md")
           MSG="スコア元データの定期更新: ${{ steps.check.outputs.changed }}件 ($(date +%F))"
           if [ "${{ steps.topo.outputs.changed }}" = "1" ]; then MSG="$MSG ＋系統トポロジー更新"; fi
-          gh label create capacity-refresh --color 0E8A16 --description "スコア元データの定期更新" 2>/dev/null || true
           if [ "${{ steps.check.outputs.ok }}" = "1" ]; then
             git add "${FILES[@]}"
             git commit -m "$MSG"
             git pull --rebase origin "${{ github.event.repository.default_branch }}"
             git push
-            TITLE="スコア元データを更新しました ($(date +%F))"
-            HEAD="変電所MAP（substation.html）に反映済みです。行ごとの変更は \`capacity_report.csv\` を参照。"
+            echo "title=スコア元データを更新しました ($(date +%F))" >> "$GITHUB_OUTPUT"
+            echo "head=変電所MAP（substation.html）に反映済みです。行ごとの変更は \`capacity_report.csv\` を参照。" >> "$GITHUB_OUTPUT"
           else
             BRANCH="auto/capacity-$(date +%Y%m%d-%H%M)"
             git checkout -b "$BRANCH"
             git add "${FILES[@]}"
             git commit -m "$MSG"
             git push -u origin "$BRANCH"
-            TITLE="スコア元データの更新に確認が必要です ($(date +%F))"
-            HEAD="普段と違う結果のため、main には反映していません。ブランチ \`$BRANCH\` の内容を確認してから取り込んでください。"
+            echo "title=スコア元データの更新に確認が必要です ($(date +%F))" >> "$GITHUB_OUTPUT"
+            echo "head=普段と違う結果のため、main には反映していません。ブランチ \`$BRANCH\` の内容を確認してから取り込んでください。" >> "$GITHUB_OUTPUT"
           fi
-          { echo "$HEAD"; echo ""; cat check.md; echo ""; cat "docs/スコア元データ_更新レポート.md"; } > issue_body.md
+
+      - name: 結果と手作業エリアの確認依頼をIssueで知らせる（毎月必ず）
+        if: always() && steps.check.conclusion == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLY_TITLE: ${{ steps.apply.outputs.title }}
+          APPLY_HEAD: ${{ steps.apply.outputs.head }}
+        run: |
+          TITLE="$APPLY_TITLE"
+          HEAD="$APPLY_HEAD"
+          if [ -z "$TITLE" ]; then
+            TITLE="スコア元データの定期確認: 自動更新分に変更なし ($(date +%F))"
+            HEAD="自動取得できる7エリアの公表値は前回と同じでした。下の⚠が付いたエリアだけ確認をお願いします。"
+          fi
+          gh label create capacity-refresh --color 0E8A16 --description "スコア元データの定期更新" 2>/dev/null || true
+          { echo "$HEAD"; echo ""; cat check.md; echo ""; cat freshness.md; echo ""
+            cat "docs/スコア元データ_更新レポート.md"; } > issue_body.md
           gh issue create --title "$TITLE" --label capacity-refresh --body-file issue_body.md
