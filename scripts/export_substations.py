@@ -50,6 +50,8 @@ def load(path):
         for k in ("area", "acc", "n1", "curtail", "rank", "judge"):
             if k in f:
                 rec[k] = d["dict"][k][row[f[k]]]
+        if "judgePub" in f:   # 公表データだけの判定（実績による格下げの前）
+            rec["judgePub"] = d["dict"]["judge"][row[f["judgePub"]]]
         # 判定の理由（substation_scoring.judge_row。画面の judgeOf と同じ文言）
         rec["judgeReason"] = SC.judge_row(rec.get("vsec"), rec.get("availCur"), rec.get("availUp"))["reason"]
         # 所在地の都道府県は座標から引いたものを優先する。元リストの都道府県は管轄の区分らしく、
@@ -99,6 +101,10 @@ COLUMNS = [
     # v2: 接続検討の判定（高圧2MW）。OK／要検討／NG／データ無 と理由
     ("判定(高圧2MW)", lambda r: r.get("judge", "")),
     ("判定の理由", lambda r: r.get("judgeReason", "")),
+    # 実績による格下げ（2026-11-06〜）。判定(高圧2MW)は格下げ後の最終判定、公表データだけの判定はこの列
+    ("判定(公表データのみ)", lambda r: r.get("judgePub", r.get("judge", ""))),
+    ("実績NG(1年以内)", lambda r: r.get("resultNg") or ""),
+    ("上位系の実績警告", lambda r: r.get("upperWarn") or ""),
     ("上位系0の警告", lambda r: "警告" if r.get("gate") else ""),
     # 地図と同じカテゴリ（5色）と、接続検討の実績の件数・分類
     ("カテゴリ（地図の色）", lambda r: GS.category_text(r["_row"]) if GS else ""),
@@ -221,6 +227,12 @@ def by_pref(rows, meta, outdir):
         "| 判定 | 意味 |",
         "|---|---|",
         *[f"| {k} | {v.split('：', 1)[1]} |" for k, v in SC.JUDGE_MEANING.items()],
+        "",
+        f"**実績による格下げ**（2026-11-06〜）：「判定(高圧2MW)」は接続検討の実績を反映した最終判定で、公表データだけの判定は「判定(公表データのみ)」列。"
+        f"直近{SC.RESULT_NG_WINDOW_DAYS // 365}年以内の接続検討の回答が 連系不可／負担金{SC.RESULT_NG_YEN_TXT}以上／工期{SC.RESULT_NG_MONTHS}ヶ月以上 のいずれか（実績NG）なら、"
+        "その変電所は空容量が空きありでも接続検討NG（「実績NG(1年以内)」列に回答日・理由。変電所名が確定している実績のみ）。"
+        "実績NGの回答が名指しした上位系の設備を上位系の制約設備として持つ変電所は「上位系の実績警告」列に⚠上位系に実績NG（接続検討OKは要検討に格下げ）。"
+        "実績DBを含まない環境で生成したCSVでは、この2列は空になります。",
         "",
         "| ファイル | 全件 | S/A | うち上位系確認済み | 接続検討OK | 要検討 | 接続検討NG |",
         "|---|---|---|---|---|---|---|",

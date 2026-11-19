@@ -34,12 +34,31 @@ v2（2026-11-06）での変更 — 「高圧2MWは上位系が逼迫していて
   データ無    空容量が未公表で判定できない
 候補地（緯度経度）の判定（judge_site）: 2km以内に「接続検討OK」の変電所があればOK、10km以内にOK／要検討の変電所しか
   無ければ要検討（距離・上位系の理由を出す）、10km以内の空容量データありの変電所がすべてNGならNG、データが無ければ要検討。
+実績による格下げ（2026-11-06、余野さん判断。ResultAdjuster）: 直近1年以内の接続検討の回答が 連系不可／負担金4,000万円以上／
+  工期24ヶ月以上 のいずれか（＝実績NG）なら、その変電所（名前が確定している実績のみ）は公表の空容量が空きありでも「接続検討NG」。
+  実績NGの回答が名指しした上位系の設備（上位変電所の変圧器など）を上位系の制約設備として持つ変電所には「⚠上位系に実績NG」の
+  警告を付け、接続検討OKなら「要検討」に落とす。公表データだけの判定は judgePub として残す。
 """
 
 import json
 import os
 
 MIN_MW = 2       # 最低必要容量（高圧2MWの案件規模）。これ未満の空容量は「空き無し」と同じ扱い（2026-10-20 余野さん判断）
+
+# ── 実績による格下げの閾値（2026-11-06 余野さん判断。詳細はファイル末尾「実績による格下げ」）──
+RESULT_NG_YEN_MAN = 4000      # 負担金（万円）がこれ以上なら実績NG（4,000万円）
+RESULT_NG_MONTHS = 24         # 連系工期（ヶ月）がこれ以上なら実績NG
+RESULT_NG_WINDOW_DAYS = 365   # 回答日がこの日数以内の実績だけを見る（直近1年）
+RESULT_NG_TAG = "実績NG"
+UPPER_WARN_TAG = "⚠上位系に実績NG"
+
+
+def fmt_yen_man(v):
+    """万円の数値を「4,000万円」「2.07億円」のように表示する。"""
+    return f"{v / 10000:g}億円" if v >= 10000 else f"{v:,.0f}万円"
+
+
+RESULT_NG_YEN_TXT = fmt_yen_man(RESULT_NG_YEN_MAN)   # "4,000万円"
 GRID_MAX = 80    # 系統スコア満点
 S7_MAX = 20      # 近接スコア満点
 TOTAL_MAX = 100  # 総合スコア満点
@@ -149,6 +168,10 @@ SCORE_DEFS = [
     ("S5", "配電用変電所か(二次電圧)", "10", "二次≦7kV(6.6/6.0):10 / その他数値:5 / 不明:0", "高圧2MW連系の受け皿"),
     ("S6", "エリア", "5", "エリア点表参照", "実績工期のエリア差(九州3ヶ月〜中部24ヶ月)"),
     ("合計", "系統スコア", "80", "S1a+S1b+S2+S3+S4+S5+S6", ""),
+    ("実績", "実績による判定の格下げ（直近1年の接続検討の回答）", "NG／要検討",
+     f"実績NG＝回答日が直近{RESULT_NG_WINDOW_DAYS // 365}年以内で 連系不可／負担金{RESULT_NG_YEN_TXT}以上／工期{RESULT_NG_MONTHS}ヶ月以上 のいずれか。"
+     "変電所名が確定している実績NGがあれば判定を接続検討NGに。名指しされた上位系の設備を制約設備として持つ変電所は⚠上位系に実績NG（OK→要検討）",
+     "牟礼（公表8MW・OKだが連系不可 2.07億円）、遠野（岩手(変)MT取替 80.8億円）など。推定の実績は変電所のNGには使わない"),
     ("S7", "(土地確定後)変電所・既設配電線への近接", "20", "≦500m:20 / ≦1km:15 / ≦2km:10 / ≦5km:4 / 超:0", "負担金≒400万+0.8〜1.0万円/m×新設延長"),
     ("", "実績補正", "±", "実績DBに同一変電所があれば優先参照(実績メモ列)", "王子SS(バンク対策済み)=神崎920万/3ヶ月 等"),
 ]
@@ -166,6 +189,11 @@ NOTES = [
     "【前提】ランク「データ無」= 空容量が両列とも未公表(OSMのみ等)。ゲート該当行（上位系0かつN-1不可）は「⚠上位系0」の警告を付けて通常どおりランク付けし、判定は「要検討」（2026-10-20までは「除外」として非表示、2026-11-06までは S1=0でランクC）。",
     "【前提】最低必要容量は2MW（高圧の案件規模）。空容量が2MW未満の変電所は「空き無し」と同じ扱い（S1a=0点・判定NG・ゲート判定・地図の色）。2026-10-20に「0以下」から変更。",
     "【前提】S4は出力制御が「なし」(完全一致)の場合のみ加点。「有り」「あり」表記ゆれ・不明は0点。",
+    f"【実績による格下げ】直近{RESULT_NG_WINDOW_DAYS // 365}年以内の接続検討の回答が 連系不可／負担金{RESULT_NG_YEN_TXT}以上／工期{RESULT_NG_MONTHS}ヶ月以上 のいずれか（実績NG）なら、"
+    "その変電所は公表の空容量が空きありでも判定「接続検討NG」（2026-11-06 余野さん判断。変電所名が確定している実績のみ。推定は使わない）。"
+    "実績NGが名指しした上位系の設備（上位変電所の変圧器など）を上位系の制約設備として持つ変電所は「⚠上位系に実績NG」の警告を付け、接続検討OKは要検討に落とす。"
+    "公表データだけの判定は「判定(公表データのみ)」に残す。xlsxの判定(高圧2MW)列は 判定(公表データのみ)・実績NG・上位系の実績警告 の3列から数式で決まる（実績の2列はPython側で算出）。"
+    "閾値は substation_scoring.py の RESULT_NG_YEN_MAN・RESULT_NG_MONTHS・RESULT_NG_WINDOW_DAYS。",
     "【参考】外部DB: 蓄電所ネット「系統連系診断」(https://bess-net.jp/tools/grid-connection-check) は10社8,346変電所の公表データで連系候補Top5を出す無料ツール(2026-10-12更新)。"
     "空容量は当該設備ベースで上位系のゲートが無いため本ツールより甘く出る(例: 旭川中央は上位系考慮0MW・N-1不可でも55点)。本ツールでは上位系0は S1b=0点・判定「要検討」になる。クロスチェック用に使い、採否は本ツールの判定と接続検討で判断する。",
 ]
@@ -376,3 +404,258 @@ RESULTS_MEMO = {}
 for _r in RESULTS_DB:
     _k = results_key(_r[0], _r[1])
     RESULTS_MEMO[_k] = f"{RESULTS_MEMO[_k]} ／ {_r[8]}" if _k in RESULTS_MEMO else _r[8]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 実績による格下げ（2026-11-06 余野さん判断。閾値はここだけを直す）
+#
+#   直近 RESULT_NG_WINDOW_DAYS 日以内の接続検討の回答で、
+#     連系不可 ／ 負担金 ≧ RESULT_NG_YEN_MAN 万円 ／ 連系工期 ≧ RESULT_NG_MONTHS ヶ月
+#   のいずれかに当たる回答を「実績NG」と呼ぶ。
+#
+#   (a) 変電所名が確定している実績NGがある変電所 → 判定を「接続検討NG」に落とす（公表の空容量が空きありでも）。
+#       回答書に変電所名が無く住所から推定した実績（「変電所は推定」）は、別の変電所の回答かもしれないので (a) には使わない。
+#   (b) 実績NGの回答が上位系の設備（例: 岩手(変)275/154kV主要変圧器、金城変電所110/66kV、新岡山(変)）を名指ししているとき、
+#       同じ設備を「上位系の制約設備」として持つ変電所（系統トポロジー data/grid_topology.js の upRefs）にも
+#       「⚠上位系に実績NG」の警告を付け、判定が接続検討OKなら「要検討」に落とす（NG・データ無はそのまま）。
+#       上位設備の名前は回答書に明記されているので、(b) は推定の実績も使う。回答を受けた変電所自身の名前は上位設備に数えない。
+#   公表データだけの判定（judge_row）は judgePub として残し、画面・CSV・xlsxには両方と理由を出す。
+#   実績DB（connection_results.json）が無い環境（実績を公開リポジトリから外した後の公開版）では何も格下げしない。
+# ══════════════════════════════════════════════════════════════════════════════
+import datetime as _dt
+import re as _re
+
+TOPOLOGY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "grid_topology.js")
+
+
+def _parse_yen_man(text):
+    """負担金の文字列から万円単位の金額（最大値）を返す。「4.64億円」「3,246万円」「約3,700〜3,900万円」。無ければ None。"""
+    vals = []
+    for m in _re.finditer(r"([\d,]+(?:\.\d+)?)\s*億円", text or ""):
+        vals.append(float(m.group(1).replace(",", "")) * 10000)
+    for m in _re.finditer(r"([\d,]+(?:\.\d+)?)\s*万円", text or ""):
+        vals.append(float(m.group(1).replace(",", "")))
+    return max(vals) if vals else None
+
+
+def _parse_months(text):
+    """連系工期の文字列から月数（複数あれば最大）を返す。「入金後1年4ヶ月」「配電7ヶ月/上位系10年2ヶ月」「記載なし」→ None。"""
+    vals = []
+    body = _re.sub(r"[（(][^）)]*[）)]", "", text or "")   # 「(受付後73ヶ月)」のような括弧内の補足は見ない
+    for seg in _re.split(r"[/／]", body):
+        m = _re.search(r"(?:(\d+)\s*年)?\s*(\d+)\s*[ヶかカケ]月", seg)
+        if m:
+            vals.append(int(m.group(1) or 0) * 12 + int(m.group(2)))
+        else:
+            m = _re.search(r"(\d+)\s*年(?![\d])", seg)
+            if m:
+                vals.append(int(m.group(1)) * 12)
+    return max(vals) if vals else None
+
+
+def _parse_date(text):
+    """「(2026-04-24)」「(回答2026/5/13)」のような回答日。複数あれば最後のもの。無ければ None。"""
+    ds = _re.findall(r"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})", text or "")
+    if not ds:
+        return None
+    y, mo, d = ds[-1]
+    try:
+        return _dt.date(int(y), int(mo), int(d))
+    except ValueError:
+        return None
+
+
+def norm_sub_name(name):
+    """変電所名の表記ゆれを吸収する（「岩手(変)」「岩手変電所」「岩手」→「岩手」）。"""
+    s = str(name or "")
+    s = _re.sub(r"[\s　]", "", s)
+    s = _re.sub(r"[（(]変[)）]$", "", s)
+    s = _re.sub(r"変電所$", "", s)
+    s = _re.sub(r"[（(]変[)）]", "", s)
+    return s
+
+
+def _upper_names(record):
+    """回答の「主な対策工事」「教訓・律速」から上位系の設備として名指しされた変電所名（正規化済み）を返す。"""
+    text = " ".join(str(x or "") for x in (record[6], record[7]))
+    # 「上位系」以降の記述を優先（無ければ全文）
+    m = _re.search(r"上位系[^:：]*[:：](.*)$", text)
+    body = m.group(1) if m else text
+    names = set()
+    for n in _re.findall(r"([一-龥ァ-ヶー]{1,8})[（(]変[)）]", body):
+        names.add(norm_sub_name(n))
+    for n in _re.findall(r"([一-龥ァ-ヶー]{1,8}変電所)", body):
+        names.add(norm_sub_name(n))
+    own = norm_sub_name(_re.sub(r"^－\(|\)$", "", str(record[1] or "")))
+    names.discard(own)
+    # 固有名でない語（「配電用変電所の増強」「上位変電所」など）は設備名に数えない
+    names -= {"", "配電用", "上位", "基幹", "当該", "連系", "既設", "新設", "他社", "自社", "最寄りの", "最寄り"}
+    return sorted(names)
+
+
+def parse_result(record):
+    """実績DBの1件を解析する。戻り値: dict(area, name, est, date, yen_man, months, no_connect, upper, ng, why)。"""
+    area, name = record[0], str(record[1] or "").strip()
+    memo = str(record[8] or "")
+    text78 = " ".join(str(x or "") for x in (record[7], record[8]))
+    est = "変電所は推定" in text78
+    date = _parse_date(memo) or _parse_date(str(record[7] or ""))
+    yen = _parse_yen_man(str(record[4] or "")) or _parse_yen_man(memo)
+    months = _parse_months(str(record[5] or ""))
+    if months is None:
+        months = _parse_months(memo)
+    no_connect = "連系不可" in text78
+    why = []
+    if no_connect:
+        why.append("連系不可")
+    if yen is not None and yen >= RESULT_NG_YEN_MAN:
+        why.append(f"負担金 {fmt_yen_man(yen)}")
+    if months is not None and months >= RESULT_NG_MONTHS:
+        why.append(f"工期 {months}ヶ月")
+    return {"area": area, "name": name, "est": est, "date": date, "yen_man": yen, "months": months,
+            "no_connect": no_connect, "upper": _upper_names(record), "ng": bool(why), "why": why,
+            "case": str(record[2] or ""), "kw": str(record[3] or "")}
+
+
+def result_ng_records(as_of=None):
+    """直近 RESULT_NG_WINDOW_DAYS 日以内の実績NG（parse_result の dict のリスト）。回答日が無い実績は除く。"""
+    as_of = as_of or _dt.date.today()
+    out = []
+    for rec in RESULTS_DB:
+        p = parse_result(rec)
+        if not p["ng"] or p["date"] is None:
+            continue
+        if (as_of - p["date"]).days > RESULT_NG_WINDOW_DAYS or p["date"] > as_of:
+            continue
+        out.append(p)
+    return out
+
+
+def _fmt_ng(p):
+    # 案件名・住所は出さない（回答書の目的外使用・第三者開示の禁止に配慮）。出力だけ添える
+    return f"{p['date'].isoformat()} {'・'.join(p['why'])}" + (f"（{p['kw']}）" if p["kw"] else "")
+
+
+class ResultAdjuster:
+    """実績NGによる判定の格下げを、変電所ごとに引き当てるための索引。"""
+
+    def __init__(self, as_of=None, topology_path=TOPOLOGY_PATH):
+        self.as_of = as_of or _dt.date.today()
+        self.ngs = result_ng_records(self.as_of)
+        # (a) 変電所名が確定している実績NG → キー（エリア＋名前）ごとの理由
+        self.direct = {}
+        # (b) 名指しされた上位設備 → (エリア, 正規化名) ごとの理由
+        self.upper = {}
+        for p in self.ngs:
+            if not p["est"] and p["name"] and not p["name"].startswith("－"):
+                self.direct.setdefault(results_key(p["area"], p["name"]), []).append(p)
+            for u in p["upper"]:
+                self.upper.setdefault((p["area"], u), []).append(p)
+        # 系統トポロジー: 変電所No → 上位系の制約設備として参照するノード名（正規化）の集合
+        self.up_names_by_no = {}
+        self.topo_ok = False
+        if os.path.exists(topology_path):
+            try:
+                self._load_topology(topology_path)
+                self.topo_ok = True
+            except Exception:  # noqa: BLE001  トポロジーが読めなくても (a) は動かす
+                self.topo_ok = False
+
+    def _load_topology(self, path):
+        raw = open(path, encoding="utf-8").read()
+        t = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
+        NF = {n: i for i, n in enumerate(t["nodeFields"])}
+        BF = {n: i for i, n in enumerate(t["bankFields"])}
+        LF = {n: i for i, n in enumerate(t["lineFields"])}
+        areas = t["meta"]["areas"]
+        nodes, lines = t["nodes"], t["lines"]
+        node_lines = {}
+        for li, l in enumerate(lines):
+            for e in (l[LF["from"]], l[LF["to"]]):
+                if isinstance(e, int):
+                    node_lines.setdefault(e, []).append(li)
+
+        def node_name(ni):
+            return norm_sub_name(nodes[ni][NF["name"]])
+
+        for ni, node in enumerate(nodes):
+            ups = set()
+            for b in node[NF["banks"]]:
+                for ref in b[BF["upRefs"]] or []:
+                    if ref[0] == "N":
+                        ups.add(ref[1])
+                    elif ref[0] == "L":
+                        l = lines[ref[1]]
+                        for e in (l[LF["from"]], l[LF["to"]]):
+                            if isinstance(e, int):
+                                ups.add(e)
+            for li in node_lines.get(ni, []):
+                for ref in lines[li][LF["upRefs"]] or []:
+                    if ref[0] == "N":
+                        ups.add(ref[1])
+            ups.discard(ni)
+            names = {node_name(u) for u in ups}
+            area = areas[node[NF["area"]]] if isinstance(node[NF["area"]], int) else node[NF["area"]]
+            for no in node[NF["nos"]]:
+                self.up_names_by_no[str(no)] = (area, names)
+
+    def upper_hits(self, area, no):
+        """この変電所の上位系の制約設備のうち、実績NGで名指しされたもの → [(設備名, [実績...]), ...]"""
+        ent = self.up_names_by_no.get(str(no)) if no is not None else None
+        if not ent:
+            return []
+        hits = []
+        for nm in sorted(ent[1]):
+            ps = self.upper.get((area, nm))
+            if ps:
+                hits.append((nm, ps))
+        return hits
+
+    def adjust(self, area, name, no, judge_pub):
+        """公表データの判定 judge_pub に実績NGを反映する。
+
+        戻り値: {"judge": 最終判定, "resultNg": 理由（(a)に該当すれば文字列、無ければ ""）,
+                 "upperWarn": 理由（(b)に該当すれば文字列、無ければ ""）}
+        """
+        direct = self.direct.get(results_key(area, name), [])
+        hits = self.upper_hits(area, no)
+        result_ng = ""
+        upper_warn = ""
+        judge = judge_pub
+        if direct:
+            result_ng = (f"{RESULT_NG_TAG}: 直近{RESULT_NG_WINDOW_DAYS // 365}年以内の接続検討で "
+                         + "／".join(_fmt_ng(p) for p in sorted(direct, key=lambda p: p["date"], reverse=True))
+                         + f"。基準: 連系不可・負担金{RESULT_NG_YEN_TXT}以上・工期{RESULT_NG_MONTHS}ヶ月以上のいずれか")
+            judge = JUDGE_NG
+        if hits:
+            parts = []
+            for nm, ps in hits:
+                p0 = sorted(ps, key=lambda p: p["date"], reverse=True)[0]
+                parts.append(f"{nm}（{p0['date'].isoformat()} {p0['name'] or '変電所名なし'}: {'・'.join(p0['why'])}"
+                             + (f" ほか{len(ps) - 1}件" if len(ps) > 1 else "") + "）")
+            upper_warn = (f"{UPPER_WARN_TAG}: この変電所の上位系の制約設備 " + "、".join(parts)
+                          + " が直近の接続検討で増強の対象になった。同じ上位問題で高額・長工期の回答になる可能性があるため、"
+                          + ("接続検討OKから要検討に格下げ" if judge_pub == JUDGE_OK and not direct else "注意して判断"))
+            if judge == JUDGE_OK:
+                judge = JUDGE_CHECK
+        return {"judge": judge, "resultNg": result_ng, "upperWarn": upper_warn}
+
+
+_ADJUSTER = None
+
+
+def result_adjuster(as_of=None):
+    """ResultAdjuster の共有インスタンス（生成が重いので1回だけ作る）。"""
+    global _ADJUSTER
+    if _ADJUSTER is None or (as_of is not None and _ADJUSTER.as_of != as_of):
+        _ADJUSTER = ResultAdjuster(as_of)
+    return _ADJUSTER
+
+
+RESULT_NG_MEANING = {
+    RESULT_NG_TAG: (f"実績NG：直近{RESULT_NG_WINDOW_DAYS // 365}年以内の接続検討の回答（変電所名が確定しているもの）が "
+                    f"連系不可・負担金{RESULT_NG_YEN_TXT}以上・工期{RESULT_NG_MONTHS}ヶ月以上のいずれか。"
+                    "公表の空容量が空きありでも判定を接続検討NGに落とす（住所から推定した実績は使わない）"),
+    UPPER_WARN_TAG: ("上位系に実績NG：実績NGの回答が名指しした上位系の設備（上位変電所の変圧器など）を、この変電所も上位系の制約設備として持つ。"
+                     "同じ上位問題で高額・長工期になる可能性があるため、接続検討OKは要検討に格下げ（要検討・NG・データ無はそのまま）"),
+}

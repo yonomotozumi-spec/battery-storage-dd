@@ -18,6 +18,8 @@
   S1a 変電所単体(当該設備)の空容量 25 / S1b 上位系の空き 10 / S2 N-1電制 10 / S3 潮流余裕 15 / S4 出力制御 5 / S5 配変 10 / S6 エリア 5
 ゲート: 空容量(上位系考慮)＜2MW かつ N-1電制≠可 → ⚠警告（ランクは通常算出。2026-10-20までは「除外」）
 判定: 変電所単体＜2MW＝接続検討NG ／ 単体は空きありだが上位系空き無し・二次電圧7kV超＝要検討 ／ それ以外＝接続検討OK ／ 空容量未公表＝データ無
+実績による格下げ（2026-11-06〜）: 直近1年以内の接続検討の回答が 連系不可／負担金4,000万円以上／工期24ヶ月以上 なら判定NG（AE列）。
+  実績NGが名指しした上位系の設備を制約設備に持つ変電所は「⚠上位系に実績NG」（AF列。OK→要検討）。公表データだけの判定はAD列
 ランク: S:60点以上 / A:48-59 / B:36-47 / C:35以下 / データ無:空容量未公表(OSMのみ等)
 
 配点・閾値・エリア点・実績DBの定義は substation_scoring.py に集約している
@@ -35,12 +37,14 @@ from openpyxl.utils import get_column_letter
 from substation_scoring import (
     AREA_POINTS, ANALYSIS_NOTES, JUDGE_CHECK, JUDGE_MEANING, JUDGE_NG, JUDGE_NODATA, JUDGE_OK, NOTES, PARAM_ROWS,
     RESULTS_DB, RESULTS_MANUAL_COUNT, RESULTS_MEMO, SCORE_DEFS, results_key,
+    RESULT_NG_MEANING, RESULT_NG_TAG, UPPER_WARN_TAG, judge_row, result_adjuster,
 )
 
 HEADER_FILL = PatternFill("solid", fgColor="FCE4D6")
 PARAM_FILL = PatternFill("solid", fgColor="FFFF00")   # 変更可能なパラメータセル
 RANK_FILL = PatternFill("solid", fgColor="FFF2A8")    # ランクS/Aハイライト（黄色）
 GATE_FILL = PatternFill("solid", fgColor="FFE0CC")    # ゲート該当（上位系0の警告）行（薄い橙）
+RESULT_NG_FILL = PatternFill("solid", fgColor="F8CBAD")  # 実績NG（直近1年の接続検討で連系不可・高額・長工期 → 判定NG）行（薄い赤）
 HDR_FONT = Font(bold=True, size=11)
 TITLE_FONT = Font(bold=True, size=14)
 SMALL = Font(size=10)
@@ -119,10 +123,10 @@ def build_base_sheet(ws):
     return params
 
 
-RANK_COUNT_ROWS = 10  # add_rank_counts が使う行数（ランク5＋警告1＋判定4）
+RANK_COUNT_ROWS = 12  # add_rank_counts が使う行数（ランク5＋警告1＋判定4＋実績2）
 
 
-def add_rank_counts(ws, start_row, rank_col_range, gate_col_range, judge_col_range):
+def add_rank_counts(ws, start_row, rank_col_range, gate_col_range, judge_col_range, resng_col_range, upwarn_col_range):
     defs = [
         ("S", "60点以上（最優先で周辺の土地を探す）"),
         ("A", "48〜59点（優先候補）"),
@@ -134,12 +138,18 @@ def add_rank_counts(ws, start_row, rank_col_range, gate_col_range, judge_col_ran
         (JUDGE_CHECK, JUDGE_MEANING[JUDGE_CHECK]),
         (JUDGE_NG, JUDGE_MEANING[JUDGE_NG]),
         (JUDGE_NODATA, JUDGE_MEANING[JUDGE_NODATA]),
+        (RESULT_NG_TAG, RESULT_NG_MEANING[RESULT_NG_TAG]),
+        (UPPER_WARN_TAG, RESULT_NG_MEANING[UPPER_WARN_TAG]),
     ]
     for i, (rank, note) in enumerate(defs):
         r = start_row + i
         ws.cell(r, 1, rank).border = BORDER
-        rng = gate_col_range if rank == "警告" else judge_col_range if rank in JUDGE_MEANING and i >= 6 else rank_col_range
-        fc = ws.cell(r, 2, f'=COUNTIF({rng},"{rank}")')
+        if rank in (RESULT_NG_TAG, UPPER_WARN_TAG):
+            rng = resng_col_range if rank == RESULT_NG_TAG else upwarn_col_range
+            fc = ws.cell(r, 2, f'=COUNTIF({rng},"?*")')   # 文字が入っている行の数
+        else:
+            rng = gate_col_range if rank == "警告" else judge_col_range if rank in JUDGE_MEANING and i >= 6 else rank_col_range
+            fc = ws.cell(r, 2, f'=COUNTIF({rng},"{rank}")')
         fc.border = BORDER; fc.alignment = CENTER
         ws.cell(r, 3, note).border = BORDER
     for col, w in [("A", 44), ("B", 14), ("C", 52), ("D", 52), ("E", 44)]:
@@ -216,12 +226,16 @@ def read_substations(path, sheet_name):
 
 
 def build_scoring_sheet(ws, rows, p, memo_range, key_range):
-    ws["A1"] = "全国変電所スコアリング v2（高圧2MW BESS）　黄色=ランクS/A ／ 橙=ゲート該当（上位系0かつN-1不可の警告。ランクは通常算出・判定は要検討）"
+    ws["A1"] = ("全国変電所スコアリング v2（高圧2MW BESS）　黄色=ランクS/A ／ 橙=ゲート該当（上位系0かつN-1不可の警告。ランクは通常算出・判定は要検討）"
+                " ／ 赤=実績NG（直近1年の接続検討で連系不可・負担金4,000万円以上・工期24ヶ月以上 → 判定NG）")
     ws["A1"].font = TITLE_FONT
     headers = ["No.", "エリア", "変電所名", "都道府県", "最大電圧kV", "二次電圧kV", "緯度", "経度",
                "座標精度", "設備容量MW", "運用容量MW", "予想潮流MW", "空容量_当該MW", "空容量_上位系MW",
                "N-1電制", "出力制御", "所在地(参考)", "ゲート", "判定(高圧2MW)", "S1a単体空容量(25)", "S1b上位系(10)", "S2 N-1(10)",
-               "S3潮流(15)", "S4出制(5)", "S5配変(10)", "S6エリア(5)", "系統スコア(80)", "ランク", "実績メモ"]
+               "S3潮流(15)", "S4出制(5)", "S5配変(10)", "S6エリア(5)", "系統スコア(80)", "ランク", "実績メモ",
+               # 実績による格下げ（AD〜AF）。判定(高圧2MW)＝S列はこの3列から数式で決まる
+               "判定(公表データのみ)", "実績NG(1年以内)", "上位系の実績警告"]
+    adj = result_adjuster()
     for c, h in enumerate(headers, 1):
         cell = ws.cell(2, c, h)
         cell.fill = HEADER_FILL; cell.font = HDR_FONT; cell.alignment = CENTER; cell.border = BORDER
@@ -234,11 +248,19 @@ def build_scoring_sheet(ws, rows, p, memo_range, key_range):
         r = 3 + i
         for c, v in enumerate(data, 1):
             ws.cell(r, c, v)
+        # 実績による格下げ（Python側で算出して文字で入れる。空なら該当なし）
+        no_, area_, name_, vsec_, avail_, avail_up_ = data[0], data[1], data[2], data[5], data[12], data[13]
+        pub = judge_row(vsec_, avail_, avail_up_)["judge"]
+        a = adj.adjust(area_, name_, no_, pub)
+        ws.cell(r, 31, a["resultNg"] or None)
+        ws.cell(r, 32, a["upperWarn"] or None)
         f = {
             # R ゲート: 空容量(上位系考慮)＜最低必要容量(2MW) かつ N-1電制≠可 → 警告（ランクには影響させない）
             18: f'=IF(COUNT($M{r}:$N{r})=0,"",IF(AND({eff(r)}<{p["s1_t3"]["thr"]},$O{r}<>"可"),"警告",""))',
-            # S 判定(高圧2MW): データ無 → 単体＜2MW=NG → 二次電圧7kV超=要検討 → 上位系公表かつ＜2MW=要検討 → OK
-            19: f'=IF(COUNT($M{r}:$N{r})=0,"{JUDGE_NODATA}",IF({own(r)}<{p["s1_t3"]["thr"]},"{JUDGE_NG}",'
+            # S 判定(高圧2MW)＝最終判定: 実績NG(AE)があればNG、上位系の実績警告(AF)があり公表データの判定がOKなら要検討、それ以外は公表データの判定(AD)
+            19: f'=IF($AE{r}<>"","{JUDGE_NG}",IF(AND($AF{r}<>"",$AD{r}="{JUDGE_OK}"),"{JUDGE_CHECK}",$AD{r}))',
+            # AD 判定(公表データのみ): データ無 → 単体＜2MW=NG → 二次電圧7kV超=要検討 → 上位系公表かつ＜2MW=要検討 → OK
+            30: f'=IF(COUNT($M{r}:$N{r})=0,"{JUDGE_NODATA}",IF({own(r)}<{p["s1_t3"]["thr"]},"{JUDGE_NG}",'
                 f'IF(AND(ISNUMBER($F{r}),$F{r}>{p["s5_1"]["thr"]}),"{JUDGE_CHECK}",'
                 f'IF(AND($N{r}<>"",$N{r}<{p["s1b_ok"]["thr"]}),"{JUDGE_CHECK}","{JUDGE_OK}"))))',
             # T S1a 変電所単体（当該設備）の空容量
@@ -273,24 +295,26 @@ def build_scoring_sheet(ws, rows, p, memo_range, key_range):
         }
         for c, formula in f.items():
             ws.cell(r, c, formula)
-        for c in range(18, 29):
+        for c in list(range(18, 29)) + [30]:
             ws.cell(r, c).alignment = CENTER
 
     last = 2 + len(rows)
-    rng = f"A3:AC{last}"
+    rng = f"A3:AF{last}"
+    ws.conditional_formatting.add(rng, FormulaRule(formula=['$AE3<>""'], fill=RESULT_NG_FILL, stopIfTrue=True))
     ws.conditional_formatting.add(rng, FormulaRule(formula=['$R3="警告"'], fill=GATE_FILL, stopIfTrue=True))
     ws.conditional_formatting.add(rng, FormulaRule(formula=['OR($AB3="S",$AB3="A")'], fill=RANK_FILL))
-    ws.auto_filter.ref = f"A2:AC{last}"
+    ws.auto_filter.ref = f"A2:AF{last}"
     ws.freeze_panes = "D3"
 
     widths = [6, 8, 26, 11, 10, 10, 11, 11, 14, 10, 10, 10, 12, 13, 16, 9, 22,
-              7, 12, 12, 10, 10, 10, 9, 10, 10, 12, 9, 40]
+              7, 12, 12, 10, 10, 10, 9, 10, 10, 12, 9, 40, 14, 48, 48]
     for c, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(c)].width = w
     for col in ("G", "H"):
         for r in range(3, last + 1):
             ws.cell(r, {"G": 7, "H": 8}[col]).number_format = "0.000000"
-    return f"スコアリング!$AB$3:$AB${last}", f"スコアリング!$R$3:$R${last}", f"スコアリング!$S$3:$S${last}"
+    return (f"スコアリング!$AB$3:$AB${last}", f"スコアリング!$R$3:$R${last}", f"スコアリング!$S$3:$S${last}",
+            f"スコアリング!$AE$3:$AE${last}", f"スコアリング!$AF$3:$AF${last}")
 
 
 def main():
@@ -311,8 +335,8 @@ def main():
 
     params = build_base_sheet(ws_base)
     memo_range, key_range = build_results_sheet(ws_db)
-    rank_range, gate_range, judge_range = build_scoring_sheet(ws_score, rows, params, memo_range, key_range)
-    add_rank_counts(ws_base, params["rank_count_row"], rank_range, gate_range, judge_range)
+    rank_range, gate_range, judge_range, resng_range, upwarn_range = build_scoring_sheet(ws_score, rows, params, memo_range, key_range)
+    add_rank_counts(ws_base, params["rank_count_row"], rank_range, gate_range, judge_range, resng_range, upwarn_range)
 
     r = params["rank_count_row"] + RANK_COUNT_ROWS + 2
     ws_base.cell(r, 1, "前提・注意").font = HDR_FONT
