@@ -48,7 +48,10 @@
   `notion-fetch` でページを読み、その値を使う。
 - 不動産情報ライブラリ（reinfolib）のキーは、環境変数 `REINFOLIB_API_KEY` に入れて
   `python scripts/reinfolib_judge.py run --lat 緯度 --lon 経度 --out values.json` を実行する。
-  これが「候補地の緯度経度から許認可7項目＋防災レイヤを自動判定する」手順の正。
+  これが「候補地から許認可7項目＋防災レイヤを自動判定する」手順の正。
+  判定は**点ではなく敷地の範囲**で行う（既定：半径50m・近接マージン100m。特高は `--pattern ehv` で150m）。
+  地番が確定して筆の形が手に入ったら `--parcel fude.geojson` で筆ポリゴンを渡して再判定する。
+  敷地の一部でもハザードにかかれば「該当」扱い（安全側）で、面積比と最短距離を必ず併記する。
   出来た values.json は DDチェック画面の「自動判定JSONを読込」か
   `build_px_checksheet.py --values` で使う。
 - キーの値は、コミット・PR・Issue・報告文・ログに**絶対に書かない**。コマンド例に書くときは
