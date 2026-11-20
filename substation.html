@@ -357,7 +357,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <span class="px-badge">PX</span>
       変電所スコア検索
     </div>
-    <div class="pg-sub">候補地の緯度経度から最寄りの変電所を検索し、系統スコア80点＋近接スコア20点で総合評価（系統用蓄電池・高圧2MW前提）</div>
+    <div class="pg-sub">候補地の緯度経度から最寄りの変電所を検索し、系統スコア80点＋近接スコア20点で総合評価（系統用蓄電池・高圧2MW前提）。画面上部の<b>案件パターン</b>で<b>特高</b>（変電所の特高母線・送電線への連系）に切り替えられます</div>
   </div>
   <a class="head-link" id="dd-link" href="index.html">DDチェックシートへ →</a>
 </header>
@@ -368,6 +368,29 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <small>候補地の緯度経度から判定と近くの変電所の採点。同じ画面の地図で位置・上位系統のつながりを確認</small></button>
   <button class="mode-tab" role="tab" id="tab-pref" aria-selected="false">🗾 都道府県から一覧・CSV
     <small>都道府県を選んで（複数可）、S/Aなど良い変電所や全変電所をCSVに</small></button>
+</div>
+
+<!-- ── 案件パターン（高圧2MW／特高）。地図の色・候補地の判定・候補変電所の表・CSVがまとめて切り替わる ── -->
+<div class="card" id="pat-card">
+  <div class="card-head">
+    <span class="sec-tag">Pattern</span>
+    <span class="card-title">案件パターン</span>
+    <span class="card-note" id="pat-note"></span>
+  </div>
+  <div class="frow">
+    <div class="flabel">何を建てるか<div class="fnote">高圧と特高では連系する設備が違い、見るデータも変わります。切り替えると地図の丸の色・凡例・候補地の判定・候補変電所の表・CSVがまとめて切り替わります</div></div>
+    <div class="fcontrol">
+      <div class="opt-row">
+        <label class="chk"><input type="radio" name="pat" id="pat-hv" value="hv" checked> <b>高圧 2MW</b>（配電用バンク＝6.6kV配電線に連系）</label>
+        <label class="chk"><input type="radio" name="pat" id="pat-ehv" value="ehv"> <b>特高</b>（変電所の特高母線・送電線に連系）</label>
+      </div>
+      <div class="coord-row list-row" id="ehv-opts" style="display:none">
+        <div><div class="coord-label">案件規模 (MW)</div><select id="ehv-mw"></select></div>
+        <div><div class="coord-label">任意の規模 (MW)</div><input type="number" id="ehv-mw-custom" placeholder="例: 35" step="0.1" min="0"></div>
+      </div>
+      <div class="fnote" id="ehv-note" style="display:none"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ── 入力 ── -->
@@ -441,12 +464,12 @@ details.foldable[open] > summary::before { content:'▾ '; }
     </div>
     <div class="sum-grid">
       <div class="sum-cell sum-judge" id="sum-judge-cell">
-        <div class="sum-label">この地点の判定（高圧2MW・接続検討を出す価値）</div>
+        <div class="sum-label" id="sum-judge-label">この地点の判定（高圧2MW・接続検討を出す価値）</div>
         <div class="sum-main" id="sum-judge">—</div>
         <div class="sum-sub" id="sum-judge-sub"></div>
       </div>
       <div class="sum-cell">
-        <div class="sum-label">最有力候補（総合スコア）</div>
+        <div class="sum-label" id="sum-best-label">最有力候補（総合スコア）</div>
         <div class="sum-main" id="sum-best">—</div>
         <div class="sum-sub" id="sum-best-sub"></div>
       </div>
@@ -456,7 +479,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
         <div class="sum-sub" id="sum-near-sub"></div>
       </div>
       <div class="sum-cell">
-        <div class="sum-label">範囲内のランクS/A</div>
+        <div class="sum-label" id="sum-sa-label">範囲内のランクS/A</div>
         <div class="sum-main" id="sum-sa">—</div>
         <div class="sum-sub" id="sum-sa-sub"></div>
       </div>
@@ -475,7 +498,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <span class="card-note" id="map-count"></span>
   </div>
   <div class="frow">
-    <div class="flabel">表示する変電所<div class="fnote">地図と下の候補変電所の表に共通の絞り込みです。既定は座標のある全変電所。丸の色は下の「丸の色」で選べます（既定＝判定。薄い緑＋点線＝OKだが上位系が未公表）。大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
+    <div class="flabel">表示する変電所<div class="fnote" id="m-filter-note">地図と下の候補変電所の表に共通の絞り込みです。既定は座標のある全変電所。丸の色は下の「丸の色」で選べます（既定＝判定。薄い緑＋点線＝OKだが上位系が未公表）。大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）</div></div>
     <div class="fcontrol">
       <div class="opt-row" id="m-ranks"></div>
       <div class="coord-row list-row">
@@ -490,7 +513,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
             <option value="ok">上位系の値を公表している変電所だけ</option>
             <option value="ng">上位系の値が未公表（当該設備で代用）の変電所だけ</option>
           </select></div>
-        <div><div class="coord-label">空容量の下限 (MW)</div><input type="number" id="m-mincap" placeholder="例: 6" step="0.1" min="0"></div>
+        <div><div class="coord-label" id="m-mincap-label">空容量の下限 (MW)</div><input type="number" id="m-mincap" placeholder="例: 6" step="0.1" min="0"></div>
         <div><div class="coord-label">電圧階級</div>
           <select id="m-kv">
             <option value="all">すべて</option>
@@ -501,7 +524,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       <div class="coord-row list-row">
         <div><div class="coord-label">丸の色</div>
           <select id="m-color">
-            <option value="judge">判定（高圧2MW）：OK（濃い緑＝上位系も空きあり／薄い緑＝上位系が未公表）／要検討／NG／データ無</option>
+            <option value="judge" id="m-color-judge">判定（高圧2MW）：OK（濃い緑＝上位系も空きあり／薄い緑＝上位系が未公表）／要検討／NG／データ無</option>
             <option value="status">変電所単体の空き × 上位系の空き（5色）</option>
             <option value="rank">系統ランク（S〜C）</option>
           </select></div>
@@ -556,6 +579,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
         <option value="total" selected>総合スコア順（100点）</option>
         <option value="dist">距離が近い順</option>
         <option value="grid">系統スコア順（80点）</option>
+        <option value="ehv" id="sort-ehv" hidden>特高の受入余力が大きい順</option>
       </select>
       <span class="card-note" id="tbl-note">行をクリックすると内訳を表示し、地図でも強調します</span>
     </div>
@@ -563,7 +587,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <div class="tbl-scroll">
       <table class="rtbl">
         <thead>
-          <tr>
+          <tr id="rthead-row">
             <th>#</th><th>変電所</th><th class="num">距離</th>
             <th class="num">S7近接<br>(20)</th><th class="num">系統<br>(80)</th>
             <th class="num">総合<br>(100)</th><th>系統ランク</th><th>判定<br>(高圧2MW)</th><th>地図</th>
@@ -589,7 +613,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
     <div class="tbl-scroll">
       <table class="rtbl">
         <thead>
-          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>当該(MW)</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>系統ランク</th><th>判定<br>(高圧2MW)</th></tr>
+          <tr><th>変電所</th><th>都道府県</th><th class="num">空容量<br>当該(MW)</th><th class="num">空容量<br>上位系(MW)</th><th>N-1電制</th><th class="num">系統(80)</th><th>系統ランク</th><th id="nc-judge-th">判定<br>(高圧2MW)</th></tr>
         </thead>
         <tbody id="nctbody"></tbody>
       </table>
@@ -681,6 +705,7 @@ details.foldable[open] > summary::before { content:'▾ '; }
       </div>
     </div>
   </div>
+  <div class="fnote" id="l-ehv-note" style="display:none;padding:0 16px 10px"></div>
   <div class="res-tools">
     <button class="btn-main" id="btn-list">一覧を表示</button>
     <button class="btn-main" id="btn-csv-list">CSVで保存</button>
@@ -946,6 +971,29 @@ const resultNg = row => (F.resultNg != null ? row[F.resultNg] : '') || '';
 const upperWarn = row => (F.upperWarn != null ? row[F.upperWarn] : '') || '';
 const judgeCls = j => j === JL.ok ? 'jd-ok' : j === JL.check ? 'jd-check' : j === JL.ng ? 'jd-ng' : 'jd-none';
 const fmtKm = m => m >= 1000 ? `${+(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`;
+
+// ── 案件パターン（高圧2MW／特高。2026-11-20）────────────────────────────
+// 高圧2MWは「配電用バンク（当該設備）の空き」で判定できるが、特高（20〜50MW級）の受け皿は変電所の
+// 特高母線（66kV以上）と、そこにつながる送電線・上位変圧器なので、見る設備もデータも別になる。
+// 特高は系統スコア80点を出さず（実績4件で配点を校正できない）、「受入余力(MW)・根拠・判定」で見せる。
+// 定義（案件規模の既定・想定電圧の下限・距離・ラベル）は scripts/substation_scoring.py の EHV_* が単一ソース。
+const EHV = (D && D.params.ehv) ? D.params.ehv : null;
+let PATTERN = 'hv';
+const isEhv = () => PATTERN === 'ehv' && !!EHV;
+// 案件規模(MW)。「任意の規模」に入力があればそれを優先する
+function ehvNeedMw() {
+  const el = $('ehv-mw-custom'), c = el ? parseFloat(el.value) : NaN;
+  if (isFinite(c) && c > 0) return c;
+  const s = $('ehv-mw'), v = s ? parseFloat(s.value) : NaN;
+  return isFinite(v) && v > 0 ? v : (EHV ? EHV.mwDefault : 50);
+}
+const EHV_SITE_OK_M = EHV ? EHV.siteOkM : 5000;
+const EHV_SITE_RANGE_M = EHV ? EHV.siteRangeM : 30000;
+// 特高の表示名（判定の値そのものは高圧と同じ4つ。表示だけ「特高OK」「特高NG」にする）
+const ehvLabel = j => (EHV && EHV.judgeLabel[j]) || j;
+const ehvSrcLabel = s => (EHV && EHV.srcLabel[s]) || s;
+const ehvIsEst = s => !!EHV && s === EHV.src.est;
+const fmtMw = v => v == null ? '—' : `${+(+v).toFixed(1)}`;
 // 変電所単体（当該設備）の空容量。未公表なら上位系考慮で代用
 const ownCap = row => val(row, 'availCur') != null ? val(row, 'availCur') : val(row, 'availUp');
 // 判定の理由（最終判定）。実績による格下げがあればその理由を先に、公表データの判定と理由を後ろに付ける
@@ -1032,7 +1080,10 @@ function run(opts = {}) {
 
   if (sortBy === 'dist') hits.sort((a, b) => a.dist - b.dist);
   else if (sortBy === 'grid') hits.sort((a, b) => b.grid - a.grid || a.dist - b.dist);
-  else hits.sort((a, b) => b.total - a.total || a.dist - b.dist);
+  else if (sortBy === 'ehv') {
+    const cap = h => { const c = ehvOf(h.row).cap; return c == null ? -Infinity : c; };
+    hits.sort((a, b) => cap(b) - cap(a) || a.dist - b.dist);
+  } else hits.sort((a, b) => b.total - a.total || a.dist - b.dist);
 
   lastResults = hits;
   render(hits, { lat, lon, radius, nearestAny, hidden, inRange, nearPrefs, nearAreas });
@@ -1061,10 +1112,15 @@ function render(hits, ctx) {
   $('dd-link').href = `index.html?lat=${lat}&lon=${lon}`;
   $('site-links').innerHTML = `<span class="fnote" style="align-self:center">候補地の現場確認：</span>` + siteLinksHtml(lat, lon, '候補地');
 
-  // この地点の判定（高圧2MW）。絞り込みに影響されないよう、座標のある全変電所から判定する
-  const sj = judgeSite(lat, lon);
-  $('sum-judge').innerHTML = `<span class="jd ${judgeCls(sj.judge)} jd-big">${esc(sj.judge)}</span> <span class="up-tag ${sj.judge === JL.ok ? 'up-ok' : 'up-ng'}" style="font-size:11px">${esc(sj.cause)}</span>`;
-  $('sum-judge-sub').innerHTML = esc(sj.reason) + (sj.key ? `<br>決め手: ${esc(val(sj.key.row, 'name'))} ${judgeBadge(sj.key.row)} ${rkBadge(rank(sj.key.row))}${upTag(sj.key.row)}` : '');
+  // この地点の判定（案件パターンに応じて高圧2MW／特高）。絞り込みに影響されないよう、座標のある全変電所から判定する
+  const sj = patJudgeSite(lat, lon);
+  $('sum-judge-label').textContent = isEhv()
+    ? `この地点の判定（特高 ${fmtMw(ehvNeedMw())}MW・接続検討を出す価値）` : 'この地点の判定（高圧2MW・接続検討を出す価値）';
+  $('sum-judge').innerHTML = `<span class="jd ${judgeCls(sj.judge)} jd-big">${esc(isEhv() ? ehvLabel(sj.judge) : sj.judge)}</span> <span class="up-tag ${sj.judge === JL.ok ? 'up-ok' : 'up-ng'}" style="font-size:11px">${esc(sj.cause)}</span>`;
+  $('sum-judge-sub').innerHTML = esc(sj.reason) + (sj.key
+    ? `<br>決め手: ${esc(val(sj.key.row, 'name'))} ${patJudgeBadge(sj.key.row)}` +
+      (isEhv() ? ` 想定電圧${ehvOf(sj.key.row).kv}kV・受入余力${fmtMw(ehvOf(sj.key.row).cap)}MW（${esc(ehvSrcLabel(ehvOf(sj.key.row).src))}）`
+               : ` ${rkBadge(rank(sj.key.row))}${upTag(sj.key.row)}`) : '');
   $('sum-judge-cell').className = `sum-cell sum-judge ${judgeCls(sj.judge).replace('jd-', 'sj-')}`;
 
   // サマリー
@@ -1074,12 +1130,35 @@ function render(hits, ctx) {
   const saCount = hits.filter(h => ['S', 'A'].includes(rank(h.row))).length;
   const saUpCount = hits.filter(h => ['S', 'A'].includes(rank(h.row)) && upChecked(h.row)).length;
 
-  if (best) {
+  // 特高モードは点数を使わないので、サマリーの2枠を「受入余力が最大の変電所」「範囲内の特高OK」に差し替える
+  if (isEhv()) {
+    $('sum-best-label').textContent = '受入余力が最大の変電所';
+    $('sum-sa-label').textContent = `範囲内の特高OK（${fmtMw(ehvNeedMw())}MW）`;
+    const cands = hits.filter(h => ehvOf(h.row).cap != null);
+    const eb = cands.length ? cands.reduce((a, b) => (ehvOf(b.row).cap > ehvOf(a.row).cap ? b : a)) : null;
+    if (eb) {
+      const e = ehvOf(eb.row);
+      $('sum-best').innerHTML = `${fmtMw(e.cap)} <span style="font-size:12px;color:var(--txt3)">MW</span> ${patJudgeBadge(eb.row)}`;
+      $('sum-best-sub').innerHTML = `${esc(val(eb.row, 'name'))}（${esc(area(eb.row))}）<br>想定電圧 ${e.kv}kV・${esc(ehvSrcLabel(e.src))}　${fmtDist(eb.dist)}`;
+    } else {
+      $('sum-best').textContent = '—';
+      $('sum-best-sub').textContent = '範囲内に受入余力を計算できる変電所がありません（東京・中部・沖縄は上位系の公表データがありません）';
+    }
+    const eOk = hits.filter(h => ehvJudgeOf(h.row) === JL.ok);
+    const eEstN = eOk.filter(h => ehvIsEst(ehvOf(h.row).src)).length;
+    $('sum-sa').textContent = eOk.length + ' 件';
+    $('sum-sa-sub').textContent = `うち公表値が根拠 ${eOk.length - eEstN}件・推定が根拠 ${eEstN}件` +
+      `／範囲内${hits.length}件のうち受入余力を計算できたもの ${hits.filter(h => ehvOf(h.row).cap != null).length}件`;
+  } else if (best) {
+    $('sum-best-label').textContent = '最有力候補（総合スコア）';
+    $('sum-sa-label').textContent = '範囲内のランクS/A';
     $('sum-best').innerHTML = `${best.total} <span style="font-size:12px;color:var(--txt3)">/100</span> ` +
       `<span class="rk ${rkClass(totalRank(best.total))}" title="${esc(totalRankMeaning(totalRank(best.total)))}">総合${totalRank(best.total)}</span>`;
     $('sum-best-sub').innerHTML = `${esc(val(best.row, 'name'))}（${esc(area(best.row))}）` +
       `<br>系統${best.grid} ＋ 近接${best.s7}　${fmtDist(best.dist)}　系統ランク ${rkBadge(rank(best.row))}`;
   } else {
+    $('sum-best-label').textContent = '最有力候補（総合スコア）';
+    $('sum-sa-label').textContent = '範囲内のランクS/A';
     $('sum-best').textContent = '—';
     $('sum-best-sub').textContent = '範囲内に該当なし';
   }
@@ -1091,9 +1170,11 @@ function render(hits, ctx) {
       `<br>座標精度: ${esc(acc(nrow))}　S7=${s7Points(near.dist)}点`;
   }
 
-  $('sum-sa').textContent = saCount + ' 件';
-  $('sum-sa-sub').textContent = `うち上位系を確認できたもの${saUpCount}件・未確認${saCount - saUpCount}件` +
-    `／範囲内${hits.length}件のうち空容量データあり${scored.length}件`;
+  if (!isEhv()) {
+    $('sum-sa').textContent = saCount + ' 件';
+    $('sum-sa-sub').textContent = `うち上位系を確認できたもの${saUpCount}件・未確認${saCount - saUpCount}件` +
+      `／範囲内${hits.length}件のうち空容量データあり${scored.length}件`;
+  }
 
   const notes = [];
   if (!hits.length) notes.push(inRange ? '指定範囲の変電所はすべて絞り込みで非表示です。地図の「表示する変電所」の条件を広げてください。' : '指定範囲に変電所が見つかりませんでした。検索範囲を広げてください。');
@@ -1103,6 +1184,11 @@ function render(hits, ctx) {
     (hits.length ? '' : '<b>この範囲にある変電所はこれだけです。</b>'));
   if (best && best.s7 === 0) notes.push('最有力候補までの距離が5kmを超えており、近接スコアは0点です。負担金は高圧線の亘長にほぼ比例するため、より近い候補地を探すことを推奨します。');
   if (scored.length === 0 && hits.length) notes.push('範囲内の変電所はすべて空容量が未公表（OSM由来）です。系統の空きは送配電事業者の公表マップか接続検討で確認してください。');
+  if (isEhv()) notes.push(`<b>判定（特高 ${fmtMw(ehvNeedMw())}MW）の見方</b>：<span class="jd jd-ok">特高OK</span>＝想定電圧（この変電所にある66kV以上で最も低い母線）の送電線・上位変圧器に案件規模以上の受入余力がある／` +
+    `<span class="jd jd-check">要検討</span>＝余力が案件規模に届かない（0より大きい）／<span class="jd jd-ng">特高NG</span>＝余力0以下。` +
+    `地点の判定は ${fmtKm(EHV_SITE_OK_M)}以内に特高OKの変電所があればOK、${fmtKm(EHV_SITE_RANGE_M)}以内にOK・要検討しか無ければ要検討です（この2つの距離は<b>仮置き</b>で、特高は送電線へのT分岐も可能なため変電所からの距離だけでは決まりません）。` +
+    `<b>特高側の空容量はほぼ公表されていない</b>ため（全国の特高変圧器1,369台中316台・公表値の最大28MW）、判定の多くは公表のN-1電制適用可能量、次に「運用容量−予想潮流」の推定が根拠です。バッジの「推」は推定が根拠、「⚠」は同じ電圧の設備に潮流が運用容量を超えているものがある印です。` +
+    `東京・中部・沖縄は上位系の公表物を自動取得できず、すべて「データ無」になります。`);
   notes.push(`<b>判定（高圧2MW）の見方</b>：<span class="jd jd-ok">OK</span>＝変電所単体（配電用バンク）に空きがあり上位系も空きあり・未公表 → 接続検討を申し込む／` +
     `<span class="jd jd-check">要検討</span>＝単体は空きありだが上位系の空き無し（実績では32件中31件が連系可。ただし工期中央値35ヶ月・出力制御あり）、または配電用変電所でない → 人が判断／` +
     `<span class="jd jd-ng">NG</span>＝単体の空き無し。地点の判定は、${fmtKm(SITE_OK_M)}以内にOKの変電所があればOK、${fmtKm(SITE_RANGE_M)}以内にOK・要検討しか無ければ要検討、すべてNGならNG（絞り込みの設定に影響されません）。`);
@@ -1127,11 +1213,12 @@ function render(hits, ctx) {
         ${memo ? memo.map(m => `<span class="memo-tag">実績: ${esc(m[8])}</span>`).join('<br>') : ''}
       </td>
       <td class="num">${fmtDist(h.dist)}</td>
+      ${isEhv() ? ehvRowCells(row) : `
       <td class="num">${h.s7}</td>
       <td class="num">${h.grid}</td>
       <td class="num total-cell">${h.total}</td>
       <td>${rkBadge(rk)}${upTag(row)}</td>
-      <td>${judgeBadge(row)}</td>
+      <td>${judgeBadge(row)}</td>`}
       <td class="tbl-links"><a href="${gmaps(val(row, 'lat'), val(row, 'lon'))}" target="_blank" rel="noopener">地図</a></td>`;
     const dtr = document.createElement('tr');
     dtr.className = 'row-detail';
@@ -1237,7 +1324,8 @@ function detailHtml(h) {
         S1a・S1b・S3が0点のため系統スコアは実力より低く出ます。判定もできません。送配電事業者の空き容量マップで確認してください。</div>` : '';
 
   return `<div class="detail-in">
-      <div><div class="dt-title">スコア内訳</div>${bars}</div>
+      ${ehvDetailHtml(row)}
+      <div><div class="dt-title">${isEhv() ? 'スコア内訳（高圧2MWの採点。特高では点数を使いません）' : 'スコア内訳'}</div>${bars}</div>
       <div><div class="dt-title">系統データ</div>${kv}</div>
       ${judgeHtml}${gateHtml}${upHtml}${noDataHtml}${accHtml}${memoHtml}
       ${topologyHtml(row)}
@@ -1263,7 +1351,9 @@ function renderNoCoord(prefs, areas) {
   if (!list.length) { card.style.display = 'none'; return; }
   // 判定（OK→要検討→NG）、そのあと系統スコア降順
   const jo = { [JL.ok]: 0, [JL.check]: 1, [JL.ng]: 2 };
-  list.sort((a, b) => (jo[judge(a)] ?? 3) - (jo[judge(b)] ?? 3) || val(b, 'grid') - val(a, 'grid'));
+  const cap = r => { const c = ehvOf(r).cap; return c == null ? -Infinity : c; };
+  list.sort((a, b) => (jo[patJudge(a)] ?? 3) - (jo[patJudge(b)] ?? 3) ||
+    (isEhv() ? cap(b) - cap(a) : val(b, 'grid') - val(a, 'grid')));
   const MAXN = 40;
   tb.innerHTML = list.slice(0, MAXN).map(r => `
     <tr>
@@ -1275,7 +1365,7 @@ function renderNoCoord(prefs, areas) {
       <td>${esc(n1(r))}</td>
       <td class="num">${val(r, 'grid')}</td>
       <td>${rkBadge(rank(r))}${upTag(r)}</td>
-      <td>${judgeBadge(r)}</td>
+      <td>${patJudgeBadge(r)}</td>
     </tr>`).join('');
   $('nocoord-note').textContent = `${[...prefs].join('・')} ${list.length}件` + (list.length > MAXN ? `中 ${MAXN}件を表示` : '');
   card.style.display = '';
@@ -1321,6 +1411,19 @@ const CSV_COLS = [
   ['つながる送電線の本数', r => TOPO && nodeOf(r) != null ? nodeLinks(nodeOf(r)).length : ''],
   ['上位側の送電線（相手側・上位側の空き）', r => TOPO ? upLinesText(r) : ''],
   ['上位系の制約設備（▼＝空き2MW未満）', r => TOPO ? upperEquipText(r) : ''],
+  // ── 特高パターン（2026-11-20。scripts/grid_status.py の ehv() と同じ値）──
+  ['特高_案件規模MW', () => EHV ? fmtMw(ehvNeedMw()) : ''],
+  ['特高_想定電圧kV', r => EHV ? (ehvOf(r).kv != null ? ehvOf(r).kv : '') : ''],
+  ['特高_受入余力MW', r => EHV ? (ehvOf(r).cap != null ? fmtMw(ehvOf(r).cap) : '') : ''],
+  ['特高_余力の根拠', r => EHV ? (ehvOf(r).src ? ehvSrcLabel(ehvOf(r).src) : '') : ''],
+  ['特高_判定', r => EHV ? ehvLabel(ehvJudgeOf(r)) : ''],
+  ['特高_判定の理由', r => EHV ? ehvReason(r) : ''],
+  ['特高_潮流超過の設備数', r => EHV ? (ehvOf(r).over || '') : ''],
+  ['特高_想定電圧の設備ごとの余力', r => {
+    const e = EHV ? ehvOf(r) : null;
+    return e && e.items ? e.items.slice().sort((a, b) => b.room - a.room)
+      .map(i => `${i.what}[${fmtMw(i.room)}MW・${ehvSrcLabel(i.src)}]`).join(' / ') : '';
+  }],
 ];
 
 // ── CSV向けの文字（HTMLなし）。scripts/grid_status.py の up_lines_text / upper_equipment_text / memo_text と同じ内容 ──
@@ -1391,10 +1494,12 @@ const today = () => new Date().toISOString().slice(0, 10);
 function csvNear() {
   if (!lastResults.length) return;
   const latN = parseFloat($('lat').value), lonN = parseFloat($('lon').value);
-  const sj = judgeSite(latN, lonN);
-  const header = ['順位', '距離km', 'S7近接(20)', '総合(100)', '総合ランク', '総合ランクの意味', '地点の判定(高圧2MW)', '地点の判定の理由', ...CSV_COLS.map(c => c[0])];
+  const sj = patJudgeSite(latN, lonN);
+  const header = ['順位', '距離km', 'S7近接(20)', '総合(100)', '総合ランク', '総合ランクの意味',
+    isEhv() ? `地点の判定(特高 ${fmtMw(ehvNeedMw())}MW)` : '地点の判定(高圧2MW)', '地点の判定の理由', ...CSV_COLS.map(c => c[0])];
+  const sjLabel = isEhv() ? ehvLabel(sj.judge) : sj.judge;
   const lines = lastResults.map((h, i) => [i + 1, (h.dist / 1000).toFixed(2), h.s7, h.total,
-    totalRank(h.total), totalRankMeaning(totalRank(h.total)), sj.judge, sj.reason, ...CSV_COLS.map(c => c[1](h.row))]);
+    totalRank(h.total), totalRankMeaning(totalRank(h.total)), sjLabel, sj.reason, ...CSV_COLS.map(c => c[1](h.row))]);
   const lat = latN.toFixed(4), lon = lonN.toFixed(4);
   // ファイル名は半角のみ。日本語名はブラウザによって「download」に化けるため
   downloadCsv(`substations_near_${lat}_${lon}_${today()}.csv`, header, lines);
@@ -1828,6 +1933,183 @@ const gsBadge = row => { const g = gridStatus(row); return `<span class="ust ${G
 const ustBadge = gsBadge;
 const capCell = v => v == null ? '—' : noRoom(v) ? `<span class="cap-bad">${v}</span>` : `<span class="cap-ok">${v}</span>`;
 
+// ── 特高の受入余力（2026-11-20）─────────────────────────────────────────
+// scripts/grid_status.py の ehv() と同じルール。**どちらかを変えたら必ず両方直すこと**（件数が一致することを確認）。
+// 1設備の受入余力は 公表の空容量 → 公表のN-1電制適用可能量 → 余裕（運用容量−|予想潮流|・推定）の優先順。
+// 想定電圧は「その変電所にある EHV.kvMin(66kV)以上の母線のうち最も低い電圧」。その電圧の送電線と、
+// この変電所でその電圧を作っているバンクを集め、公表値のある段を優先して最も余力の大きい設備を根拠にする。
+function ehvRoom(pubCap, n1amt, opcap, flow) {
+  if (pubCap != null) return [pubCap, EHV.src.cap];
+  if (typeof n1amt === 'number') return [n1amt, EHV.src.n1];
+  if (typeof opcap === 'number' && typeof flow === 'number') return [opcap - Math.abs(flow), EHV.src.est];
+  return [null, null];
+}
+function ehvKvOf(row, ni) {
+  const vs = [];
+  TOPO.nodes[ni][3].forEach(b => ['v1', 'v2'].forEach(k => {
+    const v = b[BF[k]];
+    if (typeof v === 'number' && v >= EHV.kvMin) vs.push(v);
+  }));
+  const vm = val(row, 'vmax');
+  if (typeof vm === 'number' && vm >= EHV.kvMin) vs.push(vm);
+  return vs.length ? Math.min(...vs) : null;
+}
+const EHV_CACHE = new Map();
+function ehvOf(row) {
+  if (EHV_CACHE.has(row)) return EHV_CACHE.get(row);
+  const r = ehvCalc(row);
+  EHV_CACHE.set(row, r);
+  return r;
+}
+function ehvCalc(row) {
+  if (!EHV || !TOPO) return { why: '系統トポロジーのデータが無い' };
+  if (!TOPO.meta.areas.includes(area(row))) return { why: `${area(row)}エリアは上位系の公表データを取得できず対象外（東京・中部・沖縄）` };
+  const ni = nodeOf(row);
+  if (ni == null) return { why: '公表物にこの変電所と同名のノードが無く、つながりをたどれない' };
+  const kv = ehvKvOf(row, ni);
+  if (kv == null) return { why: `${EHV.kvMin}kV以上の母線が見つからない（22/33kVのみなど）` };
+  const items = [];
+  nodeLinks(ni).forEach(x => {
+    const l = x.line, lkv = lineKv(l);
+    if (typeof lkv !== 'number' || Math.abs(lkv - kv) >= 3) return;
+    let [room, src] = ehvRoom(lineCap(l), l[LF.n1amt], l[LF.opcap], l[LF.flow]);
+    if (room == null) {
+      // 送電線自体に公表値が無ければ、相手側（上位側）変電所の同電圧バンクで代用する
+      if (typeof x.other === 'number') {
+        for (const b of TOPO.nodes[x.other][3]) {
+          const v2 = b[BF.v2];
+          if (typeof v2 !== 'number' || Math.abs(v2 - kv) >= 3) continue;
+          const [r2, s2] = ehvRoom(bankCap(b), null, b[BF.opcap], b[BF.flow]);
+          if (r2 != null) { items.push({ what: `${TOPO.nodes[x.other][1]}の${kv}kVバンク`, room: r2, src: s2 }); break; }
+        }
+      }
+      return;
+    }
+    items.push({ what: `${l[LF.name]}（${kv}kV）`, room, src });
+  });
+  TOPO.nodes[ni][3].forEach(b => {
+    const v2 = b[BF.v2];
+    if (typeof v2 !== 'number' || Math.abs(v2 - kv) >= 3) return;
+    const [room, src] = ehvRoom(bankCap(b), null, b[BF.opcap], b[BF.flow]);
+    if (room != null) items.push({ what: `この変電所の${fmtNum(b[BF.v1])}/${kv}kVバンク`, room, src });
+  });
+  if (!items.length) return { why: `${kv}kVの設備に公表データ（空容量・N-1電制適用可能量・運用容量と予想潮流）が無い`, kv };
+  let pick = null;
+  for (const src of [EHV.src.cap, EHV.src.n1, EHV.src.est]) {
+    const c = items.filter(i => i.src === src);
+    if (c.length) { pick = c.reduce((a, b) => (b.room > a.room ? b : a)); break; }
+  }
+  const ests = items.filter(i => i.src === EHV.src.est).map(i => i.room);
+  return { kv, cap: pick.room, src: pick.src, what: pick.what, n: items.length,
+    over: ests.filter(e => e < 0).length, minEst: ests.length ? Math.min(...ests) : null, items };
+}
+// 特高の判定（案件規模との比較）。余力 ≧ 規模=OK ／ 0＜余力＜規模=要検討 ／ 余力≦0=NG ／ 計算不能=データ無
+function ehvJudgeOf(row) {
+  const e = ehvOf(row);
+  if (e.cap == null) return JL.nodata;
+  const need = ehvNeedMw();
+  return e.cap >= need ? JL.ok : e.cap > 0 ? JL.check : JL.ng;
+}
+function ehvReason(row) {
+  const e = ehvOf(row);
+  if (e.cap == null) return e.why || '';
+  const need = ehvNeedMw();
+  let s = `想定電圧 ${e.kv}kV の上位系設備 ${e.n}件のうち受入余力が最大のもの＝${e.what} で ${fmtMw(e.cap)}MW（${ehvSrcLabel(e.src)}）`;
+  s += e.cap >= need ? `。案件規模 ${fmtMw(need)}MW 以上の余力あり`
+    : e.cap > 0 ? `。案件規模 ${fmtMw(need)}MW に届かない（規模を落とすか増強前提か人が判断）`
+    : '。余力0以下（予想潮流が運用容量を超えている等）';
+  if (e.over) s += `。${EHV.overTag}：同じ電圧の設備 ${e.over}件で予想潮流が運用容量を超えている（最小 ${fmtMw(e.minEst)}MW）`;
+  if (ehvIsEst(e.src)) s += '。根拠が推定値なので接続検討で必ず確認する';
+  return s;
+}
+// ── パターン共通の入口。高圧モードでは従来どおりの判定、特高モードでは特高の判定を返す ──
+const patJudge = row => isEhv() ? ehvJudgeOf(row) : judge(row);
+const patJudgeShort = row => { const j = patJudge(row); return isEhv() ? ehvLabel(j) : (JUDGE_SHORT[j] || j); };
+const patJudgeMeaning = j => isEhv() ? (EHV.judgeMeaning[j] || j) : (JUDGE_MEANING[j] || j);
+const patJudgeReason = row => isEhv() ? ehvReason(row) : judgeReason(row);
+const patJudgeTitle = () => isEhv() ? `判定（特高 ${fmtMw(ehvNeedMw())}MW）` : '判定（高圧2MW）';
+function patJudgeBadge(row, big) {
+  if (!isEhv()) return judgeBadge(row, big);
+  const j = ehvJudgeOf(row), e = ehvOf(row);
+  const mark = e.over ? '⚠' : '';
+  const est = ehvIsEst(e.src) ? '推' : '';
+  return `<span class="jd ${judgeCls(j)}${big ? ' jd-big' : ''}" title="${esc(patJudgeMeaning(j))}&#10;${esc(ehvReason(row))}">${esc(big ? ehvLabel(j) : ehvLabel(j))}${est}${mark}</span>`;
+}
+// 候補地（緯度経度）の特高の判定。構造は judgeSite と同じで距離の閾値だけ EHV_SITE_* を使う
+function ehvJudgeSite(lat, lon) {
+  const need = ehvNeedMw(), inrange = [];
+  for (const row of D.rows) {
+    const la = val(row, 'lat'), lo = val(row, 'lon');
+    if (la == null || lo == null) continue;
+    const j = ehvJudgeOf(row);
+    if (j === JL.nodata) continue;
+    const d = distanceM(lat, lon, la, lo);
+    if (d <= EHV_SITE_RANGE_M) inrange.push({ row, d, j });
+  }
+  inrange.sort((a, b) => a.d - b.d);
+  const oks = inrange.filter(x => x.j === JL.ok), checks = inrange.filter(x => x.j === JL.check);
+  const nm = x => `${val(x.row, 'name')}`;
+  if (oks.length && oks[0].d <= EHV_SITE_OK_M) return { judge: JL.ok, key: oks[0], cause: `${fmtKm(EHV_SITE_OK_M)}以内に特高OKの変電所`,
+    reason: `${fmtKm(EHV_SITE_OK_M)}以内に${fmtMw(need)}MWの受入余力がある変電所あり（${nm(oks[0])}・${fmtKm(oks[0].d)}）。引込送電線の経路・用地と、接続検討での上位系の扱いを確認する` };
+  if (oks.length) return { judge: JL.check, key: oks[0], cause: `特高OKの変電所が${fmtKm(EHV_SITE_OK_M)}より遠い（${fmtKm(oks[0].d)}）`,
+    reason: `最も近い${fmtMw(need)}MWの受入余力がある変電所（${nm(oks[0])}）まで ${fmtKm(oks[0].d)}。特高は専用の引込送電線を建設するため距離がそのまま負担金・工期に効く（実績は連系線0.1km級で隣接立地）。送電線へのT分岐の可否も含めて検討する` };
+  if (checks.length) return { judge: JL.check, key: checks[0], cause: `${fmtMw(need)}MWに届く変電所が無い`,
+    reason: `${fmtKm(EHV_SITE_RANGE_M)}以内に${fmtMw(need)}MWの受入余力がある変電所が無く、最も近いのは余力不足の ${nm(checks[0])}（${fmtKm(checks[0].d)}・${fmtMw(ehvOf(checks[0].row).cap)}MW）。案件規模を落とすか、増強を前提にするかを人が判断する` };
+  if (inrange.length) return { judge: JL.ng, key: inrange[0], cause: '周辺の変電所がすべて余力0以下',
+    reason: `${fmtKm(EHV_SITE_RANGE_M)}以内で受入余力を計算できた変電所 ${inrange.length}件はすべて余力0以下（予想潮流が運用容量を超えている等。最寄りは ${nm(inrange[0])}・${fmtKm(inrange[0].d)}）` };
+  return { judge: JL.nodata, key: null, cause: '判定材料なし',
+    reason: `${fmtKm(EHV_SITE_RANGE_M)}以内に上位系の公表データがある変電所が無く、特高の受入余力を計算できない（東京・中部・沖縄は系統トポロジーが無いためこの判定が出せない）` };
+}
+const patJudgeSite = (lat, lon) => isEhv() ? ehvJudgeSite(lat, lon) : judgeSite(lat, lon);
+
+// 候補変電所の表：特高モードの列（高圧の S7近接／系統／総合／系統ランク／判定 と同じ5セル）
+function ehvRowCells(row) {
+  const e = ehvOf(row);
+  if (e.cap == null) return `
+      <td class="num">${e.kv != null ? e.kv + 'kV' : '—'}</td>
+      <td class="num">—</td><td class="num">—</td>
+      <td><span class="fnote" title="${esc(e.why || '')}">${esc((e.why || '').slice(0, 24))}…</span></td>
+      <td>${patJudgeBadge(row)}</td>`;
+  return `
+      <td class="num">${e.kv}kV</td>
+      <td class="num total-cell">${fmtMw(e.cap)}</td>
+      <td class="num">${e.n}</td>
+      <td><span class="fnote" title="${esc(ehvSrcLabel(e.src))}">${esc(ehvIsEst(e.src) ? '推定（運用容量−潮流）' : e.src === EHV.src.cap ? '空容量（公表）' : 'N-1電制量（公表）')}</span></td>
+      <td>${patJudgeBadge(row)}</td>`;
+}
+// 候補変電所の表のヘッダをパターンに合わせて差し替える（列数は9で揃える）
+function setTableHead() {
+  const tr = $('rthead-row');
+  if (!tr) return;
+  tr.innerHTML = isEhv()
+    ? `<th>#</th><th>変電所</th><th class="num">距離</th>` +
+      `<th class="num">想定<br>電圧</th><th class="num">受入余力<br>(MW)</th><th class="num">設備<br>件数</th>` +
+      `<th>余力の根拠</th><th>判定<br>(特高 ${fmtMw(ehvNeedMw())}MW)</th><th>地図</th>`
+    : `<th>#</th><th>変電所</th><th class="num">距離</th>` +
+      `<th class="num">S7近接<br>(20)</th><th class="num">系統<br>(80)</th>` +
+      `<th class="num">総合<br>(100)</th><th>系統ランク</th><th>判定<br>(高圧2MW)</th><th>地図</th>`;
+}
+
+// 特高モードの内訳カード（想定電圧・受入余力・根拠・設備ごとの内訳・注意）
+function ehvDetailHtml(row) {
+  if (!isEhv()) return '';
+  const e = ehvOf(row), j = ehvJudgeOf(row), need = ehvNeedMw();
+  if (e.cap == null) return `<div class="detail-note"><b>特高の受入余力：計算できません</b><br>${esc(e.why || '')}<br>
+    <span style="color:var(--txt3)">東京・中部・沖縄は送電線・上位変圧器の公表物を自動取得できないため、特高の判定が出せません。中部は地図の「中部電力PG公表の送電線」で実形状とN-1電制適用可能量を確認できます。</span></div>`;
+  const rows = e.items.slice().sort((a, b) => b.room - a.room).map(i =>
+    `<tr><td>${esc(i.what)}</td><td class="num">${fmtMw(i.room)}</td><td>${esc(ehvSrcLabel(i.src))}</td></tr>`).join('');
+  return `<div class="detail-note" style="border-color:${j === JL.ok ? 'var(--pass)' : j === JL.check ? '#8E24AA' : j === JL.ng ? 'var(--fail)' : 'var(--bdr)'}">
+      <b>判定（特高 ${fmtMw(need)}MW）</b> ${patJudgeBadge(row, true)}<br>
+      想定電圧 <b>${e.kv}kV</b>（この変電所にある66kV以上の母線のうち最も低い電圧）／受入余力 <b>${fmtMw(e.cap)}MW</b>（${esc(ehvSrcLabel(e.src))}）<br>
+      ${esc(ehvReason(row))}<br>
+      <span style="color:var(--txt3)">${esc(patJudgeMeaning(j))}</span>
+      <table class="def-tbl" style="margin-top:8px"><thead><tr><th>想定電圧の設備</th><th class="num">受入余力(MW)</th><th>根拠</th></tr></thead><tbody>${rows}</tbody></table>
+      ${ehvIsEst(e.src) ? `<div style="margin-top:6px;color:#B06A00"><b>根拠は推定値です</b>：${esc(EHV.srcNote[EHV.src.est])}</div>` : ''}
+      ${e.over ? `<div style="margin-top:6px;color:var(--fail)"><b>${esc(EHV.overTag)}</b>：${esc(EHV.overMeaning)}</div>` : ''}
+      ${e.kv >= 154 ? `<div style="margin-top:6px;color:var(--txt3)">想定電圧が154kV以上です。引出設備・遮断器が大規模になり、実績では負担金1.7〜9.2億円・工期26〜73ヶ月でした。</div>` : ''}
+    </div>`;
+}
+
 // 上位系設備の参照（["L", 送電線添字] / ["N", ノード添字] / ["T", 文字]）を表示用の文字にする。空き0以下のものは赤
 function refLabel(ref) {
   const [k, v] = ref;
@@ -2067,7 +2349,11 @@ function mapFilter(opts = {}) {
     if (up === 'ownok' && !['both', 'upunk', 'upbad'].includes(gridStatus(r).cls)) return false;
     if (['both', 'upbad', 'upunk', 'ownbad'].includes(up) && gridStatus(r).cls !== up) return false;
     if ($('m-memo').checked && !memoOf(r)) return false;
-    if (isFinite(minCap) && !(effCap(r) >= minCap)) return false;
+    // 「下限(MW)」は高圧モードでは空容量、特高モードでは特高の受入余力に効かせる
+    if (isFinite(minCap)) {
+      const v = isEhv() ? ehvOf(r).cap : effCap(r);
+      if (!(v != null && v >= minCap)) return false;
+    }
     const vm = val(r, 'vmax');
     if (kvSel === 'hi' && !(vm >= 154)) return false;
     if (kvSel === 'lo' && !(vm != null && vm < 154)) return false;
@@ -2086,10 +2372,13 @@ const okUnverified = r => judge(r) === JL.ok && hasData(r) && !upChecked(r);
 function markerStyle(r, selected) {
   const rk = rank(r), big = val(r, 'vmax') >= 154;
   const mode = $('m-color').value;
-  const okUnk = mode === 'judge' && okUnverified(r);
+  const ehvMode = mode === 'judge' && isEhv();
+  const jd = ehvMode ? ehvJudgeOf(r) : judge(r);
+  // 判定モードで薄い色＋点線にするもの: 高圧は「OKだが上位系が未公表」、特高は「OKだが根拠が推定値」
+  const okUnk = mode === 'judge' && (ehvMode ? (jd === JL.ok && ehvIsEst(ehvOf(r).src)) : okUnverified(r));
   const fill = okUnk ? JUDGE_OK_UNK_COLOR
-    : mode === 'judge' ? (JUDGE_COLOR[judge(r)] || '#999') : mode === 'status' ? GS_COLOR[gridStatus(r).cls] : (RANK_COLOR[rk] || '#999');
-  const faint = mode === 'judge' ? judge(r) === JL.nodata : mode === 'status' ? gridStatus(r).cls === 'none' : rk === 'データ無';
+    : mode === 'judge' ? (JUDGE_COLOR[jd] || '#999') : mode === 'status' ? GS_COLOR[gridStatus(r).cls] : (RANK_COLOR[rk] || '#999');
+  const faint = mode === 'judge' ? jd === JL.nodata : mode === 'status' ? gridStatus(r).cls === 'none' : rk === 'データ無';
   return {
     radius: (big ? 7 : 4.5) + (selected ? 3 : 0),
     fillColor: fill, fillOpacity: faint ? .6 : .9,
@@ -2100,10 +2389,20 @@ function markerStyle(r, selected) {
   };
 }
 
+// 特高モードのツールチップの1行（想定電圧・受入余力・根拠・判定）
+function ehvTipLine(r) {
+  const e = ehvOf(r), j = ehvJudgeOf(r);
+  if (e.cap == null) return `判定(特高 ${fmtMw(ehvNeedMw())}MW): <b style="color:#999">${esc(ehvLabel(JL.nodata))}</b>（${esc(e.why || '')}）<br>`;
+  return `判定(特高 ${fmtMw(ehvNeedMw())}MW): <b style="color:${JUDGE_COLOR[j] || '#999'}">${esc(ehvLabel(j))}</b>` +
+    `　想定電圧 ${e.kv}kV・受入余力 <b>${fmtMw(e.cap)}MW</b>（${esc(ehvSrcLabel(e.src))}）` +
+    (e.over ? `<span style="color:#CC2A20">　${esc(EHV.overTag)}${e.over}件</span>` : '') + '<br>';
+}
+
 function markerTip(r) {
   return `<b>${esc(val(r, 'name'))}</b>（${esc(area(r))}${prefOf(r) ? ' / ' + esc(prefOf(r)) : ''}）<br>` +
     `系統ランク ${esc(rank(r))}・${val(r, 'grid')}点　${val(r, 'vmax') != null ? val(r, 'vmax') + 'kV' : ''}${val(r, 'vsec') != null ? '→' + val(r, 'vsec') + 'kV' : ''}<br>` +
     `空容量 上位系 ${fmtNum(val(r, 'availUp'))}／当該 ${fmtNum(val(r, 'availCur'))} MW　N-1 ${esc(n1(r))}<br>` +
+    (isEhv() ? ehvTipLine(r) : '') +
     `判定(高圧2MW): <b style="color:${JUDGE_COLOR[judge(r)] || '#999'}">${esc(judge(r))}</b>${okUnverified(r) ? '<span style="color:#B06A00">（上位系未確認）</span>' : ''}　カテゴリ: <b style="color:${GS_COLOR[gridStatus(r).cls]}">${esc(gridStatus(r).label)}</b>` +
     (nodeOf(r) != null ? `　つながる送電線 ${nodeLinks(nodeOf(r)).length}本` : '') +
     (memoOf(r) ? `<br>接続検討の実績 ${memoSummary(r).n}件（対策なし ${memoSummary(r).none}・バンク等の対策待ち ${memoSummary(r).bank}・上位系対策あり ${memoSummary(r).yes}・記載なし ${memoSummary(r).unk}${memoSummary(r).est ? `・うち変電所は推定 ${memoSummary(r).est}` : ''}）` : '');
@@ -2137,7 +2436,10 @@ function renderMarkers() {
   const cnt = k => list.filter(r => gridStatus(r).cls === k).length, nMemo = list.filter(r => memoOf(r)).length;
   const jc = j => list.filter(r => judge(r) === j).length, okUnkN = list.filter(r => okUnverified(r)).length;
   const noCoord = D.meta.total - D.meta.withCoords;
+  const ec = j => list.filter(r => ehvJudgeOf(r) === j).length;
+  const eEst = list.filter(r => ehvJudgeOf(r) === JL.ok && ehvIsEst(ehvOf(r).src)).length;
   $('map-count').innerHTML = `表示 ${list.length.toLocaleString()}件／座標あり ${D.meta.withCoords.toLocaleString()}件（S/A ${sa.toLocaleString()}）` +
+    (isEhv() ? `<br>判定(特高 ${fmtMw(ehvNeedMw())}MW): 特高OK ${ec(JL.ok).toLocaleString()}（うち根拠が推定 ${eEst.toLocaleString()}）・要検討 ${ec(JL.check).toLocaleString()}・特高NG ${ec(JL.ng).toLocaleString()}・データ無 ${ec(JL.nodata).toLocaleString()}` : '') +
     `<br>判定: OK ${jc(JL.ok).toLocaleString()}（うち上位系が未公表 ${okUnkN.toLocaleString()}）・要検討 ${jc(JL.check).toLocaleString()}・NG ${jc(JL.ng).toLocaleString()}・データ無 ${jc(JL.nodata).toLocaleString()}` +
     `<br>緑 ${cnt('both').toLocaleString()}・黄 ${cnt('upunk').toLocaleString()}・紫 ${cnt('upbad').toLocaleString()}・赤 ${cnt('ownbad').toLocaleString()}・灰 ${cnt('none').toLocaleString()}・実績あり ${nMemo}` +
     `<br>座標が未取得の ${noCoord.toLocaleString()}件は地図に出ません`;
@@ -2146,7 +2448,16 @@ function renderMarkers() {
 function renderLegend() {
   const dot = (c, extra = '') => `<span class="lg-dot ${extra}" style="background:${c}"></span>`;
   const mode = $('m-color').value;
-  const dots = mode === 'judge'
+  const dots = mode === 'judge' && isEhv()
+    ? `<span><b>丸の色＝判定（特高 ${fmtMw(ehvNeedMw())}MW・変電所ごと）：</b></span>` +
+      `<span title="${esc(EHV.judgeMeaning[JL.ok] || '')}">${dot(JUDGE_COLOR[JL.ok])}${esc(ehvLabel(JL.ok))}（公表値が根拠）</span>` +
+      `<span title="公表の空容量もN-1電制適用可能量も無く、運用容量−予想潮流の「余裕」で代用した推定値が根拠。精度を検証する手段が無いため接続検討で必ず確認してください">${dot(JUDGE_OK_UNK_COLOR, 'ok-unk')}${esc(ehvLabel(JL.ok))}（根拠が推定）</span>` +
+      [JL.check, JL.ng, JL.nodata].map(j => `<span title="${esc(EHV.judgeMeaning[j] || '')}">${dot(JUDGE_COLOR[j])}${esc(ehvLabel(j))}</span>`).join('') +
+      `<span>※受入余力は「想定電圧（この変電所にある66kV以上で最も低い母線）の送電線・上位変圧器のうち最も余力の大きい設備の値」です。公表の空容量 → 公表のN-1電制適用可能量 → 余裕（運用容量−予想潮流・推定）の順に拾っています。</span>` +
+      `<span>※特高側の空容量はほぼ公表されていないため（全国1,369台中316台・最大28MW）、判定の多くはN-1電制適用可能量（ノンファーム・N-1電制前提の受入可能量）が根拠です。</span>` +
+      `<span>※東京・中部・沖縄は送電線・上位変圧器の公表物を自動取得できず、すべて「データ無」になります（中部は下の「中部電力PG公表の送電線」で実形状を確認できます）。</span>` +
+      `<span>※バッジの「推」＝根拠が推定値、「⚠」＝同じ電圧の設備に予想潮流が運用容量を超えているものがある、という印です。</span>`
+    : mode === 'judge'
     ? `<span><b>丸の色＝判定（高圧2MW・変電所ごと）：</b></span>` +
       `<span title="${esc(JUDGE_MEANING[JL.ok] || '')}">${dot(JUDGE_COLOR[JL.ok])}${esc(JL.ok)}（上位系も空きあり）</span>` +
       `<span title="空容量(上位系考慮)が未公表のため「上位系の空き無し」と判定できずOKになっている変電所。東北・中部・四国・北陸・沖縄に多い">${dot(JUDGE_OK_UNK_COLOR, 'ok-unk')}${esc(JL.ok)}（上位系が未公表）</span>` +
@@ -2474,6 +2785,66 @@ function initMapControls() {
     : '・data/grid_topology.js を読み込めなかったため、つながりの表示はできません（空容量などの表示は可能です）。';
 }
 
+// ── 案件パターン（高圧2MW／特高）の切り替え ──
+// 切り替えると地図の丸の色・凡例・件数、候補地の判定、候補変電所の表・CSVがまとめて特高基準になる。
+function applyPattern(opts = {}) {
+  const ehv = isEhv();
+  $('ehv-opts').style.display = ehv ? '' : 'none';
+  $('ehv-note').style.display = ehv ? '' : 'none';
+  $('pat-note').textContent = ehv ? `特高 ${fmtMw(ehvNeedMw())}MW で判定しています` : '高圧2MW で判定しています';
+  $('sort-ehv').hidden = !ehv;
+  $('m-mincap-label').textContent = ehv ? '受入余力の下限 (MW)' : '空容量の下限 (MW)';
+  $('nc-judge-th').innerHTML = ehv ? `判定<br>(特高 ${fmtMw(ehvNeedMw())}MW)` : '判定<br>(高圧2MW)';
+  $('m-filter-note').innerHTML = ehv
+    ? '地図と下の候補変電所の表に共通の絞り込みです。既定は座標のある全変電所。丸の色は下の「丸の色」で選べます（既定＝特高の判定。濃い緑＝公表値が根拠／薄い緑＋点線＝根拠が推定）。大きい丸＝154kV以上。' +
+      '「上位系の確認」「系統ランク」は<b>高圧2MWの採点の絞り込み</b>なので、特高では既定の「すべて・全変電所」のまま使ってください。座標が未取得の変電所は地図に出ません'
+    : '地図と下の候補変電所の表に共通の絞り込みです。既定は座標のある全変電所。丸の色は下の「丸の色」で選べます（既定＝判定。薄い緑＋点線＝OKだが上位系が未公表）。大きい丸＝154kV以上。座標が未取得の変電所は地図に出ません（同エリアの一覧は「場所から検索」の下部に出ます）';
+  $('l-ehv-note').style.display = ehv ? '' : 'none';
+  $('l-ehv-note').innerHTML = ehv
+    ? `<b>特高モード中です。</b>この「都道府県から一覧」の表の系統スコア・系統ランク・判定は<b>高圧2MW基準のまま</b>です。` +
+      `特高の想定電圧・受入余力・根拠・判定は、下の「CSVで保存」に含まれる<b>「特高_」で始まる列</b>に入ります（案件規模 ${fmtMw(ehvNeedMw())}MW で計算）。` +
+      `地図で特高基準に色分けして見るときは、上の「📍 場所から検索・地図で見る」を使ってください。`
+    : '';
+  $('m-color-judge').textContent = ehv
+    ? `判定（特高 ${fmtMw(ehvNeedMw())}MW）：特高OK（濃い緑＝公表値が根拠／薄い緑＝根拠が推定）／要検討／特高NG／データ無`
+    : '判定（高圧2MW）：OK（濃い緑＝上位系も空きあり／薄い緑＝上位系が未公表）／要検討／NG／データ無';
+  if (opts.switched) {
+    // パターンを切り替えたときは、その基準で見やすい既定に合わせる
+    $('m-color').value = 'judge';
+    // 特高は引込送電線の距離がそのまま負担金・工期に効くので、既定は距離順（余力順も選べる）
+    $('sortby').value = ehv ? 'dist' : 'total';
+  }
+  setTableHead();
+  if (MAP) { renderMarkers(); renderLegend(); }
+  if ($('result').classList.contains('show')) run({ quiet: true });
+}
+function initPattern() {
+  if (!EHV) {   // 古い data/substations.js（params.ehv が無い）では特高モードを出さない
+    $('pat-card').style.display = 'none';
+    return;
+  }
+  $('ehv-mw').innerHTML = EHV.mwOptions.map(mw =>
+    `<option value="${mw}"${mw === EHV.mwDefault ? ' selected' : ''}>${mw} MW</option>`).join('');
+  $('ehv-note').innerHTML =
+    `<b>特高モードの前提</b>：受入余力は「その変電所にある${EHV.kvMin}kV以上で最も低い母線（＝想定電圧）の送電線・上位変圧器のうち、` +
+    `最も余力の大きい設備の値」です。${esc(EHV.srcLabel[EHV.src.cap])} → ${esc(EHV.srcLabel[EHV.src.n1])} → ${esc(EHV.srcLabel[EHV.src.est])} の順に拾います。<br>` +
+    `<b>注意</b>：特高側の空容量はほとんど公表されていません（全国の特高変圧器1,369台のうち公表は316台、公表値の最大は28MWで50MW以上は0件）。` +
+    `そのため判定の多くは公表の<b>N-1電制適用可能量</b>（ノンファーム型接続・N-1電制を前提に受け入れられる量）が根拠で、それも無い設備は` +
+    `<b>「運用容量−予想潮流」の推定</b>になります。推定の精度は検証できません（空容量と予想潮流が同じ設備で同時に公表されないため）。` +
+    `バッジの「推」＝推定が根拠、「⚠」＝同じ電圧の設備に予想潮流が運用容量を超えているものがある、という印です。<br>` +
+    `<b>東京・中部・沖縄</b>は送電線・上位変圧器の公表物を自動取得できないため、特高の判定はすべて「データ無」になります` +
+    `（中部は地図の「中部電力PG公表の送電線」で実形状とN-1電制適用可能量を確認できます）。最終確認は必ず接続検討で行ってください。`;
+  document.querySelectorAll('input[name="pat"]').forEach(el => el.addEventListener('change', () => {
+    PATTERN = el.value;
+    EHV_CACHE.clear();
+    applyPattern({ switched: true });
+  }));
+  // 案件規模を変えると判定が変わる（受入余力そのものは変わらないのでキャッシュは消さない）
+  $('ehv-mw').addEventListener('change', () => applyPattern());
+  $('ehv-mw-custom').addEventListener('input', () => applyPattern());
+  applyPattern();
+}
+
 // ── 初期化 ──
 function init() {
   if (!D) {
@@ -2484,6 +2855,7 @@ function init() {
   }
   renderStatic();
   initList();
+  initPattern();
   $('tab-loc').addEventListener('click', () => setMode('loc'));
   $('tab-pref').addEventListener('click', () => setMode('pref'));
   initMapControls();
