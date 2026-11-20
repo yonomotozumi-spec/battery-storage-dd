@@ -135,6 +135,15 @@ COLUMNS = [
     ("つながる送電線の本数", _gs(lambda g, row: g.links_count(row))),
     ("上位側の送電線（相手側・上位側の空き）", _gs(lambda g, row: g.up_lines_text(row))),
     ("上位系の制約設備（▼＝空き0以下）", _gs(lambda g, row: g.upper_equipment_text(row))),
+    # ── 特高パターン（2026-11-20。substation.html の特高モードと同じ値。案件規模は EHV_MW_DEFAULT）──
+    ("特高_案件規模MW", lambda r: SC.EHV_MW_DEFAULT),
+    ("特高_想定電圧kV", _gs(lambda g, row: g.ehv(row).get("kv") or "")),
+    ("特高_受入余力MW", _gs(lambda g, row: (lambda c: "" if c is None else round(c, 1))(g.ehv(row).get("cap")))),
+    ("特高_余力の根拠", _gs(lambda g, row: SC.EHV_SRC_LABEL.get(g.ehv(row).get("src"), ""))),
+    ("特高_判定", _gs(lambda g, row: SC.EHV_JUDGE_LABEL[g.ehv_judge(row)])),
+    ("特高_判定の理由", _gs(lambda g, row: g.ehv_reason(row))),
+    ("特高_潮流超過の設備数", _gs(lambda g, row: g.ehv(row).get("over") or "")),
+    ("特高_想定電圧の設備ごとの余力", _gs(lambda g, row: g.ehv_items_text(row))),
 ]
 
 
@@ -234,6 +243,25 @@ def by_pref(rows, meta, outdir):
         "実績NGの回答が名指しした上位系の設備を上位系の制約設備として持つ変電所は「上位系の実績警告」列に⚠上位系に実績NG（接続検討OKは要検討に格下げ）。"
         "実績DBを含まない環境で生成したCSVでは、この2列は空になります。",
         "",
+        f"**特高パターンの列**（2026-11-20〜。「特高_」で始まる8列。案件規模 {SC.EHV_MW_DEFAULT}MW で計算）",
+        "",
+        f"高圧2MWは配電用バンク（当該設備）の空きで判定できますが、特高の受け皿は変電所の特高母線（{SC.EHV_KV_MIN}kV以上）と、"
+        "そこにつながる送電線・上位変圧器です。「特高_想定電圧kV」はその変電所にある特高母線のうち最も低い電圧、"
+        "「特高_受入余力MW」はその電圧の設備のうち最も余力の大きいものの値で、根拠は次の優先順です。",
+        "",
+        "| 特高_余力の根拠 | 意味 |",
+        "|---|---|",
+        *[f"| {SC.EHV_SRC_LABEL[k]} | {SC.EHV_SRC_NOTE[k]} |" for k in (SC.EHV_SRC_CAP, SC.EHV_SRC_N1, SC.EHV_SRC_EST)],
+        "",
+        "| 特高_判定 | 意味 |",
+        "|---|---|",
+        *[f"| {SC.EHV_JUDGE_LABEL[k]} | {v.split('：', 1)[1]} |" for k, v in SC.EHV_JUDGE_MEANING.items()],
+        "",
+        "**注意**：特高側の空容量はほとんど公表されていないため（全国の特高変圧器1,369台のうち公表は316台、公表値の最大は28MWで50MW以上は0件）、"
+        "判定の多くは公表のN-1電制適用可能量（ノンファーム型接続・N-1電制を前提に受け入れられる量）が根拠で、それも無い設備は"
+        "「運用容量−予想潮流」の推定になります。推定の精度は検証できません（空容量と予想潮流が同じ設備で同時に公表されないため）。"
+        "東京・中部・沖縄は上位系の公表物を自動取得できないため、特高の列はすべて空・判定は「データ無」になります。",
+        "",
         "| ファイル | 全件 | S/A | うち上位系確認済み | 接続検討OK | 要検討 | 接続検討NG |",
         "|---|---|---|---|---|---|---|",
     ]
@@ -282,8 +310,8 @@ def main():
         ap.error("--out か --by-pref を指定してください")
     sel = select(rows, args)
     write_csv(args.out, sel)
-    n, s, u = counts(sel)
-    print(f"該当 {n}件（S/A {s}件・うち上位系確認済み {u}件） → {args.out}")
+    n, s, u, ok, ck, ng = counts(sel)   # counts() は6個返す（--by-pref 側と同じ受け方にする）
+    print(f"該当 {n}件（S/A {s}件・うち上位系確認済み {u}件／判定 OK {ok}・要検討 {ck}・NG {ng}） → {args.out}")
     if not sel:
         print("※ 条件に合う変電所がありません。地域名の表記（「県」「市」の有無）や条件を見直してください。", file=sys.stderr)
 

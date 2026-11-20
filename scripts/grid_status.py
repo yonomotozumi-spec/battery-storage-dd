@@ -5,8 +5,12 @@
 地図モード（substation.html）と同じ判定ルールで計算する（CSV払い出し用）。
 
 data/substations.js（本体行・実績DB）と data/grid_topology.js（上位系統のつながり）を読む。
-判定ルールは substation.html の upperStatus / needCheck / memoUpper / lineUpStatus と同じ内容を Python に写したもの。
-**画面側のルールを変えたらここも同じに直す**（両方の件数が一致することを確認する）。
+判定ルールは substation.html の upperStatus / needCheck / memoUpper / lineUpStatus / ehvOf と同じ内容を
+Python に写したもの。**画面側のルールを変えたらここも同じに直す**（両方の件数が一致することを確認する）。
+
+特高パターン（2026-11-20〜）: ehv() が「想定電圧（66kV以上で最も低い母線）の上位系設備の受入余力」を
+公表の空容量 → 公表のN-1電制適用可能量 → 余裕(運用容量−|予想潮流|・推定) の優先順で求める。
+閾値・案件規模の既定値は substation_scoring.py の EHV_* が単一ソース。
 
   python scripts/grid_status.py            # 判定の件数を表示（画面の表示件数との突き合わせ用）
 """
@@ -14,6 +18,9 @@ import json
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import substation_scoring as S  # noqa: E402  配点・閾値・特高の定義の単一ソース
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOPO_JS = os.path.join(ROOT, "data", "grid_topology.js")
@@ -162,6 +169,126 @@ class GridStatus:
         up = ends[0] if len(ends) == 1 else (ends[0] if self.vmax_of_node(ends[0]) >= self.vmax_of_node(ends[1]) else ends[1])
         r = self.node_status_for_kv(up, kv)
         return {"st": r["st"], "cap": r["cap"], "via": f"{self.topo['nodes'][up][1]}の該当バンク", "up": up}
+
+    # ── 特高パターン（2026-11-20）。想定電圧の上位系設備（送電線・上位変圧器）の受入余力を出す ──
+    #   画面（substation.html の ehvOf）と同じルール。**どちらかを変えたら必ず両方直す**。
+    #   優先順: 公表の空容量 → 公表のN-1電制適用可能量 → 余裕（運用容量−|予想潮流|。推定）
+    def _ehv_room(self, pub_cap, n1amt, opcap, flow):
+        """1設備の受入余力を (値, 出所) で返す。公表値が無ければ余裕（推定）。"""
+        if pub_cap is not None:
+            return pub_cap, S.EHV_SRC_CAP
+        if isinstance(n1amt, (int, float)) and not isinstance(n1amt, bool):
+            return float(n1amt), S.EHV_SRC_N1
+        if (isinstance(opcap, (int, float)) and not isinstance(opcap, bool)
+                and isinstance(flow, (int, float)) and not isinstance(flow, bool)):
+            return float(opcap) - abs(float(flow)), S.EHV_SRC_EST
+        return None, None
+
+    def ehv_kv(self, row, ni):
+        """特高連系の想定電圧(kV)。その変電所にある EHV_KV_MIN 以上の母線のうち最も低い電圧。"""
+        vs = set()
+        for b in self.topo["nodes"][ni][3]:
+            for k in ("v1", "v2"):
+                v = b[self.BF[k]]
+                if isinstance(v, (int, float)) and v >= S.EHV_KV_MIN:
+                    vs.add(float(v))
+        v = self.v(row, "vmax")
+        if isinstance(v, (int, float)) and v >= S.EHV_KV_MIN:
+            vs.add(float(v))
+        return min(vs) if vs else None
+
+    def ehv(self, row):
+        """特高の受入余力。戻り値は
+        {"kv", "cap", "src", "what", "n", "over", "min_est", "items"} か {"why": 計算できない理由}。
+        """
+        key = ("ehv", id(row))
+        if key in self._cache:
+            return self._cache[key]
+        r = self._ehv(row)
+        self._cache[key] = r
+        return r
+
+    def _ehv(self, row):
+        if not self.topo:
+            return {"why": "系統トポロジーのデータが無い"}
+        if self.area(row) not in self.topo["meta"]["areas"]:
+            return {"why": f"{self.area(row)}エリアは上位系の公表データを取得できず対象外（東京・中部・沖縄）"}
+        ni = self.node_of(row)
+        if ni is None:
+            return {"why": "公表物にこの変電所と同名のノードが無く、つながりをたどれない"}
+        kv = self.ehv_kv(row, ni)
+        if kv is None:
+            return {"why": f"{S.EHV_KV_MIN}kV以上の母線が見つからない（22/33kVのみなど）"}
+        items = []
+        for x in self.node_links(ni):
+            l = x["line"]
+            lkv = self.line_kv(l)
+            if not isinstance(lkv, (int, float)) or abs(lkv - kv) >= 3:
+                continue
+            room, src = self._ehv_room(self.line_cap(l), l[self.LF["n1amt"]], l[self.LF["opcap"]], l[self.LF["flow"]])
+            if room is None and isinstance(x["other"], int):
+                # 送電線自体に公表値が無ければ、相手側（上位側）変電所の同電圧バンクで代用する
+                for b in self.topo["nodes"][x["other"]][3]:
+                    v2 = b[self.BF["v2"]]
+                    if isinstance(v2, (int, float)) and abs(v2 - kv) < 3:
+                        room, src = self._ehv_room(self.bank_cap(b), None, b[self.BF["opcap"]], b[self.BF["flow"]])
+                        if room is not None:
+                            items.append({"what": f"{self.topo['nodes'][x['other']][1]}の{kv:g}kVバンク",
+                                          "room": room, "src": src})
+                            break
+                continue
+            if room is not None:
+                items.append({"what": f"{l[self.LF['name']]}（{kv:g}kV）", "room": room, "src": src})
+        for b in self.topo["nodes"][ni][3]:
+            v2 = b[self.BF["v2"]]
+            if isinstance(v2, (int, float)) and abs(v2 - kv) < 3:
+                room, src = self._ehv_room(self.bank_cap(b), None, b[self.BF["opcap"]], b[self.BF["flow"]])
+                if room is not None:
+                    items.append({"what": f"この変電所の{fmt(b[self.BF['v1']])}/{kv:g}kVバンク", "room": room, "src": src})
+        if not items:
+            return {"why": f"{kv:g}kVの設備に公表データ（空容量・N-1電制適用可能量・運用容量と予想潮流）が無い", "kv": kv}
+        # 公表値（空容量→N-1電制適用可能量）がある設備を優先し、同じ段の中では最も余力の大きい設備を根拠にする
+        pick = None
+        for src in (S.EHV_SRC_CAP, S.EHV_SRC_N1, S.EHV_SRC_EST):
+            cands = [i for i in items if i["src"] == src]
+            if cands:
+                pick = max(cands, key=lambda i: i["room"])
+                break
+        ests = [i["room"] for i in items if i["src"] == S.EHV_SRC_EST]
+        return {"kv": kv, "cap": pick["room"], "src": pick["src"], "what": pick["what"], "n": len(items),
+                "over": sum(1 for e in ests if e < 0), "min_est": min(ests) if ests else None, "items": items}
+
+    def ehv_judge(self, row, need_mw=None):
+        e = self.ehv(row)
+        return S.ehv_judge(e.get("cap"), need_mw)
+
+    def ehv_reason(self, row, need_mw=None):
+        """特高の判定の理由。画面のツールチップ・CSVの理由列と同じ文言。"""
+        need = S.EHV_MW_DEFAULT if need_mw is None else need_mw
+        e = self.ehv(row)
+        if "cap" not in e:
+            return e.get("why", "")
+        head = (f"想定電圧 {e['kv']:g}kV の上位系設備 {e['n']}件のうち受入余力が最大のもの＝{e['what']} で "
+                f"{e['cap']:g}MW（{S.EHV_SRC_LABEL[e['src']]}）")
+        if e["cap"] >= need:
+            tail = f"。案件規模 {need:g}MW 以上の余力あり"
+        elif e["cap"] > 0:
+            tail = f"。案件規模 {need:g}MW に届かない（規模を落とすか増強前提か人が判断）"
+        else:
+            tail = "。余力0以下（予想潮流が運用容量を超えている等）"
+        if e["over"]:
+            tail += f"。{S.EHV_OVER_TAG}：同じ電圧の設備 {e['over']}件で予想潮流が運用容量を超えている（最小 {e['min_est']:g}MW）"
+        if e["src"] == S.EHV_SRC_EST:
+            tail += "。根拠が推定値なので接続検討で必ず確認する"
+        return head + tail
+
+    def ehv_items_text(self, row):
+        """想定電圧の設備ごとの受入余力（CSV用）。"""
+        e = self.ehv(row)
+        if "items" not in e:
+            return ""
+        return " / ".join(f"{i['what']}[{i['room']:g}MW・{S.EHV_SRC_LABEL[i['src']]}]"
+                          for i in sorted(e["items"], key=lambda i: -i["room"]))
 
     # ── 実績 ──
     @staticmethod
@@ -375,6 +502,13 @@ def main():
     print("実績の分類:", dict(m))
     print("要接続検討（紫）:", sum(1 for r in gs.rows if gs.grid_status(r)["cls"] == "upbad"),
           "実績あり:", sum(1 for r in gs.rows if gs.memo_of(r)))
+    # 特高パターン（画面の件数と一致することを確認する）
+    coord = [r for r in gs.rows if gs.v(r, "lat") is not None]
+    src = Counter(S.EHV_SRC_LABEL[gs.ehv(r)["src"]] for r in gs.rows if "cap" in gs.ehv(r))
+    print(f"特高の受入余力が出せた行: {sum(1 for r in gs.rows if 'cap' in gs.ehv(r))}件（根拠 {dict(src)}）")
+    for mw in S.EHV_MW_OPTIONS:
+        c = Counter(S.EHV_JUDGE_LABEL[S.ehv_judge(gs.ehv(r).get("cap"), mw)] for r in coord)
+        print(f"  座標あり行の特高判定（案件規模 {mw}MW）:", dict(c))
 
 
 if __name__ == "__main__":

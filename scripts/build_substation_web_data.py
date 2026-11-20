@@ -93,7 +93,11 @@ def main():
     ap.add_argument("--list-sheet", default="全国変電所リスト", help="入力の変電所リストのシート名")
     ap.add_argument("--source-label", default="全国変電所リスト（66kV以上・系統接続検討用）",
                     help="画面に表示する元データ名")
+    ap.add_argument("--result-as-of", default=None,
+                    help="実績による格下げの基準日（YYYY-MM-DD）。既定は実行日。"
+                         "配点・画面だけを変えたいときに前回の基準日を指定すると判定が動かない")
     args = ap.parse_args()
+    as_of = datetime.date.fromisoformat(args.result_as_of) if args.result_as_of else None
 
     src_rows = read_substations(args.src, args.list_sheet)
 
@@ -102,7 +106,7 @@ def main():
     with_coords = 0
     geo = load_geo()
     with_muni = 0
-    adj = S.result_adjuster()
+    adj = S.result_adjuster(as_of)
     n_result_ng = n_upper_warn = 0
     for (no, area, name, pref, vmax, vsec, lat, lon, acc, cap, opcap, flow,
          avail, avail_up, n1, curtail, addr) in src_rows:
@@ -168,6 +172,13 @@ def main():
             # 実績による格下げの閾値とラベル（画面の凡例・理由の文言に使う）
             "resultNg": {"yenMan": S.RESULT_NG_YEN_MAN, "months": S.RESULT_NG_MONTHS, "windowDays": S.RESULT_NG_WINDOW_DAYS,
                          "tag": S.RESULT_NG_TAG, "upperTag": S.UPPER_WARN_TAG, "meaning": S.RESULT_NG_MEANING},
+            # 特高パターン（2026-11-20〜）。受入余力は画面が data/grid_topology.js から計算するため行には持たせない
+            "ehv": {"mwDefault": S.EHV_MW_DEFAULT, "mwOptions": S.EHV_MW_OPTIONS, "kvMin": S.EHV_KV_MIN,
+                    "siteOkM": S.EHV_SITE_OK_M, "siteRangeM": S.EHV_SITE_RANGE_M,
+                    "srcLabel": S.EHV_SRC_LABEL, "srcNote": S.EHV_SRC_NOTE,
+                    "judgeLabel": S.EHV_JUDGE_LABEL, "judgeMeaning": S.EHV_JUDGE_MEANING,
+                    "overTag": S.EHV_OVER_TAG, "overMeaning": S.EHV_OVER_MEANING,
+                    "src": {"cap": S.EHV_SRC_CAP, "n1": S.EHV_SRC_N1, "est": S.EHV_SRC_EST}},
         },
         "areaPoints": [list(a) for a in S.AREA_POINTS],
         "scoreDefs": [list(s) for s in S.SCORE_DEFS],
