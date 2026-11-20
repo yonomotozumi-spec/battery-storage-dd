@@ -24,6 +24,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: 公開版に実績が含まれていないか確認
+        run: python3 scripts/check_no_private_results.py
       - uses: actions/configure-pages@v5
         with:
           enablement: true
