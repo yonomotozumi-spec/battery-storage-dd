@@ -254,7 +254,7 @@ def write_summary(ws, args, dd_title, dd_count):
     for n in notes:
         ws.cell(r,2,n).font=SMALL; r+=1
 
-def write_dd(ws, items, address, pxno, tanto):
+def write_dd(ws, items, address, pxno, tanto, site_note=""):
     ws.sheet_view.showGridLines=False
     GRAY_FILL=PatternFill("solid",fgColor="F1EFE8")
     GRAY_FONT=Font(color="7F7F7F",bold=True,size=11)
@@ -266,7 +266,9 @@ def write_dd(ws, items, address, pxno, tanto):
     for col,w in {"C":12,"D":26,"E":34,"F":52,"G":30,"H":14}.items():
         ws.column_dimensions[col].width=w
     # 行1 凡例
-    lg=ws["C1"]; lg.value="凡例： 緑=自動判定済 ／ 黄=要確認（人が確認・記入） ／ F列「検索リンク」＝開いて内容を確認"; lg.font=Font(size=10,color="7F7F7F")
+    lg=ws["C1"]; lg.value=("凡例： 緑=自動判定済 ／ 黄=要確認（人が確認・記入） ／ F列「検索リンク」＝開いて内容を確認"
+                            + (" ／ " + site_note if site_note else ""))
+    lg.font=Font(size=10,color="7F7F7F")
     # 行2 見出し（C=グレー、D〜G=オレンジ）
     ws["C2"]="担当者"; ws["C2"].fill=GRAY_FILL; ws["C2"].font=GRAY_FONT; ws["C2"].alignment=CENTER; ws["C2"].border=BORDER
     ws["D2"]="地点名称"; ws["D2"].fill=HEADER_FILL; ws["D2"].font=HDR_FONT; ws["D2"].alignment=Alignment(horizontal="left",vertical="center"); ws["D2"].border=BORDER
@@ -351,11 +353,20 @@ def main():
     ap.add_argument("--grid",default="",help="系統接続確認の回答JSON（任意）")
     args=ap.parse_args()
     items=dd_items(args.lat,args.lon,args.address,args.muni,args.pref)
-    permit_ov={}
+    permit_ov={}; site_note=""
     if args.values and os.path.exists(args.values):
         _data=json.load(open(args.values,encoding="utf-8"))
         ov=_data.get("values",{})
         permit_ov=_data.get("permits",{})
+        _site=_data.get("site") or {}
+        if _site.get("label"):
+            site_note="自動判定の範囲： " + _site["label"]
+            if _site.get("area_m2"): site_note+=f"（約{_site['area_m2']:,}㎡）"
+        _cov=_data.get("coverage") or {}
+        _part=[v.get("desc") or k for k,v in _cov.items()
+               if v.get("status")=="一部該当" and v.get("point") is False]
+        if _part:
+            site_note+=" ／ ⚠敷地の一部だけが該当（点判定では見落とす）： " + "・".join(_part)
         merged=[]
         for (no,name,val,url,how,comment) in items:
             if no in ov:
@@ -368,7 +379,7 @@ def main():
     safe=args.address
     for ch in '[]:*?/\\': safe=safe.replace(ch,"")
     ws1.title=(safe[:28]+"…") if len(safe)>28 else (safe or "DD")
-    write_dd(ws1,items,args.address,args.pxno,args.tanto)
+    write_dd(ws1,items,args.address,args.pxno,args.tanto,site_note)
     write_permits(wb.create_sheet("許認可チェックシート"),args.pxno,permit_ov)
     write_transport(wb.create_sheet("輸送確認"),TRANSPORT_ITEMS,args.address,args.pxno)
     grid_ov={}

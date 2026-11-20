@@ -479,7 +479,7 @@ select:focus, input:focus {
       <span>自動判定JSONを読込</span>
       <input type="file" accept=".json,application/json" onchange="loadReinfolibJson(this.files[0])" style="display:none">
     </label>
-    <span class="autoload-status" id="auto-status">reinfolib_judge.py で出力した values.json を読み込むと、○（API）項目を座標から自動判定します</span>
+    <span class="autoload-status" id="auto-status">reinfolib_judge.py で出力した values.json を読み込むと、○（API）項目を<b>敷地の範囲</b>（既定：半径50m・近接100m）で自動判定します</span>
   </div>
   <div style="overflow-x:auto">
   <table class="permit-table">
@@ -831,7 +831,14 @@ function diagnose(){
 // ── reinfolib 自動判定JSON（reinfolib_judge.py の values.json）を読込 ──
 function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-// 自動判定テキスト → プルダウン値（2=問題なし / 1=要確認 / 0=該当・問題あり）
+// 判定の取り出し：reinfolib_judge v2 が渡す level を優先し、v1 の values.json はテキストから推定
+// （2=問題なし / 1=要確認 / 0=該当・問題あり）
+function levelOf(no, item){
+  if(item && typeof item.level==='number') return item.level;
+  return judgeFromValue(no, item && item.value);
+}
+
+// 自動判定テキスト → プルダウン値（v1互換。2=問題なし / 1=要確認 / 0=該当・問題あり）
 function judgeFromValue(no, value){
   const v = String(value||'').trim();
   const none = /該当なし|指定なし|対象範囲外/.test(v);
@@ -874,7 +881,7 @@ function applyAutoValues(data){
     const sel=document.querySelector(`select[name="p${no}"]`);
     const box=document.getElementById(`pauto-val-${no}`);
     if(!sel){ skipped++; return; }
-    const j=judgeFromValue(no, values[k].value);
+    const j=levelOf(no, values[k]);
     if(j<0){ skipped++; return; }
     sel.value=String(j);
     applied++;
@@ -885,7 +892,17 @@ function applyAutoValues(data){
     }
   });
   const missing=Array.isArray(data.missing)?data.missing:[];
-  let msg=`✅ ${applied}項目を座標から自動判定しました（reinfolib）`;
+  const site=data.site||null;
+  const cov=data.coverage||{};
+  // 点判定では見落とす該当（敷地の一部だけがかかっている＝候補地の点そのものは区域外）
+  const partial=Object.keys(cov).filter(c=>cov[c] && cov[c].status==='一部該当' && cov[c].point===false)
+                               .map(c=>cov[c].desc||c);
+  const near=Object.keys(cov).filter(c=>cov[c] && cov[c].status==='近接')
+                             .map(c=>`${cov[c].desc||c} ${cov[c].dist_m}m`);
+  let msg=`✅ ${applied}項目を自動判定しました（reinfolib）`;
+  if(site && site.label) msg+=` ／ 判定の範囲：${site.label}`+(site.area_m2?`・約${Number(site.area_m2).toLocaleString()}㎡`:'');
+  if(partial.length) msg+=` ／ ⚠ 敷地の一部だけが該当（点判定では見落とす）：${partial.join('・')}`;
+  if(near.length) msg+=` ／ 敷地の外だが近い：${near.join('・')}`;
   if(missing.length) msg+=` ／ 未取得レイヤ ${missing.length}件`;
   msg+='　※判定は目視で最終確認してください';
   status.textContent=msg;
